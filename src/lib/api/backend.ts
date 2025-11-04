@@ -288,3 +288,15 @@ export async function getPredesignedPlans(filters?: {
 
   return response.json();
 }
+
+/**
+ * Redistribute workouts based on updated user weekdays
+ */
+export async function redistributeWorkouts(): Promise<{ success: boolean; workouts_created: number; training_days: string[] }> {
+  const { data, error } = await supabase.functions.invoke('redistribute-workouts', {
+    method: 'POST'
+  });
+
+  if (error) throw error;
+  return data;
+}

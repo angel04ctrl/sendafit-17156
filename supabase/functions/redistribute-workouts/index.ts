@@ -101,13 +101,21 @@ serve(async (req) => {
       );
     }
 
-    // Agrupar ejercicios por día
+    console.log('Total plan exercises fetched:', planExercises.length);
+
+    // Agrupar ejercicios por día - REMOVIENDO DUPLICADOS
     const exercisesByDay: { [key: number]: any[] } = {};
     planExercises.forEach((pe: any) => {
       if (!exercisesByDay[pe.dia]) {
         exercisesByDay[pe.dia] = [];
       }
-      exercisesByDay[pe.dia].push(pe);
+      // Verificar que el ejercicio no esté ya agregado (evitar duplicados)
+      const alreadyExists = exercisesByDay[pe.dia].some(
+        (existing: any) => existing.ejercicio_id === pe.ejercicio_id
+      );
+      if (!alreadyExists) {
+        exercisesByDay[pe.dia].push(pe);
+      }
     });
 
     const planDays = Object.keys(exercisesByDay).map(Number).sort((a, b) => a - b);

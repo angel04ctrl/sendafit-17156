@@ -11,6 +11,7 @@ import {
   getAllWorkouts,
   completeWorkout,
   getPredesignedPlans,
+  redistributeWorkouts,
   type ProgressData
 } from '@/lib/api/backend';
 
@@ -170,5 +171,21 @@ export const usePredesignedPlans = (filters?: {
     queryKey: ['predesigned-plans', filters],
     queryFn: () => getPredesignedPlans(filters),
     staleTime: 30 * 60 * 1000, // 30 minutes
+  });
+};
+
+/**
+ * Hook to redistribute workouts based on updated weekdays
+ */
+export const useRedistributeWorkouts = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: redistributeWorkouts,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
+      queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
+    },
   });
 };

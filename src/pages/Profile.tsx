@@ -142,27 +142,13 @@ const Profile = () => {
 
     // Si cambiaron los días, redistribuir entrenamientos
     if (weekdaysChanged && newWeekdays.length > 0) {
-      const { data: authData } = await supabase.auth.getSession();
-      const token = authData?.session?.access_token;
-      
-      if (token) {
-        try {
-          const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/redistribute-workouts`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          });
-
-          if (!response.ok) {
-            console.error('Error redistributing workouts');
-          } else {
-            toast.success("Entrenamientos redistribuidos según tus nuevos días");
-          }
-        } catch (error) {
-          console.error('Error calling redistribute function:', error);
-        }
+      try {
+        const { redistributeWorkouts } = await import('@/lib/api/backend');
+        await redistributeWorkouts();
+        toast.success("Entrenamientos redistribuidos según tus nuevos días");
+      } catch (error) {
+        console.error('Error calling redistribute function:', error);
+        toast.error("Error al redistribuir entrenamientos");
       }
     }
 
