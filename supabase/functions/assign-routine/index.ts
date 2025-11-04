@@ -264,13 +264,19 @@ serve(async (req) => {
 
     console.log('Fetched plan exercises:', planExercises?.length || 0);
 
-    // Group exercises by day
+    // Group exercises by day - REMOVIENDO DUPLICADOS
     const exercisesByDay: { [key: number]: any[] } = {};
     planExercises?.forEach((pe: any) => {
       if (!exercisesByDay[pe.dia]) {
         exercisesByDay[pe.dia] = [];
       }
-      exercisesByDay[pe.dia].push(pe);
+      // Verificar que el ejercicio no esté ya agregado (evitar duplicados)
+      const alreadyExists = exercisesByDay[pe.dia].some(
+        (existing: any) => existing.ejercicio_id === pe.ejercicio_id
+      );
+      if (!alreadyExists) {
+        exercisesByDay[pe.dia].push(pe);
+      }
     });
 
     console.log('Exercises grouped by day:', Object.keys(exercisesByDay).length, 'days');
@@ -452,21 +458,29 @@ serve(async (req) => {
 
       console.log('Created workout:', workout.id, 'for date:', workoutData.scheduled_date);
 
-      // Add exercises to the workout
+      // Add exercises to the workout (filtrando duplicados)
       if (exercises && exercises.length > 0) {
-        const workoutExercises = exercises
-          .filter((pe: any) => pe.exercises && pe.exercises.nombre) // Filter out null exercises
-          .map((pe: any) => {
-            const exercise = pe.exercises;
-            return {
-              workout_id: workout.id,
-              name: exercise.nombre,
-              sets: exercise.series_sugeridas || 3,
-              reps: exercise.repeticiones_sugeridas || 10,
-              notes: `${exercise.grupo_muscular || 'General'} - ${exercise.nivel || 'B'}`,
-              duration_minutes: exercise.duracion_promedio_segundos ? Math.ceil(exercise.duracion_promedio_segundos / 60) : null,
-            };
-          });
+        // Primero filtrar ejercicios válidos
+        const validExercises = exercises.filter((pe: any) => pe.exercises && pe.exercises.nombre);
+        
+        // Luego eliminar duplicados por ejercicio_id
+        const uniqueExercises = validExercises.filter((pe: any, index: number, self: any[]) => 
+          self.findIndex((t: any) => t.ejercicio_id === pe.ejercicio_id) === index
+        );
+        
+        console.log(`Exercises: ${exercises.length} total, ${validExercises.length} valid, ${uniqueExercises.length} unique`);
+        
+        const workoutExercises = uniqueExercises.map((pe: any) => {
+          const exercise = pe.exercises;
+          return {
+            workout_id: workout.id,
+            name: exercise.nombre,
+            sets: exercise.series_sugeridas || 3,
+            reps: exercise.repeticiones_sugeridas || 10,
+            notes: `${exercise.grupo_muscular || 'General'} - ${exercise.nivel || 'B'}`,
+            duration_minutes: exercise.duracion_promedio_segundos ? Math.ceil(exercise.duracion_promedio_segundos / 60) : null,
+          };
+        });
 
         if (workoutExercises.length === 0) {
           console.warn('No valid exercises found for workout:', workout.id);
