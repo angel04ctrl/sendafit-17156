@@ -42,8 +42,10 @@ serve(async (req) => {
 
     console.log('Fetching todays workouts for user:', user.id);
 
-    // Get today's date
-    const today = new Date().toISOString().split('T')[0];
+    // Get today's date in LOCAL time
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    const today = local.toISOString().split('T')[0];
 
     // Fetch today's workouts with exercises
     const { data: workouts, error: workoutsError } = await supabase
