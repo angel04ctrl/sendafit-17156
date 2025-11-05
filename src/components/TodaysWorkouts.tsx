@@ -1,24 +1,39 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useTodaysWorkouts, useCompleteWorkout } from "@/hooks/useBackendApi";
+import { useTodaysWorkouts } from "@/hooks/useBackendApi";
 import { Dumbbell, Clock, Flame, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 export const TodaysWorkouts = () => {
   const { data, isLoading, error } = useTodaysWorkouts();
-  const completeWorkoutMutation = useCompleteWorkout();
+  const [completingWorkout, setCompletingWorkout] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const handleCompleteWorkout = async (workoutId: string, currentStatus: boolean) => {
+    setCompletingWorkout(workoutId);
     try {
-      await completeWorkoutMutation.mutateAsync({
-        workoutId,
-        completed: !currentStatus,
-      });
+      const { error } = await supabase
+        .from('workouts' as any)
+        .update({ 
+          completed: !currentStatus,
+          completed_at: !currentStatus ? new Date().toISOString() : null
+        })
+        .eq('id', workoutId);
+
+      if (error) throw error;
+
+      queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['progress-stats'] });
       toast.success(!currentStatus ? '¡Entrenamiento completado!' : 'Entrenamiento marcado como incompleto');
     } catch (error) {
       console.error('Error updating workout:', error);
       toast.error('Error al actualizar el entrenamiento');
+    } finally {
+      setCompletingWorkout(null);
     }
   };
 
@@ -91,7 +106,7 @@ export const TodaysWorkouts = () => {
                   <Checkbox
                     checked={workout.completed}
                     onCheckedChange={() => handleCompleteWorkout(workout.id, workout.completed)}
-                    disabled={completeWorkoutMutation.isPending}
+                    disabled={completingWorkout === workout.id}
                     className="mt-1"
                   />
                   <div className="flex-1">
