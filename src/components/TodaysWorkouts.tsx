@@ -1,40 +1,24 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useTodaysWorkouts } from "@/hooks/useBackendApi";
+import { useTodaysWorkouts, useCompleteWorkout } from "@/hooks/useBackendApi";
 import { Dumbbell, Clock, Flame, Loader2 } from "lucide-react";
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 export const TodaysWorkouts = () => {
   const { data, isLoading, error } = useTodaysWorkouts();
-  const [completingWorkout, setCompletingWorkout] = useState<string | null>(null);
-  const queryClient = useQueryClient();
+  const completeWorkoutMutation = useCompleteWorkout();
 
   const handleCompleteWorkout = async (workoutId: string, currentStatus: boolean) => {
-    setCompletingWorkout(workoutId);
     try {
-      const { error } = await supabase
-        .from('workouts')
-        .update({ 
-          completed: !currentStatus,
-          completed_at: !currentStatus ? new Date().toISOString() : null
-        })
-        .eq('id', workoutId);
-
-      if (error) throw error;
-
-      queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
-      queryClient.invalidateQueries({ queryKey: ['progress-stats'] });
-      toast.success(!currentStatus ? 'Workout completed!' : 'Workout marked as incomplete');
+      await completeWorkoutMutation.mutateAsync({
+        workoutId,
+        completed: !currentStatus,
+      });
+      toast.success(!currentStatus ? '¡Entrenamiento completado!' : 'Entrenamiento marcado como incompleto');
     } catch (error) {
       console.error('Error updating workout:', error);
-      toast.error('Failed to update workout');
-    } finally {
-      setCompletingWorkout(null);
+      toast.error('Error al actualizar el entrenamiento');
     }
   };
 
@@ -107,7 +91,7 @@ export const TodaysWorkouts = () => {
                   <Checkbox
                     checked={workout.completed}
                     onCheckedChange={() => handleCompleteWorkout(workout.id, workout.completed)}
-                    disabled={completingWorkout === workout.id}
+                    disabled={completeWorkoutMutation.isPending}
                     className="mt-1"
                   />
                   <div className="flex-1">

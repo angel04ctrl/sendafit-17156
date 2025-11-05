@@ -14,14 +14,17 @@ import { es } from "date-fns/locale";
 import { RoutineManager } from "@/components/RoutineManager";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DashboardMobileCarousel } from "@/components/DashboardMobileCarousel";
+import { useTodaysWorkouts } from "@/hooks/useBackendApi";
 
 const Dashboard = () => {
   const { user } = useAuth();
   const [profile, setProfile] = useState<any>(null);
   const [todayMacros, setTodayMacros] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
-  const [todayWorkouts, setTodayWorkouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const isMobile = useIsMobile();
+  
+  const { data: workoutsData, isLoading: workoutsLoading } = useTodaysWorkouts();
+  const todayWorkouts = workoutsData?.workouts || [];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -56,14 +59,6 @@ const Dashboard = () => {
           );
           setTodayMacros(totals);
         }
-
-        const { data: workoutsData } = await supabase
-          .from("workouts")
-          .select("*, workout_exercises(*)")
-          .eq("user_id", user.id)
-          .eq("scheduled_date", today);
-
-        setTodayWorkouts(workoutsData || []);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
@@ -75,7 +70,7 @@ const Dashboard = () => {
   }, [user]);
 
   // Esperar a que se determine el tamaño de pantalla en la primera carga
-  if (loading || isMobile === undefined) {
+  if (loading || workoutsLoading || isMobile === undefined) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
