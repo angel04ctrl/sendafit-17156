@@ -20,6 +20,7 @@ const OnboardingForm = () => {
   const [loading, setLoading] = useState(false);
   const [checkingProfile, setCheckingProfile] = useState(true);
   const [formData, setFormData] = useState<any>({});
+  const sb = supabase as any;
 
   const totalSteps = 7;
   const progress = (currentStep / totalSteps) * 100;
@@ -33,7 +34,7 @@ const OnboardingForm = () => {
         
         if (user) {
           // Usuario ya autenticado, verificar onboarding
-          const { data: profile } = await supabase
+          const { data: profile } = await sb
             .from("profiles")
             .select("onboarding_completed")
             .eq("id", user.id)
@@ -264,7 +265,7 @@ const OnboardingForm = () => {
       }
 
       // PASO 3: Crear o actualizar el perfil completo en la base de datos
-      const { error: profileError } = await supabase
+      const { error: profileError } = await sb
         .from("profiles")
         .upsert({
           id: userId,
@@ -316,7 +317,7 @@ const OnboardingForm = () => {
       }
 
       // PASO 4: Crear el rol de usuario (si no existe)
-      const { error: roleError } = await supabase
+      const { error: roleError } = await sb
         .from("user_roles")
         .insert({
           user_id: userId,

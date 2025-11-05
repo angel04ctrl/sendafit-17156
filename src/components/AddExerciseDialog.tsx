@@ -35,6 +35,7 @@ interface AddExerciseDialogProps {
 
 export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location }: AddExerciseDialogProps) => {
   const { user } = useAuth();
+  const sb = supabase as any;
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [series, setSeries] = useState("3");
@@ -54,7 +55,7 @@ export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location 
 
   const fetchExercises = async () => {
     // Traer TODOS los ejercicios sin filtrar por ubicación
-    const { data } = await supabase
+    const { data } = await sb
       .from("exercises")
       .select("*")
       .order("nombre");
@@ -64,7 +65,7 @@ export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location 
 
   const fetchUserProfile = async () => {
     if (!user) return;
-    const { data } = await supabase
+    const { data } = await sb
       .from("profiles")
       .select("weight, fitness_level")
       .eq("id", user.id)

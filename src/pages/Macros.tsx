@@ -31,6 +31,7 @@ const mealTypes = [
 const Macros = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const sb = supabase as any;
   const [meals, setMeals] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [open, setOpen] = useState(false);
@@ -53,7 +54,7 @@ const Macros = () => {
   }, [user]);
 
   const fetchFoods = async () => {
-    const { data } = await supabase
+    const { data } = await sb
       .from("foods")
       .select("*")
       .order("nombre", { ascending: true });
@@ -64,7 +65,7 @@ const Macros = () => {
   const fetchData = async () => {
     if (!user) return;
 
-    const { data: profileData } = await supabase
+    const { data: profileData } = await sb
       .from("profiles")
       .select("*")
       .eq("id", user.id)
@@ -73,7 +74,7 @@ const Macros = () => {
     setProfile(profileData);
 
     const today = format(new Date(), "yyyy-MM-dd");
-    const { data: mealsData } = await supabase
+    const { data: mealsData } = await sb
       .from("meals")
       .select("*")
       .eq("user_id", user.id)
@@ -86,7 +87,7 @@ const Macros = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const { error } = await supabase.from("meals").insert([{
+    const { error } = await sb.from("meals").insert([{
       user_id: user?.id!,
       meal_type: formData.meal_type as any,
       name: formData.name,
@@ -117,7 +118,7 @@ const Macros = () => {
 
     const portionMultiplier = parseFloat(portion);
     
-    const { error } = await supabase.from("meals").insert([{
+    const { error } = await sb.from("meals").insert([{
       user_id: user?.id!,
       meal_type: formData.meal_type as any,
       name: `${selectedFood.nombre} (${portion} × ${selectedFood.racion}${selectedFood.unidad})`,
@@ -154,7 +155,7 @@ const Macros = () => {
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("meals").delete().eq("id", id);
+    const { error } = await sb.from("meals").delete().eq("id", id);
 
     if (error) {
       toast.error("Error al eliminar");

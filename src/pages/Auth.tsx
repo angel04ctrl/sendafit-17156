@@ -40,7 +40,7 @@ const Auth = () => {
       
       // Verificar si completó el onboarding
       if (data.user) {
-        const { data: profile } = await supabase
+        const { data: profile } = await (supabase as any)
           .from("profiles")
           .select("onboarding_completed")
           .eq("id", data.user.id)

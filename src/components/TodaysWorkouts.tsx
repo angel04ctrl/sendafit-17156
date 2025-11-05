@@ -12,12 +12,13 @@ export const TodaysWorkouts = () => {
   const { data, isLoading, error } = useTodaysWorkouts();
   const [completingWorkout, setCompletingWorkout] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const sb = supabase as any;
 
   const handleCompleteWorkout = async (workoutId: string, currentStatus: boolean) => {
     setCompletingWorkout(workoutId);
     try {
-      const { error } = await supabase
-        .from('workouts' as any)
+      const { error } = await sb
+        .from('workouts')
         .update({ 
           completed: !currentStatus,
           completed_at: !currentStatus ? new Date().toISOString() : null

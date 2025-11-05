@@ -17,6 +17,7 @@ import { useValidatePlanChange, useAssignRoutine, useRedistributeWorkouts } from
 
 const Profile = () => {
   const { user } = useAuth();
+  const sb = supabase as any;
   const [profile, setProfile] = useState<any>(null);
   const [userRole, setUserRole] = useState<string>("user");
   const [loading, setLoading] = useState(false);
@@ -51,7 +52,7 @@ const Profile = () => {
   const fetchProfile = async () => {
     if (!user) return;
 
-    const { data: profileData, error: profileError } = await supabase
+    const { data: profileData, error: profileError } = await sb
       .from("profiles")
       .select("*")
       .eq("id", user.id)
@@ -74,8 +75,8 @@ const Profile = () => {
         height: profileData.height?.toString() || "",
         age: profileData.age?.toString() || "",
         available_days_per_week: profileData.available_days_per_week?.toString() || "",
-        available_weekdays: Array.isArray(profileData.available_weekdays) 
-          ? [...new Set(profileData.available_weekdays.map(String))] 
+        available_weekdays: Array.isArray(profileData.available_weekdays)
+          ? ([...new Set((profileData.available_weekdays as any[]).map(String))] as string[])
           : [],
         daily_calorie_goal: profileData.daily_calorie_goal?.toString() || "",
         daily_protein_goal: profileData.daily_protein_goal?.toString() || "",
@@ -84,7 +85,7 @@ const Profile = () => {
       });
     }
 
-    const { data: roleData } = await supabase
+    const { data: roleData } = await sb
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
@@ -152,7 +153,7 @@ const Profile = () => {
       console.log("Macros recalculados:", calculatedMacros);
     }
 
-    const { error } = await supabase
+    const { error } = await sb
       .from("profiles")
       .update({
         full_name: formData.full_name,

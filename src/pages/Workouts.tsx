@@ -31,6 +31,7 @@ interface ConfiguredExercise {
 
 const Workouts = () => {
   const { user } = useAuth();
+  const sb = supabase as any;
   const [workouts, setWorkouts] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false);
@@ -58,7 +59,7 @@ const Workouts = () => {
   const fetchWorkouts = async () => {
     if (!user) return;
 
-    const { data, error } = await supabase
+    const { data, error } = await sb
       .from("workouts")
       .select("*, workout_exercises(*)")
       .eq("user_id", user.id)
@@ -107,7 +108,7 @@ const Workouts = () => {
 
     console.log('Fecha seleccionada en el formulario:', formData.scheduled_date);
 
-    const { data: workoutData, error: workoutError } = await supabase
+    const { data: workoutData, error: workoutError } = await sb
       .from("workouts")
       .insert([{
         user_id: user?.id!,
@@ -138,7 +139,7 @@ const Workouts = () => {
       notes: ex.peso > 0 ? `Peso: ${ex.peso}kg` : undefined
     }));
 
-    const { error: exercisesError } = await supabase
+    const { error: exercisesError } = await sb
       .from("workout_exercises")
       .insert(exercisesToInsert);
 
@@ -173,7 +174,7 @@ const Workouts = () => {
   };
 
   const deleteWorkout = async (id: string) => {
-    const { error } = await supabase
+    const { error } = await sb
       .from("workouts")
       .delete()
       .eq("id", id);

@@ -17,6 +17,7 @@ import { DashboardMobileCarousel } from "@/components/DashboardMobileCarousel";
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const sb = supabase as any;
   const [profile, setProfile] = useState<any>(null);
   const [todayMacros, setTodayMacros] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
   const [todayWorkouts, setTodayWorkouts] = useState<any[]>([]);
@@ -28,8 +29,8 @@ const Dashboard = () => {
       if (!user) return;
 
       try {
-        const { data: profileData } = await supabase
-          .from("profiles" as any)
+        const { data: profileData } = await sb
+          .from("profiles")
           .select("*")
           .eq("id", user.id)
           .single();
@@ -38,8 +39,8 @@ const Dashboard = () => {
 
         const today = format(new Date(), "yyyy-MM-dd");
 
-        const { data: mealsData } = await supabase
-          .from("meals" as any)
+        const { data: mealsData } = await sb
+          .from("meals")
           .select("*")
           .eq("user_id", user.id)
           .eq("date", today);
@@ -57,8 +58,8 @@ const Dashboard = () => {
           setTodayMacros(totals);
         }
 
-        const { data: workoutsData } = await supabase
-          .from("workouts" as any)
+        const { data: workoutsData } = await sb
+          .from("workouts")
           .select("*, workout_exercises(*)")
           .eq("user_id", user.id)
           .eq("scheduled_date", today);

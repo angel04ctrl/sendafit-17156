@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (session?.user && mounted) {
           // Verificar que el usuario existe en la base de datos
-          const { error: userError } = await supabase
+          const { error: userError } = await (supabase as any)
             .from('profiles')
             .select('id')
             .eq('id', session.user.id)
