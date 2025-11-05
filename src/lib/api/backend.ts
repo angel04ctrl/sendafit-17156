@@ -48,6 +48,39 @@ export interface StatsResponse {
   calculated_at: string;
 }
 
+export interface PlanChangeValidation {
+  action: string;
+  needsReassign: boolean;
+  needsRedistribute: boolean;
+  reason: string;
+  changes: {
+    goalChanged: boolean;
+    weekdaysCountChanged: boolean;
+    weekdaysChanged: boolean;
+    oldGoal: string;
+    newGoal: string;
+    oldWeekdays: string[];
+    newWeekdays: string[];
+    oldDaysCount: number;
+    newDaysCount: number;
+  };
+  impact: {
+    affectedWorkoutsCount: number;
+    completedWorkoutsCount: number;
+    pendingWorkoutsCount: number;
+    willPreserveCompleted: boolean;
+  };
+  currentPlan?: {
+    nombre_plan: string;
+    dias_semana: number;
+    objetivo: string;
+  };
+  preview: {
+    message: string;
+    summary: string;
+  };
+}
+
 /**
  * Assign a routine automatically to the current user based on their profile
  */
@@ -287,6 +320,21 @@ export async function getPredesignedPlans(filters?: {
   }
 
   return response.json();
+}
+
+/**
+ * Validate plan changes before applying them
+ */
+export async function validatePlanChange(params: {
+  new_weekdays?: string[];
+  new_goal?: string;
+}): Promise<PlanChangeValidation> {
+  const { data, error } = await supabase.functions.invoke('validate-plan-change', {
+    body: params,
+  });
+
+  if (error) throw error;
+  return data;
 }
 
 /**

@@ -1,1 +1,40 @@
 project_id = "ucowyhtrbucwfbwbmkmd"
+
+[functions.assign-routine]
+verify_jwt = true
+
+[functions.complete-workout]
+verify_jwt = true
+
+[functions.get-all-workouts]
+verify_jwt = true
+
+[functions.get-predesigned-plans]
+verify_jwt = false
+
+[functions.get-progress-stats]
+verify_jwt = true
+
+[functions.get-progress]
+verify_jwt = true
+
+[functions.get-routines]
+verify_jwt = false
+
+[functions.get-todays-workouts]
+verify_jwt = true
+
+[functions.get-user-routine]
+verify_jwt = true
+
+[functions.get-workouts-by-date]
+verify_jwt = true
+
+[functions.record-progress]
+verify_jwt = true
+
+[functions.redistribute-workouts]
+verify_jwt = true
+
+[functions.validate-plan-change]
+verify_jwt = true

@@ -12,6 +12,7 @@ import {
   completeWorkout,
   getPredesignedPlans,
   redistributeWorkouts,
+  validatePlanChange,
   type ProgressData
 } from '@/lib/api/backend';
 
@@ -171,6 +172,16 @@ export const usePredesignedPlans = (filters?: {
     queryKey: ['predesigned-plans', filters],
     queryFn: () => getPredesignedPlans(filters),
     staleTime: 30 * 60 * 1000, // 30 minutes
+  });
+};
+
+/**
+ * Hook to validate plan changes
+ */
+export const useValidatePlanChange = () => {
+  return useMutation({
+    mutationFn: (params: { new_weekdays?: string[]; new_goal?: string }) =>
+      validatePlanChange(params),
   });
 };
 

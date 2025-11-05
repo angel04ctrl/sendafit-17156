@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Pencil } from "lucide-react";
 import { ProButton } from "@/components/ProButton";
 import { calculateMacros, validateProfileData } from "@/lib/macrosCalculator";
+import { PlanChangePreviewModal } from "@/components/PlanChangePreviewModal";
+import { useValidatePlanChange, useAssignRoutine, useRedistributeWorkouts } from "@/hooks/useBackendApi";
 
 const Profile = () => {
   const { user } = useAuth();
@@ -20,6 +22,8 @@ const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [resetOnFirstDayClick, setResetOnFirstDayClick] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [validationData, setValidationData] = useState<any>(null);
   const [formData, setFormData] = useState({
     full_name: "",
     gender: "femenino",
@@ -35,6 +39,10 @@ const Profile = () => {
     daily_carbs_goal: "",
     daily_fat_goal: "",
   });
+
+  const validateMutation = useValidatePlanChange();
+  const assignMutation = useAssignRoutine();
+  const redistributeMutation = useRedistributeWorkouts();
 
   useEffect(() => {
     fetchProfile();
@@ -89,12 +97,43 @@ const Profile = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-
-    // Verificar si cambiaron los días de entrenamiento
+    
+    // Check if plan-related fields changed
+    const oldGoal = profile?.fitness_goal;
+    const newGoal = formData.fitness_goal;
     const oldWeekdays = profile?.available_weekdays || [];
     const newWeekdays = formData.available_weekdays;
-    const weekdaysChanged = JSON.stringify(oldWeekdays.sort()) !== JSON.stringify(newWeekdays.sort());
+
+    const goalChanged = oldGoal !== newGoal;
+    const weekdaysChanged = oldWeekdays.length !== newWeekdays.length || 
+      !oldWeekdays.every((day: string) => newWeekdays.includes(day));
+
+    // If goal or weekdays changed, validate first
+    if (goalChanged || weekdaysChanged) {
+      try {
+        const validation = await validateMutation.mutateAsync({
+          new_weekdays: newWeekdays,
+          new_goal: newGoal,
+        });
+
+        if (validation.action !== 'none') {
+          setValidationData(validation);
+          setShowPreviewModal(true);
+          return; // Wait for user confirmation
+        }
+      } catch (error) {
+        console.error('Error validating changes:', error);
+        toast.error('Error al validar cambios');
+        return;
+      }
+    }
+
+    // No plan changes, proceed with normal update
+    await updateProfile();
+  };
+
+  const updateProfile = async () => {
+    setLoading(true);
 
     // Recalcular macros si hay información completa
     let calculatedMacros = null;
@@ -125,7 +164,6 @@ const Profile = () => {
         age: parseInt(formData.age) || null,
         available_days_per_week: formData.available_weekdays.length || null,
         available_weekdays: (formData.available_weekdays.length > 0 ? [...new Set(formData.available_weekdays)] : null) as any,
-        // Usar macros calculados si están disponibles, si no mantener los valores actuales
         daily_calorie_goal: calculatedMacros?.dailyCalories || parseInt(formData.daily_calorie_goal) || 2000,
         daily_protein_goal: calculatedMacros?.protein || parseInt(formData.daily_protein_goal) || 150,
         daily_carbs_goal: calculatedMacros?.carbs || parseInt(formData.daily_carbs_goal) || 200,
@@ -140,20 +178,7 @@ const Profile = () => {
       return;
     }
 
-    // Si cambiaron los días, redistribuir entrenamientos
-    if (weekdaysChanged && newWeekdays.length > 0) {
-      try {
-        const { redistributeWorkouts } = await import('@/lib/api/backend');
-        await redistributeWorkouts();
-        toast.success("Entrenamientos redistribuidos según tus nuevos días");
-      } catch (error) {
-        console.error('Error calling redistribute function:', error);
-        toast.error("Error al redistribuir entrenamientos");
-      }
-    }
-
     setLoading(false);
-
     if (calculatedMacros) {
       toast.success("Perfil y macros actualizados correctamente");
     } else {
@@ -161,6 +186,37 @@ const Profile = () => {
     }
     setIsEditing(false);
     fetchProfile();
+  };
+
+  const handleConfirmPlanChange = async () => {
+    if (!validationData) return;
+
+    setLoading(true);
+    try {
+      // First update the profile
+      await updateProfile();
+
+      // Then execute the plan changes
+      if (validationData.needsReassign) {
+        toast.info('Reasignando plan de entrenamiento...');
+        await assignMutation.mutateAsync();
+      }
+
+      if (validationData.needsRedistribute) {
+        toast.info('Redistribuyendo entrenamientos...');
+        await redistributeMutation.mutateAsync();
+      }
+
+      toast.success('Plan actualizado exitosamente');
+      setShowPreviewModal(false);
+      setValidationData(null);
+      fetchProfile();
+    } catch (error) {
+      console.error('Error applying plan changes:', error);
+      toast.error('Error al aplicar cambios al plan');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -447,6 +503,14 @@ const Profile = () => {
           </Card>
         </div>
       </div>
+
+      <PlanChangePreviewModal
+        open={showPreviewModal}
+        onOpenChange={setShowPreviewModal}
+        onConfirm={handleConfirmPlanChange}
+        validationData={validationData}
+        isLoading={loading}
+      />
     </div>
   );
 };
