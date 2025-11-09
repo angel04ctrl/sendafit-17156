@@ -71,6 +71,32 @@ const Dashboard = () => {
     fetchData();
   }, [user]);
 
+  // Realtime subscription for workouts
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('dashboard-workouts')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'workouts',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Workout changed:', payload);
+          // React Query will auto-refetch
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   // Esperar a que se determine el tamaño de pantalla en la primera carga
   if (loading || isMobile === undefined) {
     return (

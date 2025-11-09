@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Card } from "@/components/ui/card";
 import { format, startOfWeek, addDays, isSameDay } from "date-fns";
@@ -7,6 +7,7 @@ import { CheckCircle2 } from "lucide-react";
 import { DashboardMobileCarousel } from "@/components/DashboardMobileCarousel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkoutsByDate } from "@/hooks/useBackendApi";
+import { supabase } from "@/integrations/supabase/client";
 
 const Calendar = () => {
   const isMobile = useIsMobile();
@@ -22,6 +23,29 @@ const Calendar = () => {
   });
 
   const workouts = weekData?.workouts || [];
+
+  // Realtime subscription for workout changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('calendar-workouts')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'workouts',
+        },
+        (payload) => {
+          console.log('Workout updated in calendar:', payload);
+          // Query will auto-refetch due to React Query
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const getWorkoutsForDate = (date: Date) => {
     return workouts.filter((w) =>

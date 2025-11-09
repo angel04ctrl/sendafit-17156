@@ -63,6 +63,33 @@ const Workouts = () => {
     fetchData();
   }, [user]);
 
+  // Realtime subscription for workouts
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('workouts-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'workouts',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Workout changed:', payload);
+          refetchTodays();
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   const fetchData = async () => {
     if (!user) return;
 

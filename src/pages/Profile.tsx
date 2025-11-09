@@ -51,6 +51,32 @@ const Profile = () => {
     fetchProfile();
   }, [user]);
 
+  // Realtime subscription for profile changes (plan updates)
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('profile-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Profile updated:', payload);
+          fetchProfile();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   const fetchProfile = async () => {
     if (!user) return;
 
@@ -203,11 +229,9 @@ const Profile = () => {
       if (validationData.needsReassign) {
         toast.info('Reasignando plan de entrenamiento...');
         await assignMutation.mutateAsync();
-      }
-
-      if (validationData.needsRedistribute) {
+      } else if (validationData.needsRedistribute) {
         toast.info('Redistribuyendo entrenamientos...');
-        await redistributeMutation.mutateAsync();
+        await redistributeMutation.mutateAsync({});
       }
 
       // Invalidate all related queries to refresh data across the app

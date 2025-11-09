@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import {
   assignRoutine,
   getUserRoutine,
@@ -57,18 +58,40 @@ export const useWorkoutsByDate = (params?: {
 };
 
 /**
- * Hook to assign a routine to the current user
+ * Generate weekly workouts (unified assign + redistribute)
  */
-export const useAssignRoutine = () => {
+export const useGenerateWeeklyWorkouts = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: assignRoutine,
+    mutationFn: async (options?: { reassign?: boolean }) => {
+      const { data, error } = await supabase.functions.invoke('generate-weekly-workouts', {
+        body: options || {}
+      });
+      
+      if (error) throw error;
+      return data;
+    },
     onSuccess: () => {
+      // Invalidate all workout-related queries
       queryClient.invalidateQueries({ queryKey: ['user-routine'] });
       queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
       queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
       queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
+    },
+  });
+};
+
+/**
+ * Hook to assign a routine to the current user
+ * Now uses unified generate-weekly-workouts function
+ */
+export const useAssignRoutine = () => {
+  const generateWorkouts = useGenerateWeeklyWorkouts();
+  
+  return useMutation({
+    mutationFn: async () => {
+      return generateWorkouts.mutateAsync({ reassign: true });
     },
   });
 };
@@ -189,17 +212,8 @@ export const useValidatePlanChange = () => {
 
 /**
  * Hook to redistribute workouts based on updated weekdays
+ * Now uses unified generate-weekly-workouts function
  */
 export const useRedistributeWorkouts = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: redistributeWorkouts,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['user-routine'] });
-      queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
-      queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
-      queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
-    },
-  });
+  return useGenerateWeeklyWorkouts();
 };
