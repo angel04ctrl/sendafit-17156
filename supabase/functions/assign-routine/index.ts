@@ -74,24 +74,19 @@ serve(async (req) => {
       training_types: profile.training_types
     });
 
-    // Check if user already has workouts for this week
-    const { data: existingWorkouts } = await supabase
+    // Delete existing future automatic workouts (allows plan reassignment)
+    const { error: deleteError } = await supabase
       .from('workouts')
-      .select('id')
+      .delete()
       .eq('user_id', user.id)
-      .gte('scheduled_date', monday.toISOString().split('T')[0])
-      .eq('tipo', 'automatico');
+      .eq('tipo', 'automatico')
+      .eq('completed', false)
+      .gte('scheduled_date', new Date().toISOString().split('T')[0]);
 
-    if (existingWorkouts && existingWorkouts.length > 0) {
-      console.log('User already has workouts for this week, skipping assignment');
-      return new Response(
-        JSON.stringify({ 
-          success: true,
-          message: 'User already has workouts assigned for this week',
-          workouts_existing: existingWorkouts.length
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (deleteError) {
+      console.error('Error deleting old workouts:', deleteError);
+    } else {
+      console.log('Deleted old automatic workouts for plan reassignment');
     }
 
     // Get all available predesigned plans

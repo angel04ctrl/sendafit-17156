@@ -65,8 +65,10 @@ export const useAssignRoutine = () => {
   return useMutation({
     mutationFn: assignRoutine,
     onSuccess: () => {
-      // Invalidate user routine query to refetch
       queryClient.invalidateQueries({ queryKey: ['user-routine'] });
+      queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
+      queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
     },
   });
 };
@@ -194,6 +196,7 @@ export const useRedistributeWorkouts = () => {
   return useMutation({
     mutationFn: redistributeWorkouts,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-routine'] });
       queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
       queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
       queryClient.invalidateQueries({ queryKey: ['all-workouts'] });

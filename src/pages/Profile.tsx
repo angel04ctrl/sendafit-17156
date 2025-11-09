@@ -211,7 +211,9 @@ const Profile = () => {
       toast.success('Plan actualizado exitosamente');
       setShowPreviewModal(false);
       setValidationData(null);
-      fetchProfile();
+      
+      // Force reload to get fresh data
+      window.location.reload();
     } catch (error) {
       console.error('Error applying plan changes:', error);
       toast.error('Error al aplicar cambios al plan');
