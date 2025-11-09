@@ -633,7 +633,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      calculate_weekday_from_date: {
+        Args: { date_val: string }
+        Returns: number
+      }
     }
     Enums: {
       app_role: "user" | "pro"
