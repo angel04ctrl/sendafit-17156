@@ -10,12 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, CheckCircle2, Circle, Trash2, ChevronDown, Scan, Library } from "lucide-react";
+import { Plus, CheckCircle2, Circle, Trash2, ChevronDown, Scan, Library, Info } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { AddExerciseDialog } from "@/components/AddExerciseDialog";
-import { useCompleteWorkout } from "@/hooks/useBackendApi";
+import { useCompleteWorkout, useTodaysWorkouts } from "@/hooks/useBackendApi";
 import { ProButton } from "@/components/ProButton";
+import { ExerciseDetailModal } from "@/components/ExerciseDetailModal";
 
 interface ConfiguredExercise {
   exercise: {
@@ -35,9 +36,14 @@ const Workouts = () => {
   const [workouts, setWorkouts] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false);
+  const [exerciseDetailOpen, setExerciseDetailOpen] = useState(false);
+  const [selectedExercise, setSelectedExercise] = useState<any>(null);
   const [configuredExercises, setConfiguredExercises] = useState<ConfiguredExercise[]>([]);
   const [otherDaysOpen, setOtherDaysOpen] = useState(false);
   const completeWorkoutMutation = useCompleteWorkout();
+  
+  // Use backend API for today's workouts
+  const { data: todaysData, refetch: refetchTodays } = useTodaysWorkouts();
   const getTodayDate = () => {
     const today = new Date();
     const year = today.getFullYear();
@@ -156,6 +162,7 @@ const Workouts = () => {
       scheduled_date: getTodayDate(),
     });
     setConfiguredExercises([]);
+    refetchTodays(); // Refetch today's workouts
     fetchWorkouts();
   };
 
@@ -167,6 +174,7 @@ const Workouts = () => {
       });
       
       toast.success(!completed ? "¡Entrenamiento completado!" : "Marcado como pendiente");
+      refetchTodays();
       fetchWorkouts();
     } catch (error) {
       toast.error("Error al actualizar");
@@ -190,8 +198,8 @@ const Workouts = () => {
 
   const today = getTodayDate();
   
-  // Filtrar workouts del día actual
-  const todayWorkouts = workouts.filter((w) => w.scheduled_date === today);
+  // Use backend data for today's workouts
+  const todayWorkouts = todaysData?.workouts || [];
   const otherDaysWorkouts = workouts.filter((w) => w.scheduled_date !== today);
   
   // Filtros por ubicación para el día actual
@@ -238,6 +246,35 @@ const Workouts = () => {
                   <span>~{workout.estimated_calories} kcal</span>
                   <span className="capitalize">{workout.location}</span>
                 </div>
+                
+                {/* Show exercises with clickable details */}
+                {workout.workout_exercises && workout.workout_exercises.length > 0 && (
+                  <div className="ml-9 mt-2 space-y-1">
+                    {workout.workout_exercises.map((ex: any) => (
+                      <Button
+                        key={ex.id}
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto py-1 px-2 text-xs justify-start"
+                        onClick={() => {
+                          setSelectedExercise({
+                            nombre: ex.name,
+                            descripcion: ex.notes || 'Sin descripción disponible',
+                            grupo_muscular: 'General',
+                            nivel: 'B',
+                            lugar: workout.location,
+                            series_sugeridas: ex.sets,
+                            repeticiones_sugeridas: ex.reps,
+                          });
+                          setExerciseDetailOpen(true);
+                        }}
+                      >
+                        <Info className="w-3 h-3 mr-1" />
+                        {ex.name} - {ex.sets}x{ex.reps}
+                      </Button>
+                    ))}
+                  </div>
+                )}
               </div>
               <Button
                 variant="ghost"
@@ -424,6 +461,12 @@ const Workouts = () => {
             onOpenChange={setExerciseDialogOpen}
             onAddExercise={handleAddExercise}
             location={formData.location}
+          />
+
+          <ExerciseDetailModal
+            open={exerciseDetailOpen}
+            onOpenChange={setExerciseDetailOpen}
+            exercise={selectedExercise}
           />
 
           <div className="space-y-6">

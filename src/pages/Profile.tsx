@@ -212,8 +212,8 @@ const Profile = () => {
       setShowPreviewModal(false);
       setValidationData(null);
       
-      // Force reload to get fresh data
-      window.location.reload();
+      // Refetch profile instead of full reload
+      fetchProfile();
     } catch (error) {
       console.error('Error applying plan changes:', error);
       toast.error('Error al aplicar cambios al plan');
@@ -355,7 +355,12 @@ const Profile = () => {
                             : [...currentDays, day.value];
                         }
                         const uniqueDays = [...new Set(newDays)];
-                        setFormData({ ...formData, available_weekdays: uniqueDays });
+                        // Auto-update available_days_per_week based on selected days
+                        setFormData({ 
+                          ...formData, 
+                          available_weekdays: uniqueDays,
+                          available_days_per_week: uniqueDays.length.toString()
+                        });
                       }}
                       disabled={!isEditing}
                       className="min-w-[80px]"

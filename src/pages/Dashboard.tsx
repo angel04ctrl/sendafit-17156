@@ -14,15 +14,19 @@ import { es } from "date-fns/locale";
 import { RoutineManager } from "@/components/RoutineManager";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DashboardMobileCarousel } from "@/components/DashboardMobileCarousel";
+import { useTodaysWorkouts } from "@/hooks/useBackendApi";
 
 const Dashboard = () => {
   const { user } = useAuth();
   const sb = supabase as any;
   const [profile, setProfile] = useState<any>(null);
   const [todayMacros, setTodayMacros] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
-  const [todayWorkouts, setTodayWorkouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const isMobile = useIsMobile();
+  
+  // Use backend API for today's workouts
+  const { data: todaysData } = useTodaysWorkouts();
+  const todayWorkouts = todaysData?.workouts || [];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -57,14 +61,6 @@ const Dashboard = () => {
           );
           setTodayMacros(totals);
         }
-
-        const { data: workoutsData } = await sb
-          .from("workouts")
-          .select("*, workout_exercises(*)")
-          .eq("user_id", user.id)
-          .eq("scheduled_date", today);
-
-        setTodayWorkouts(workoutsData || []);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
