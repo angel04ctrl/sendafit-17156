@@ -37,20 +37,40 @@ serve(async (req) => {
 
     console.log('Fetching todays workouts for user:', user.id);
 
-    // Get today's date in LOCAL time
-    const now = new Date();
-    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-    const today = local.toISOString().split('T')[0];
+    // Get user profile to fetch assigned plan
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('assigned_routine_id')
+      .eq('id', user.id)
+      .single();
 
-    // Fetch today's workouts with exercises
-    const { data: workouts, error: workoutsError } = await supabase
+    if (profileError) {
+      console.error('Error fetching profile:', profileError);
+    }
+
+    // Calculate today's weekday (1-7 where 1=Monday)
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+    const weekday = dayOfWeek === 0 ? 7 : dayOfWeek; // Convert to 1-7 where 1=Monday, 7=Sunday
+
+    console.log(`Today's weekday: ${weekday}, Assigned plan: ${profile?.assigned_routine_id || 'none'}`);
+
+    // Fetch today's workouts by weekday and plan_id (more reliable than date)
+    let query = supabase
       .from('workouts')
       .select(`
         *,
         workout_exercises (*)
       `)
       .eq('user_id', user.id)
-      .eq('scheduled_date', today)
+      .eq('weekday', weekday);
+
+    // Filter by plan_id if user has an assigned plan
+    if (profile?.assigned_routine_id) {
+      query = query.eq('plan_id', profile.assigned_routine_id);
+    }
+
+    const { data: workouts, error: workoutsError } = await query
       .order('created_at', { ascending: true });
 
     if (workoutsError) {
@@ -66,7 +86,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         workouts: workouts || [],
-        date: today,
+        weekday: weekday,
         count: workouts?.length || 0,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

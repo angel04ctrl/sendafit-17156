@@ -7,15 +7,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Mapeo de días de semana a números de día (Lunes = 0, Domingo = 6)
+// Mapeo de días de semana a números (1-7, donde 1=Lunes, 7=Domingo)
 const dayMap: Record<string, number> = {
-  'L': 0,   // Lunes
-  'M': 1,   // Martes
-  'Mi': 2,  // Miércoles
-  'J': 3,   // Jueves
-  'V': 4,   // Viernes
-  'S': 5,   // Sábado
-  'D': 6,   // Domingo
+  'L': 1,   // Lunes
+  'M': 2,   // Martes
+  'Mi': 3,  // Miércoles
+  'J': 4,   // Jueves
+  'V': 5,   // Viernes
+  'S': 6,   // Sábado
+  'D': 7,   // Domingo
 };
 
 const dayNames: Record<string, string> = {
@@ -121,11 +121,12 @@ serve(async (req) => {
     const planDays = Object.keys(exercisesByDay).map(Number).sort((a, b) => a - b);
     console.log('Plan has exercises for days:', planDays);
 
-    // Calcular lunes de la semana actual
+    // Calcular lunes de la semana actual (weekStartsOn: 1)
     const today = new Date();
-    const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const currentDayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const daysToMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
     const monday = new Date(today);
-    monday.setDate(today.getDate() - currentDay + (currentDay === 0 ? -6 : 1));
+    monday.setDate(today.getDate() - daysToMonday);
     monday.setHours(0, 0, 0, 0);
 
     // Eliminar workouts automáticos futuros (no completados)
@@ -161,11 +162,15 @@ serve(async (req) => {
     
     // Distribuir los días del plan entre los días seleccionados por el usuario
     selectedDays.forEach((dayCode, index) => {
-      const dayNum = dayMap[dayCode];
+      const weekday = dayMap[dayCode]; // 1-7 donde 1=Lunes
+      if (!weekday) {
+        console.warn(`Unknown day code: ${dayCode}`);
+        return;
+      }
       
-      // Calcular la fecha para este día
+      // Calcular la fecha para este día (weekday 1=Lunes = monday + 0 días)
       const workoutDate = new Date(monday);
-      workoutDate.setDate(monday.getDate() + dayNum);
+      workoutDate.setDate(monday.getDate() + (weekday - 1));
       
       // Si la fecha ya pasó esta semana, saltarla
       if (workoutDate < today) {
@@ -201,6 +206,8 @@ serve(async (req) => {
         name: `${planData?.nombre_plan || 'Entrenamiento'} - ${dayNames[dayCode]}`,
         description: `${muscleGroup} - ${planData?.descripcion_plan || 'Rutina personalizada'}`,
         scheduled_date: dateStr,
+        weekday: weekday, // 1-7 donde 1=Lunes
+        plan_id: profile.assigned_routine_id,
         location: normalizeLocation(planData?.lugar),
         duration_minutes: dayExercises.length * 5,
         estimated_calories: Math.round(estimatedCalories),

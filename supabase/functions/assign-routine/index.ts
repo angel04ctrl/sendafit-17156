@@ -276,24 +276,24 @@ serve(async (req) => {
 
     console.log('Exercises grouped by day:', Object.keys(exercisesByDay).length, 'days');
 
-    // Mapeo de días de semana - soporta tanto letras como números
+    // Mapeo de días de semana - weekday 1-7 donde 1=Lunes, 7=Domingo
     const dayMap: Record<string, number> = {
       // Formato letra (L, M, Mi, etc.)
-      'L': 0,   // Lunes (offset desde lunes)
-      'M': 1,   // Martes
-      'Mi': 2,  // Miércoles
-      'J': 3,   // Jueves
-      'V': 4,   // Viernes
-      'S': 5,   // Sábado
-      'D': 6,   // Domingo
+      'L': 1,   // Lunes
+      'M': 2,   // Martes
+      'Mi': 3,  // Miércoles
+      'J': 4,   // Jueves
+      'V': 5,   // Viernes
+      'S': 6,   // Sábado
+      'D': 7,   // Domingo
       // Formato numérico (1=Lunes, 2=Martes, etc.)
-      '1': 0,   // Lunes
-      '2': 1,   // Martes
-      '3': 2,   // Miércoles
-      '4': 3,   // Jueves
-      '5': 4,   // Viernes
-      '6': 5,   // Sábado
-      '7': 6,   // Domingo
+      '1': 1,   // Lunes
+      '2': 2,   // Martes
+      '3': 3,   // Miércoles
+      '4': 4,   // Jueves
+      '5': 5,   // Viernes
+      '6': 6,   // Sábado
+      '7': 7,   // Domingo
     };
 
     const dayNames: Record<string, string> = {
@@ -328,17 +328,17 @@ serve(async (req) => {
       console.log('Using user-selected days:', selectedDays);
       
       selectedDays.forEach((dayCode: string, index: number) => {
-        const dayOffset = dayMap[dayCode];
-        if (dayOffset === undefined) {
+        const weekday = dayMap[dayCode]; // 1-7 donde 1=Lunes
+        if (weekday === undefined) {
           console.warn(`Unknown day code: ${dayCode}, skipping`);
           return;
         }
         
-        console.log(`Processing day ${dayCode} (index ${index}, offset ${dayOffset})`);
+        console.log(`Processing day ${dayCode} (index ${index}, weekday ${weekday})`);
         
-        // Calculate date for this day in current or next week
+        // Calculate date for this day (weekday 1=Lunes = monday + 0 días)
         const workoutDate = new Date(monday);
-        workoutDate.setDate(monday.getDate() + dayOffset);
+        workoutDate.setDate(monday.getDate() + (weekday - 1));
         
         // If date is in the past, schedule for next week
         if (workoutDate < today) {
@@ -380,6 +380,8 @@ serve(async (req) => {
           name: `${selectedPlan.nombre_plan} - ${dayNames[dayCode]}`,
           description: `${muscleGroup} - ${selectedPlan.descripcion_plan}`,
           scheduled_date: dateStr,
+          weekday: weekday, // 1-7 donde 1=Lunes
+          plan_id: selectedPlan.id,
           location: normalizeLocation(selectedPlan.lugar),
           duration_minutes: dayExercises.length * 5,
           estimated_calories: Math.round(estimatedCalories),

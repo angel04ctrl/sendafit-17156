@@ -14,6 +14,7 @@ import { ProButton } from "@/components/ProButton";
 import { calculateMacros, validateProfileData } from "@/lib/macrosCalculator";
 import { PlanChangePreviewModal } from "@/components/PlanChangePreviewModal";
 import { useValidatePlanChange, useAssignRoutine, useRedistributeWorkouts } from "@/hooks/useBackendApi";
+import { useQueryClient } from "@tanstack/react-query";
 
 const Profile = () => {
   const { user } = useAuth();
@@ -44,6 +45,7 @@ const Profile = () => {
   const validateMutation = useValidatePlanChange();
   const assignMutation = useAssignRoutine();
   const redistributeMutation = useRedistributeWorkouts();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     fetchProfile();
@@ -208,11 +210,18 @@ const Profile = () => {
         await redistributeMutation.mutateAsync();
       }
 
+      // Invalidate all related queries to refresh data across the app
+      await queryClient.invalidateQueries({ queryKey: ['user-routine'] });
+      await queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
+      await queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
+      await queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
+      await queryClient.invalidateQueries({ queryKey: ['progress-stats'] });
+
       toast.success('Plan actualizado exitosamente');
       setShowPreviewModal(false);
       setValidationData(null);
       
-      // Refetch profile instead of full reload
+      // Refetch profile
       fetchProfile();
     } catch (error) {
       console.error('Error applying plan changes:', error);

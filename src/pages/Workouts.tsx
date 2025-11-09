@@ -34,6 +34,7 @@ const Workouts = () => {
   const { user } = useAuth();
   const sb = supabase as any;
   const [workouts, setWorkouts] = useState<any[]>([]);
+  const [profile, setProfile] = useState<any>(null);
   const [open, setOpen] = useState(false);
   const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false);
   const [exerciseDetailOpen, setExerciseDetailOpen] = useState(false);
@@ -59,24 +60,38 @@ const Workouts = () => {
   });
 
   useEffect(() => {
-    fetchWorkouts();
+    fetchData();
   }, [user]);
 
-  const fetchWorkouts = async () => {
+  const fetchData = async () => {
     if (!user) return;
 
-    const { data, error } = await sb
-      .from("workouts")
-      .select("*, workout_exercises(*)")
-      .eq("user_id", user.id)
-      .order("scheduled_date", { ascending: false });
+    try {
+      // Fetch profile with assigned routine
+      const { data: profileData } = await sb
+        .from("profiles")
+        .select("assigned_routine_id")
+        .eq("id", user.id)
+        .single();
 
-    if (error) {
-      console.error("Error fetching workouts:", error);
-      return;
+      setProfile(profileData);
+
+      // Fetch workouts for the current plan only
+      const { data, error } = await sb
+        .from("workouts")
+        .select("*, workout_exercises(*)")
+        .eq("user_id", user.id)
+        .order("scheduled_date", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching workouts:", error);
+        return;
+      }
+
+      setWorkouts(data || []);
+    } catch (error) {
+      console.error("Error in fetchData:", error);
     }
-
-    setWorkouts(data || []);
   };
 
   const handleAddExercise = (exercise: ConfiguredExercise) => {
@@ -163,7 +178,7 @@ const Workouts = () => {
     });
     setConfiguredExercises([]);
     refetchTodays(); // Refetch today's workouts
-    fetchWorkouts();
+    fetchData();
   };
 
   const toggleComplete = async (id: string, completed: boolean) => {
@@ -175,7 +190,7 @@ const Workouts = () => {
       
       toast.success(!completed ? "¡Entrenamiento completado!" : "Marcado como pendiente");
       refetchTodays();
-      fetchWorkouts();
+      fetchData();
     } catch (error) {
       toast.error("Error al actualizar");
     }
@@ -193,14 +208,25 @@ const Workouts = () => {
     }
 
     toast.success("Entrenamiento eliminado");
-    fetchWorkouts();
+    fetchData();
   };
 
   const today = getTodayDate();
   
   // Use backend data for today's workouts
   const todayWorkouts = todaysData?.workouts || [];
-  const otherDaysWorkouts = workouts.filter((w) => w.scheduled_date !== today);
+  
+  // Filter "other days" workouts to only show current plan's workouts
+  const otherDaysWorkouts = workouts.filter((w) => {
+    // Exclude today's workouts
+    if (w.scheduled_date === today) return false;
+    
+    // Only show workouts from the current plan (or manual workouts)
+    if (w.tipo === 'manual') return true;
+    if (!profile?.assigned_routine_id) return true;
+    
+    return w.plan_id === profile.assigned_routine_id;
+  });
   
   // Filtros por ubicación para el día actual
   const todayHome = todayWorkouts.filter((w) => w.location === "casa");
