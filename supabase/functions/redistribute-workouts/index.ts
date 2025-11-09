@@ -129,14 +129,17 @@ serve(async (req) => {
     monday.setDate(today.getDate() - daysToMonday);
     monday.setHours(0, 0, 0, 0);
 
-    // Eliminar workouts automáticos futuros (no completados)
+    // Eliminar workouts automáticos solo de la semana actual (no completados)
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
     const { error: deleteError } = await supabase
       .from('workouts')
       .delete()
       .eq('user_id', user.id)
       .eq('tipo', 'automatico')
       .eq('completed', false)
-      .gte('scheduled_date', today.toISOString().split('T')[0]);
+      .gte('scheduled_date', monday.toISOString().split('T')[0])
+      .lte('scheduled_date', sunday.toISOString().split('T')[0]);
 
     if (deleteError) {
       console.error('Error deleting old workouts:', deleteError);
@@ -172,9 +175,9 @@ serve(async (req) => {
       const workoutDate = new Date(monday);
       workoutDate.setDate(monday.getDate() + (weekday - 1));
       
-      // Si la fecha ya pasó esta semana, saltarla
+      // Si la fecha ya pasó esta semana, reprogramar para la próxima semana
       if (workoutDate < today) {
-        return;
+        workoutDate.setDate(workoutDate.getDate() + 7);
       }
 
       const dateStr = workoutDate.toISOString().split('T')[0];

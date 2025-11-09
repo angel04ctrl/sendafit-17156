@@ -13,7 +13,7 @@ const Calendar = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showAllPending, setShowAllPending] = useState(false);
 
-  const weekStart = startOfWeek(new Date(), { locale: es });
+  const weekStart = startOfWeek(new Date(), { locale: es, weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   const { data: weekData } = useWorkoutsByDate({

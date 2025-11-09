@@ -73,6 +73,23 @@ serve(async (req) => {
     const { data: workouts, error: workoutsError } = await query
       .order('created_at', { ascending: true });
 
+    let finalWorkouts = workouts || [];
+
+    // Fallback: if no workouts found by weekday/plan, try by scheduled_date (legacy/manual)
+    if ((!finalWorkouts || finalWorkouts.length === 0)) {
+      const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+      const today = local.toISOString().split('T')[0];
+      const { data: fallback, error: fallbackError } = await supabase
+        .from('workouts')
+        .select(`*, workout_exercises (*)`)
+        .eq('user_id', user.id)
+        .eq('scheduled_date', today)
+        .order('created_at', { ascending: true });
+      if (!fallbackError && fallback) {
+        finalWorkouts = fallback;
+      }
+    }
+
     if (workoutsError) {
       console.error('Error fetching workouts:', workoutsError);
       return new Response(
@@ -81,13 +98,13 @@ serve(async (req) => {
       );
     }
 
-    console.log('Found', workouts?.length || 0, 'workouts for today');
+    console.log('Found', finalWorkouts?.length || 0, 'workouts for today');
 
     return new Response(
       JSON.stringify({
-        workouts: workouts || [],
+        workouts: finalWorkouts || [],
         weekday: weekday,
-        count: workouts?.length || 0,
+        count: finalWorkouts?.length || 0,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

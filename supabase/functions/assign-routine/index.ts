@@ -425,6 +425,8 @@ serve(async (req) => {
           name: `${selectedPlan.nombre_plan} - Día ${dayNum}`,
           description: `${muscleGroup} - ${selectedPlan.descripcion_plan}`,
           scheduled_date: dateStr,
+          weekday: dayNum,
+          plan_id: selectedPlan.id,
           location: normalizeLocation(selectedPlan.lugar),
           duration_minutes: dayExercises.length * 5, // Estimate 5 min per exercise
           estimated_calories: Math.round(estimatedCalories),
