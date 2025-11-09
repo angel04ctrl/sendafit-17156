@@ -6,6 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Mapeo de días: 1=Lunes, 7=Domingo
+const dayMap: Record<string, number> = {
+  'L': 1, 'M': 2, 'Mi': 3, 'J': 4, 'V': 5, 'S': 6, 'D': 7,
+  '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -96,17 +102,34 @@ serve(async (req) => {
       );
     }
 
-    // Structure the routine object
+    // Group exercises by plan day (1, 2, 3, ...)
+    const exercisesByPlanDay: { [key: number]: any[] } = {};
+    planExercises?.forEach((pe) => {
+      if (!exercisesByPlanDay[pe.dia]) {
+        exercisesByPlanDay[pe.dia] = [];
+      }
+      exercisesByPlanDay[pe.dia].push(pe.exercises);
+    });
+
+    // Map plan days to actual user selected weekdays
+    const selectedDays = profile.available_weekdays as string[] || [];
+    const planDays = Object.keys(exercisesByPlanDay).map(Number).sort((a, b) => a - b);
+    
+    // Create mapping: actual weekday number -> exercises
+    const mappedDays: { [key: number]: any[] } = {};
+    selectedDays.forEach((dayCode, index) => {
+      const weekday = dayMap[dayCode];
+      if (weekday && planDays.length > 0) {
+        const planDayIndex = index % planDays.length;
+        const planDay = planDays[planDayIndex];
+        mappedDays[weekday] = exercisesByPlanDay[planDay];
+      }
+    });
+
+    // Structure the routine object with mapped days
     const routine = {
       ...plan,
-      days: planExercises?.reduce((acc, pe) => {
-        const day = pe.dia;
-        if (!acc[day]) {
-          acc[day] = [];
-        }
-        acc[day].push(pe.exercises);
-        return acc;
-      }, {}),
+      days: mappedDays,
     };
 
     console.log(`Retrieved routine '${plan.nombre_plan}' for user ${user.id}`);
