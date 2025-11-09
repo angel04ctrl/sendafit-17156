@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 /**
  * Backend API client for fitness app
@@ -137,6 +138,7 @@ export async function getWorkoutsByDate(params?: {
 
   const response = await fetch(url, {
     headers: {
+      'apikey': SUPABASE_ANON_KEY,
       'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json'
     }
@@ -181,6 +183,7 @@ export async function getProgress(options?: {
 
   const response = await fetch(url, {
     headers: {
+      'apikey': SUPABASE_ANON_KEY,
       'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json'
     }
@@ -205,6 +208,7 @@ export async function getProgressStats(days: number = 30): Promise<StatsResponse
 
   const response = await fetch(url, {
     headers: {
+      'apikey': SUPABASE_ANON_KEY,
       'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json'
     }
@@ -232,6 +236,7 @@ export async function getRoutines(options?: {
   
   const response = await fetch(url, {
     headers: {
+      'apikey': SUPABASE_ANON_KEY,
       'Content-Type': 'application/json'
     }
   });
@@ -265,6 +270,7 @@ export async function getAllWorkouts(params?: {
 
   const response = await fetch(url, {
     headers: {
+      'apikey': SUPABASE_ANON_KEY,
       'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json'
     }
@@ -311,6 +317,7 @@ export async function getPredesignedPlans(filters?: {
   
   const response = await fetch(url, {
     headers: {
+      'apikey': SUPABASE_ANON_KEY,
       'Content-Type': 'application/json'
     }
   });
