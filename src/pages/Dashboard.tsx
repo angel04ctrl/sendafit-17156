@@ -289,7 +289,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <div className="pt-14 sm:pt-16 pb-16 sm:pb-20 px-3 sm:px-4">
+      <div className="pt-14 sm:pt-16 pb-16 sm:pb-20 px-3 sm:px-4 overflow-x-hidden">
         {/* Header */}
         <div className="max-w-7xl mx-auto mb-3">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-1">
@@ -336,7 +336,7 @@ const Dashboard = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
-              <Card className="p-3 sm:p-4 shadow-card w-fit max-w-full">
+              <Card className="p-3 sm:p-4 shadow-card">
                 <h3 className="text-base sm:text-lg font-semibold mb-2">Progreso de Calorías</h3>
                 <div className="space-y-4">
                   <div>
@@ -360,7 +360,7 @@ const Dashboard = () => {
                 </div>
               </Card>
 
-              <Card className="p-3 sm:p-4 shadow-card w-fit max-w-full">
+              <Card className="p-3 sm:p-4 shadow-card">
                 <h3 className="text-base sm:text-lg font-semibold mb-2">Entrenamientos de Hoy</h3>
                 {todayWorkouts.length === 0 ? (
                   <p className="text-muted-foreground">No hay entrenamientos programados para hoy</p>
@@ -391,7 +391,7 @@ const Dashboard = () => {
 
             <RoutineManager />
 
-            <Card className="p-3 sm:p-4 shadow-card bg-gradient-card w-fit max-w-full">
+            <Card className="p-3 sm:p-4 shadow-card bg-gradient-card">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-base sm:text-lg font-semibold">Análisis Avanzado</h3>
                 <Badge variant="default" className="gap-1">
@@ -426,7 +426,7 @@ const Dashboard = () => {
               </div>
             </Card>
 
-            <Card className="p-3 sm:p-4 shadow-card bg-gradient-card w-fit max-w-full">
+            <Card className="p-3 sm:p-4 shadow-card bg-gradient-card">
               <h3 className="text-base sm:text-lg font-semibold mb-2">Consejos del Día</h3>
               <div className="space-y-3">
                 <div className="flex items-start gap-3">

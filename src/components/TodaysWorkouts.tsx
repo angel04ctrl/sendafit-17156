@@ -73,7 +73,7 @@ export const TodaysWorkouts = () => {
   const workouts = data?.workouts || [];
 
   return (
-    <Card className="bg-gradient-card border-primary/20 border-2 shadow-card w-fit max-w-full">
+    <Card className="bg-gradient-card border-primary/20 border-2 shadow-card">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <div className="p-2 rounded-xl bg-gradient-primary text-primary-foreground shadow-card">
@@ -102,41 +102,41 @@ export const TodaysWorkouts = () => {
                   : 'bg-gradient-card border-primary/20 hover:shadow-elevated hover:scale-[1.01]'
               }`}
             >
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-start gap-3 flex-1">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
                   <Checkbox
                     checked={workout.completed}
                     onCheckedChange={() => handleCompleteWorkout(workout.id, workout.completed)}
                     disabled={completingWorkout === workout.id}
-                    className="mt-1"
+                    className="mt-1 flex-shrink-0"
                   />
-                  <div className="flex-1">
-                    <h4 className={`font-semibold text-base mb-1 ${workout.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                  <div className="flex-1 min-w-0">
+                    <h4 className={`font-semibold text-sm sm:text-base mb-1 break-words ${workout.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                       {workout.name}
                     </h4>
                     {workout.description && (
-                      <p className="text-sm text-muted-foreground mb-2">{workout.description}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">{workout.description}</p>
                     )}
                     <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                       {workout.duration_minutes && (
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1 flex-shrink-0">
                           <Clock className="h-3 w-3" />
                           {workout.duration_minutes} min
                         </span>
                       )}
                       {workout.estimated_calories && (
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1 flex-shrink-0">
                           <Flame className="h-3 w-3" />
                           {workout.estimated_calories} cal
                         </span>
                       )}
                       {workout.location && (
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs flex-shrink-0">
                           {workout.location === 'casa' ? '🏠 Casa' : '🏋️ Gimnasio'}
                         </Badge>
                       )}
                       {workout.tipo && (
-                        <Badge variant={workout.tipo === 'automatico' ? 'default' : 'secondary'} className="text-xs">
+                        <Badge variant={workout.tipo === 'automatico' ? 'default' : 'secondary'} className="text-xs flex-shrink-0">
                           {workout.tipo === 'automatico' ? '⚡ Auto' : '✍️ Manual'}
                         </Badge>
                       )}
@@ -152,12 +152,12 @@ export const TodaysWorkouts = () => {
                   </p>
                   <div className="space-y-1">
                     {workout.workout_exercises.slice(0, 3).map((exercise: any, idx: number) => (
-                      <div key={exercise.id || idx} className="text-xs flex items-center justify-between">
-                        <span className={workout.completed ? 'text-muted-foreground line-through' : 'text-foreground'}>
+                      <div key={exercise.id || idx} className="text-xs flex items-center justify-between gap-2">
+                        <span className={`truncate ${workout.completed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
                           {exercise.name}
                         </span>
-                        <span className="text-muted-foreground">
-                          {exercise.sets}x{exercise.reps}
+                        <span className="text-muted-foreground flex-shrink-0">
+                          {exercise.sets}×{exercise.reps}
                         </span>
                       </div>
                     ))}

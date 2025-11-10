@@ -261,9 +261,9 @@ const Workouts = () => {
   const todayOutdoor = todayWorkouts.filter((w) => w.location === "exterior");
 
   const WorkoutList = ({ workouts, isToday = false }: { workouts: any[]; isToday?: boolean }) => (
-    <div className="space-y-2 sm:space-y-3 max-h-[65vh] overflow-y-auto pr-1">
+    <div className="space-y-2 sm:space-y-3">
       {workouts.length === 0 ? (
-        <p className="text-muted-foreground">No hay entrenamientos registrados</p>
+        <p className="text-muted-foreground text-sm">No hay entrenamientos registrados</p>
       ) : (
         workouts.map((workout) => (
           <Card
@@ -272,81 +272,84 @@ const Workouts = () => {
               workout.completed ? "bg-primary/5 border-primary/20" : ""
             }`}
           >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <button onClick={() => toggleComplete(workout.id, workout.completed)}>
-                    {workout.completed ? (
-                      <CheckCircle2 className="w-6 h-6 text-primary" />
-                    ) : (
-                      <Circle className="w-6 h-6 text-muted-foreground" />
-                    )}
-                  </button>
-                  <div>
-                    {(() => {
-                      const dateStr = isToday ? today : workout.scheduled_date;
-                      const [year, month, day] = dateStr.split('-').map(Number);
-                      const localDate = new Date(year, month - 1, day);
-                      const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-                      const baseName = workout.name.replace(/\s-\s(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo)$/i, '');
-                      const displayName = `${baseName} - ${days[localDate.getDay()]}`;
-                      return (
-                        <>
-                          <h3 className="text-lg font-semibold">{displayName}</h3>
-                          <p className="text-sm text-muted-foreground">{format(localDate, "d 'de' MMMM, yyyy")}</p>
-                        </>
-                      );
-                    })()}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-start gap-2 sm:gap-3">
+                <button 
+                  onClick={() => toggleComplete(workout.id, workout.completed)}
+                  className="flex-shrink-0 mt-0.5"
+                >
+                  {workout.completed ? (
+                    <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                  ) : (
+                    <Circle className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground" />
+                  )}
+                </button>
+                <div className="flex-1 min-w-0">
+                  {(() => {
+                    const dateStr = isToday ? today : workout.scheduled_date;
+                    const [year, month, day] = dateStr.split('-').map(Number);
+                    const localDate = new Date(year, month - 1, day);
+                    const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+                    const baseName = workout.name.replace(/\s-\s(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo)$/i, '');
+                    const displayName = `${baseName} - ${days[localDate.getDay()]}`;
+                    return (
+                      <>
+                        <h3 className="font-semibold text-sm sm:text-base break-words">{displayName}</h3>
+                        <p className="text-xs sm:text-sm text-muted-foreground">
+                          {format(localDate, "d 'de' MMMM, yyyy")}
+                        </p>
+                      </>
+                    );
+                  })()}
+                  {workout.description && (
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
+                      {workout.description}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground mt-1">
+                    <span className="flex-shrink-0">{workout.duration_minutes} min</span>
+                    <span className="flex-shrink-0">~{workout.estimated_calories} kcal</span>
+                    <span className="capitalize flex-shrink-0">{workout.location}</span>
                   </div>
+                  
+                  {/* Show exercises */}
+                  {workout.workout_exercises && workout.workout_exercises.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {workout.workout_exercises.map((ex: any) => (
+                        <Button
+                          key={ex.id}
+                          variant="ghost"
+                          size="sm"
+                          className="h-auto py-1 px-2 text-xs justify-start w-full hover:bg-muted"
+                          onClick={() => {
+                            setSelectedExercise({
+                              nombre: ex.name,
+                              descripcion: ex.notes || 'Sin descripción disponible',
+                              grupo_muscular: 'General',
+                              nivel: 'B',
+                              lugar: workout.location,
+                              series_sugeridas: ex.sets,
+                              repeticiones_sugeridas: ex.reps,
+                            });
+                            setExerciseDetailOpen(true);
+                          }}
+                        >
+                          <Info className="w-3 h-3 mr-1 flex-shrink-0" />
+                          <span className="truncate">{ex.name} - {ex.sets}×{ex.reps}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                {workout.description && (
-                  <p className="text-sm text-muted-foreground ml-9 mb-2">
-                    {workout.description}
-                  </p>
-                )}
-                <div className="flex gap-4 ml-9 text-sm text-muted-foreground">
-                  <span>{workout.duration_minutes} min</span>
-                  <span>~{workout.estimated_calories} kcal</span>
-                  <span className="capitalize">{workout.location}</span>
-                </div>
-                
-                {/* Show exercises with clickable details */}
-                {workout.workout_exercises && workout.workout_exercises.length > 0 && (
-                  <div className="ml-9 mt-2 space-y-1">
-                    {workout.workout_exercises.map((ex: any) => (
-                      <Button
-                        key={ex.id}
-                        variant="ghost"
-                        size="sm"
-                        className="h-auto py-1 px-2 text-xs justify-start"
-                        onClick={() => {
-                          setSelectedExercise({
-                            nombre: ex.name,
-                            descripcion: ex.notes || 'Sin descripción disponible',
-                            grupo_muscular: 'General',
-                            nivel: 'B',
-                            lugar: workout.location,
-                            series_sugeridas: ex.sets,
-                            repeticiones_sugeridas: ex.reps,
-                          });
-                          setExerciseDetailOpen(true);
-                        }}
-                      >
-                        <Info className="w-3 h-3 mr-1" />
-                        {ex.name} - {ex.sets}x{ex.reps}
-                      </Button>
-                    ))}
-                  </div>
-                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => deleteWorkout(workout.id)}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0 h-8 w-8 p-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => deleteWorkout(workout.id)}
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <Trash2 className="w-5 h-5" />
-              </Button>
             </div>
           </Card>
         ))
@@ -357,7 +360,7 @@ const Workouts = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <div className="pt-14 sm:pt-16 pb-16 sm:pb-20 px-3 sm:px-4">
+      <div className="pt-14 sm:pt-16 pb-16 sm:pb-20 px-3 sm:px-4 overflow-x-hidden">
         <div className="max-w-7xl mx-auto space-y-2 sm:space-y-3">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div>
@@ -532,7 +535,7 @@ const Workouts = () => {
             exercise={selectedExercise}
           />
 
-          <div className="space-y-4 sm:space-y-6 w-fit max-w-full">
+          <div className="space-y-4 sm:space-y-6">
             <div>
               <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-3">Entrenamientos de Hoy</h2>
               <Tabs defaultValue="all" className="w-full">

@@ -184,7 +184,7 @@ const Macros = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <div className="pt-14 sm:pt-16 pb-16 sm:pb-20 px-3 sm:px-4">
+      <div className="pt-14 sm:pt-16 pb-16 sm:pb-20 px-3 sm:px-4 overflow-x-hidden">
         <div className="max-w-7xl mx-auto space-y-2 sm:space-y-3">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div>
