@@ -48,11 +48,16 @@ const Calendar = () => {
   }, []);
 
   const getWorkoutsForDate = (date: Date) => {
+    // Normalize the comparison date to midnight local time
+    const compareDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    
     return workouts.filter((w) => {
       // Parse scheduled_date in local timezone to avoid UTC offset issues
       const [year, month, day] = w.scheduled_date.split('-').map(Number);
       const workoutDate = new Date(year, month - 1, day);
-      return isSameDay(workoutDate, date);
+      
+      // Compare dates at midnight to avoid time-of-day issues
+      return workoutDate.getTime() === compareDate.getTime();
     });
   };
 
