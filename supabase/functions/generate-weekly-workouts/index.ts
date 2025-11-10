@@ -202,8 +202,18 @@ serve(async (req) => {
     // Delete existing automatic workouts
     // If reassigning plan, delete ALL automatic workouts (not completed)
     // If only redistributing, delete only current week's workouts
+    let deletedCount = 0;
     if (needsReassign) {
       console.log('Deleting all previous automatic workouts due to plan reassignment');
+      const { data: deletedWorkouts } = await supabase
+        .from('workouts')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('tipo', 'automatico')
+        .eq('completed', false);
+      
+      deletedCount = deletedWorkouts?.length || 0;
+      
       await supabase
         .from('workouts')
         .delete()
@@ -212,6 +222,17 @@ serve(async (req) => {
         .eq('completed', false);
     } else {
       console.log('Deleting current week automatic workouts for redistribution');
+      const { data: deletedWorkouts } = await supabase
+        .from('workouts')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('tipo', 'automatico')
+        .eq('completed', false)
+        .gte('scheduled_date', monday.toISOString().split('T')[0])
+        .lte('scheduled_date', sunday.toISOString().split('T')[0]);
+      
+      deletedCount = deletedWorkouts?.length || 0;
+      
       await supabase
         .from('workouts')
         .delete()
@@ -255,6 +276,14 @@ serve(async (req) => {
       }
 
       const dateStr = workoutDate.toISOString().split('T')[0];
+      
+      // Get the actual day name from the calculated date for consistency
+      const calculatedDayOfWeek = workoutDate.getDay(); // 0=Sunday, 1=Monday, etc.
+      const dayNameMapping: Record<number, string> = {
+        1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves',
+        5: 'Viernes', 6: 'Sábado', 0: 'Domingo'
+      };
+      const actualDayName = dayNameMapping[calculatedDayOfWeek];
       const planDayIndex = index % planDays.length;
       const planDay = planDays[planDayIndex];
       const dayExercises = exercisesByDay[planDay];
@@ -274,7 +303,7 @@ serve(async (req) => {
 
       workoutsToCreate.push({
         user_id: user.id,
-        name: `${planData?.nombre_plan || 'Entrenamiento'} - ${dayNames[dayCode]}`,
+        name: `${planData?.nombre_plan || 'Entrenamiento'} - ${actualDayName}`,
         description: `${muscleGroup} - ${planData?.descripcion_plan || 'Plan personalizado'}`,
         scheduled_date: dateStr,
         weekday: weekday,
@@ -340,6 +369,7 @@ serve(async (req) => {
         plan_id: planId,
         plan_name: planData?.nombre_plan,
         workouts_created: createdWorkouts.length,
+        workouts_deleted: deletedCount,
         training_days: selectedDays,
         week_range: `${monday.toISOString().split('T')[0]} to ${sunday.toISOString().split('T')[0]}`,
       }),

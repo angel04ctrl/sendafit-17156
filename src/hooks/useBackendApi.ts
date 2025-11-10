@@ -72,12 +72,18 @@ export const useGenerateWeeklyWorkouts = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
       // Invalidate all workout-related queries
       queryClient.invalidateQueries({ queryKey: ['user-routine'] });
       queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
       queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
       queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
+      
+      // Show confirmation message if workouts were deleted
+      if (data?.workouts_deleted && data.workouts_deleted > 0) {
+        const { toast } = await import('sonner');
+        toast.success(`Se eliminaron ${data.workouts_deleted} entrenamientos anteriores y se crearon ${data.workouts_created} nuevos entrenamientos`);
+      }
     },
   });
 };
