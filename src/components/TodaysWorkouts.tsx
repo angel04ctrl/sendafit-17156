@@ -73,7 +73,7 @@ export const TodaysWorkouts = () => {
   const workouts = data?.workouts || [];
 
   return (
-    <Card className="bg-gradient-card border-primary/20 border-2 shadow-card">
+    <Card className="bg-gradient-card border-primary/20 border-2 shadow-card w-fit max-w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <div className="p-2 rounded-xl bg-gradient-primary text-primary-foreground shadow-card">

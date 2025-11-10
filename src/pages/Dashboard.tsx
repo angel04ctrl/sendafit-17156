@@ -305,7 +305,7 @@ const Dashboard = () => {
           <DashboardMobileCarousel sections={sections} />
         ) : (
           /* Vista desktop: Layout normal */
-          <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4">
+          <div className="max-w-7xl mx-auto space-y-2 sm:space-y-3">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
               <StatCard
                 title="Calorías"
@@ -335,9 +335,9 @@ const Dashboard = () => {
               />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-              <Card className="p-3 sm:p-4 shadow-card">
-                <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3">Progreso de Calorías</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
+              <Card className="p-3 sm:p-4 shadow-card w-fit max-w-full">
+                <h3 className="text-base sm:text-lg font-semibold mb-2">Progreso de Calorías</h3>
                 <div className="space-y-4">
                   <div>
                     <div className="flex justify-between mb-2">
@@ -360,8 +360,8 @@ const Dashboard = () => {
                 </div>
               </Card>
 
-              <Card className="p-3 sm:p-4 shadow-card">
-                <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3">Entrenamientos de Hoy</h3>
+              <Card className="p-3 sm:p-4 shadow-card w-fit max-w-full">
+                <h3 className="text-base sm:text-lg font-semibold mb-2">Entrenamientos de Hoy</h3>
                 {todayWorkouts.length === 0 ? (
                   <p className="text-muted-foreground">No hay entrenamientos programados para hoy</p>
                 ) : (
@@ -391,18 +391,18 @@ const Dashboard = () => {
 
             <RoutineManager />
 
-            <Card className="p-3 sm:p-4 shadow-card bg-gradient-card">
-              <div className="flex items-center justify-between mb-3">
+            <Card className="p-3 sm:p-4 shadow-card bg-gradient-card w-fit max-w-full">
+              <div className="flex items-center justify-between mb-2">
                 <h3 className="text-base sm:text-lg font-semibold">Análisis Avanzado</h3>
                 <Badge variant="default" className="gap-1">
                   <TrendingUp className="w-3 h-3" />
                   PRO
                 </Badge>
               </div>
-              <p className="text-sm text-muted-foreground mb-3">
+              <p className="text-sm text-muted-foreground mb-2">
                 Obtén análisis detallados de tu progreso, reportes personalizados y estadísticas avanzadas
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <ProButton
                   icon={BarChart3}
                   label="Ver Gráficos de Progreso"
@@ -426,8 +426,8 @@ const Dashboard = () => {
               </div>
             </Card>
 
-            <Card className="p-3 sm:p-4 shadow-card bg-gradient-card">
-              <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3">Consejos del Día</h3>
+            <Card className="p-3 sm:p-4 shadow-card bg-gradient-card w-fit max-w-full">
+              <h3 className="text-base sm:text-lg font-semibold mb-2">Consejos del Día</h3>
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">

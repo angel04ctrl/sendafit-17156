@@ -261,14 +261,14 @@ const Workouts = () => {
   const todayOutdoor = todayWorkouts.filter((w) => w.location === "exterior");
 
   const WorkoutList = ({ workouts, isToday = false }: { workouts: any[]; isToday?: boolean }) => (
-    <div className="space-y-4">
+    <div className="space-y-2 sm:space-y-3 max-h-[65vh] overflow-y-auto pr-1">
       {workouts.length === 0 ? (
         <p className="text-muted-foreground">No hay entrenamientos registrados</p>
       ) : (
         workouts.map((workout) => (
           <Card
             key={workout.id}
-            className={`p-4 sm:p-5 shadow-card transition-all ${
+            className={`p-3 sm:p-4 shadow-card transition-all ${
               workout.completed ? "bg-primary/5 border-primary/20" : ""
             }`}
           >
@@ -358,7 +358,7 @@ const Workouts = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="pt-14 sm:pt-16 pb-16 sm:pb-20 px-3 sm:px-4">
-        <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4">
+        <div className="max-w-7xl mx-auto space-y-2 sm:space-y-3">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div>
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-1">Entrenamientos</h1>
@@ -532,9 +532,9 @@ const Workouts = () => {
             exercise={selectedExercise}
           />
 
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6 w-fit max-w-full">
             <div>
-              <h2 className="text-xl font-semibold mb-4">Entrenamientos de Hoy</h2>
+              <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-3">Entrenamientos de Hoy</h2>
               <Tabs defaultValue="all" className="w-full">
                 <TabsList className="grid w-full grid-cols-4 h-auto">
                   <TabsTrigger value="all" className="text-xs sm:text-sm py-2">Todos</TabsTrigger>
@@ -542,16 +542,16 @@ const Workouts = () => {
                   <TabsTrigger value="gimnasio" className="text-xs sm:text-sm py-2">Gimnasio</TabsTrigger>
                   <TabsTrigger value="exterior" className="text-xs sm:text-sm py-2">Exterior</TabsTrigger>
                 </TabsList>
-                <TabsContent value="all" className="mt-6">
+                <TabsContent value="all" className="mt-3 sm:mt-4">
                   <WorkoutList workouts={todayWorkouts} isToday />
                 </TabsContent>
-                <TabsContent value="casa" className="mt-6">
+                <TabsContent value="casa" className="mt-3 sm:mt-4">
                   <WorkoutList workouts={todayHome} isToday />
                 </TabsContent>
-                <TabsContent value="gimnasio" className="mt-6">
+                <TabsContent value="gimnasio" className="mt-3 sm:mt-4">
                   <WorkoutList workouts={todayGym} isToday />
                 </TabsContent>
-                <TabsContent value="exterior" className="mt-6">
+                <TabsContent value="exterior" className="mt-3 sm:mt-4">
                   <WorkoutList workouts={todayOutdoor} isToday />
                 </TabsContent>
               </Tabs>

@@ -71,7 +71,7 @@ const Calendar = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="pt-14 sm:pt-16 pb-16 sm:pb-20 px-3 sm:px-4">
-        <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4">
+        <div className="max-w-7xl mx-auto space-y-2 sm:space-y-3">
           <div>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-1">Calendario Semanal</h1>
             <p className="text-muted-foreground text-xs sm:text-sm">
