@@ -9,8 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Pencil } from "lucide-react";
-import { ProButton } from "@/components/ProButton";
+import { Pencil, Sparkles } from "lucide-react";
 import { calculateMacros, validateProfileData } from "@/lib/macrosCalculator";
 import { PlanChangePreviewModal } from "@/components/PlanChangePreviewModal";
 import { useValidatePlanChange, useAssignRoutine, useRedistributeWorkouts } from "@/hooks/useBackendApi";
@@ -272,7 +271,9 @@ const Profile = () => {
               <div>
                 <h3 className="text-base sm:text-lg font-semibold">Plan Actual</h3>
                 <p className="text-sm text-muted-foreground">
-                  {user?.email}
+                  {profile?.full_name ? 
+                    `${profile.full_name.split(' ')[0]} ${profile.full_name.split(' ')[1]?.charAt(0) || ''}.` 
+                    : user?.email}
                 </p>
               </div>
               <Badge variant={userRole === "pro" ? "default" : "secondary"} className="text-lg px-4 py-2">
@@ -283,28 +284,25 @@ const Profile = () => {
               <div className="mt-4 space-y-3">
                 <div className="p-4 bg-primary/10 rounded-lg">
                   <p className="text-sm font-medium mb-2">
-                    🌟 Próximamente: Plan PRO
+                    🌟 Lo que incluye el plan PRO
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    Análisis con IA, integración con apps de ciclo menstrual, y más funciones exclusivas
-                  </p>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Análisis avanzado con IA</li>
+                    <li>• Integración con apps de ciclo menstrual</li>
+                    <li>• Chat con entrenador virtual 24/7</li>
+                    <li>• Planes personalizados avanzados</li>
+                    <li>• Estadísticas y gráficos detallados</li>
+                  </ul>
                 </div>
                 
-                <ProButton
-                  icon={MessageSquare}
-                  label="Chat Entrenador IA"
-                  featureTitle="Chat Entrenador Personal IA"
-                  featureDescription="Tu entrenador virtual 24/7 con conocimiento de tu progreso y rutina"
-                  features={[
-                    "Respuestas personalizadas basadas en tu perfil",
-                    "Consejos de nutrición y entrenamiento",
-                    "Ajustes a tu rutina en tiempo real",
-                    "Motivación y seguimiento continuo",
-                    "Análisis de tu progreso con IA"
-                  ]}
-                  className="w-full"
-                  disabled
-                />
+                <Button className="w-full" size="lg" disabled>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Actualizar a PRO
+                </Button>
+                
+                <p className="text-xs text-center text-muted-foreground">
+                  Próximamente disponible
+                </p>
               </div>
             )}
           </Card>
