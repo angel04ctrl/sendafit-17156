@@ -283,15 +283,19 @@ const Workouts = () => {
                     )}
                   </button>
                   <div>
-                    <h3 className="text-lg font-semibold">{workout.name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {(() => {
-                        // Parse date in local timezone to avoid day shift
-                        const [year, month, day] = workout.scheduled_date.split('-').map(Number);
-                        const localDate = new Date(year, month - 1, day);
-                        return format(localDate, "d 'de' MMMM, yyyy");
-                      })()}
-                    </p>
+                    {(() => {
+                      const [year, month, day] = workout.scheduled_date.split('-').map(Number);
+                      const localDate = new Date(year, month - 1, day);
+                      const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+                      const baseName = workout.name.replace(/\s-\s(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo)$/i, '');
+                      const displayName = `${baseName} - ${days[localDate.getDay()]}`;
+                      return (
+                        <>
+                          <h3 className="text-lg font-semibold">{displayName}</h3>
+                          <p className="text-sm text-muted-foreground">{format(localDate, "d 'de' MMMM, yyyy")}</p>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
                 {workout.description && (
@@ -592,10 +596,19 @@ const Workouts = () => {
                                 )}
                               </button>
                               <div>
-                                <h4 className="font-medium text-sm">{workout.name}</h4>
-                                <p className="text-xs text-muted-foreground">
-                                  {format(new Date(workout.scheduled_date), "d 'de' MMMM, yyyy")}
-                                </p>
+                                {(() => {
+                                  const [year, month, day] = workout.scheduled_date.split('-').map(Number);
+                                  const localDate = new Date(year, month - 1, day);
+                                  const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+                                  const baseName = workout.name.replace(/\s-\s(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo)$/i, '');
+                                  const displayName = `${baseName} - ${days[localDate.getDay()]}`;
+                                  return (
+                                    <>
+                                      <h4 className="font-medium text-sm">{displayName}</h4>
+                                      <p className="text-xs text-muted-foreground">{format(localDate, "d 'de' MMMM, yyyy")}</p>
+                                    </>
+                                  );
+                                })()}
                               </div>
                             </div>
                             <div className="flex gap-3 ml-7 text-xs text-muted-foreground">
