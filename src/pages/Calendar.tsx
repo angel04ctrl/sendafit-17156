@@ -16,10 +16,11 @@ const Calendar = () => {
 
   const weekStart = startOfWeek(new Date(), { locale: es, weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const twoWeeksEnd = addDays(weekStart, 13);
 
   const { data: weekData } = useWorkoutsByDate({
     start_date: format(weekDays[0], 'yyyy-MM-dd'),
-    end_date: format(weekDays[6], 'yyyy-MM-dd'),
+    end_date: format(twoWeeksEnd, 'yyyy-MM-dd'),
   });
 
   const workouts = weekData?.workouts || [];
@@ -50,15 +51,20 @@ const Calendar = () => {
   const getWorkoutsForDate = (date: Date) => {
     // Normalize the comparison date to midnight local time
     const compareDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    
-    return workouts.filter((w) => {
-      // Parse scheduled_date in local timezone to avoid UTC offset issues
+
+    // First, try strict match by scheduled_date within the fetched range
+    const directMatches = workouts.filter((w) => {
+      if (!w.scheduled_date) return false;
       const [year, month, day] = w.scheduled_date.split('-').map(Number);
       const workoutDate = new Date(year, month - 1, day);
-      
-      // Compare dates at midnight to avoid time-of-day issues
       return workoutDate.getTime() === compareDate.getTime();
     });
+    if (directMatches.length > 0) return directMatches;
+
+    // Fallback: match by weekday to handle generation date drift
+    const jsDay = compareDate.getDay(); // 0=Sun..6=Sat
+    const weekdayNumber = jsDay === 0 ? 7 : jsDay; // 1=Mon..7=Sun
+    return workouts.filter((w) => w.weekday === weekdayNumber);
   };
 
   return (
