@@ -199,15 +199,28 @@ serve(async (req) => {
     const planDays = Object.keys(exercisesByDay).map(Number).sort((a, b) => a - b);
     console.log(`Plan has ${planExercises.length} exercises across ${planDays.length} days`);
 
-    // Delete existing automatic workouts for this week only
-    await supabase
-      .from('workouts')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('tipo', 'automatico')
-      .eq('completed', false)
-      .gte('scheduled_date', monday.toISOString().split('T')[0])
-      .lte('scheduled_date', sunday.toISOString().split('T')[0]);
+    // Delete existing automatic workouts
+    // If reassigning plan, delete ALL automatic workouts (not completed)
+    // If only redistributing, delete only current week's workouts
+    if (needsReassign) {
+      console.log('Deleting all previous automatic workouts due to plan reassignment');
+      await supabase
+        .from('workouts')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('tipo', 'automatico')
+        .eq('completed', false);
+    } else {
+      console.log('Deleting current week automatic workouts for redistribution');
+      await supabase
+        .from('workouts')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('tipo', 'automatico')
+        .eq('completed', false)
+        .gte('scheduled_date', monday.toISOString().split('T')[0])
+        .lte('scheduled_date', sunday.toISOString().split('T')[0]);
+    }
 
     // Get plan metadata
     const { data: planData } = await supabase
