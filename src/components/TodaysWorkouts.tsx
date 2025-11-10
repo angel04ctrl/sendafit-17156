@@ -96,7 +96,7 @@ export const TodaysWorkouts = () => {
           workouts.map((workout: any) => (
             <div
               key={workout.id}
-              className={`rounded-xl p-4 transition-all border-2 shadow-card ${
+              className={`rounded-xl p-3 transition-all border-2 shadow-card ${
                 workout.completed 
                   ? 'bg-muted/50 border-muted-foreground/30' 
                   : 'bg-gradient-card border-primary/20 hover:shadow-elevated hover:scale-[1.01]'

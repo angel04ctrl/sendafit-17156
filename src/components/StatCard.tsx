@@ -29,20 +29,20 @@ export const StatCard = ({
   return (
     <Card
       className={cn(
-        "p-4 sm:p-5 lg:p-6 shadow-card hover:shadow-elevated transition-all duration-300 hover:scale-[1.02] border-2",
+        "p-3 sm:p-4 shadow-card hover:shadow-elevated transition-all duration-300 hover:scale-[1.02] border-2",
         variants[variant],
         className
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="space-y-1 sm:space-y-1.5 min-w-0 flex-1">
+        <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
           <p className={cn(
             "text-[10px] sm:text-xs font-semibold truncate",
             variant === "default" ? "text-muted-foreground" : "opacity-90"
           )}>
             {title}
           </p>
-          <p className="text-xl sm:text-2xl lg:text-3xl font-black truncate">{value}</p>
+          <p className="text-lg sm:text-xl lg:text-2xl font-black truncate">{value}</p>
           {subtitle && (
             <p className={cn(
               "text-[9px] sm:text-[10px] truncate font-medium leading-tight",

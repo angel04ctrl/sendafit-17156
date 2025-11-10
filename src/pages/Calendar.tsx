@@ -70,11 +70,11 @@ const Calendar = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <div className="pt-16 sm:pt-20 pb-20 sm:pb-24 px-3 sm:px-4">
-        <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 lg:space-y-8">
+      <div className="pt-14 sm:pt-16 pb-16 sm:pb-20 px-3 sm:px-4">
+        <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-1 sm:mb-2">Calendario Semanal</h1>
-            <p className="text-muted-foreground text-sm sm:text-base">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-1">Calendario Semanal</h1>
+            <p className="text-muted-foreground text-xs sm:text-sm">
               Visualiza tu planificación de entrenamientos
             </p>
           </div>
@@ -214,7 +214,7 @@ const Calendar = () => {
             />
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-2 sm:gap-3 lg:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-2 sm:gap-3">
                 {weekDays.map((day) => {
                   const dayWorkouts = getWorkoutsForDate(day);
                   const isToday = isSameDay(day, new Date());
@@ -223,12 +223,12 @@ const Calendar = () => {
                   return (
                     <Card
                       key={day.toISOString()}
-                      className={`p-4 cursor-pointer transition-all ${
+                      className={`p-3 cursor-pointer transition-all ${
                         isToday ? "border-primary border-2" : ""
                       } ${isSelected ? "bg-primary/5" : ""}`}
                       onClick={() => setSelectedDate(day)}
                     >
-                      <div className="text-center mb-3">
+                      <div className="text-center mb-2">
                         <p className="text-sm font-medium text-muted-foreground uppercase">
                           {format(day, "EEE", { locale: es })}
                         </p>
@@ -269,8 +269,8 @@ const Calendar = () => {
                 })}
               </div>
 
-              <Card className="p-4 sm:p-6 shadow-card">
-                <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">
+              <Card className="p-3 sm:p-4 shadow-card">
+                <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3">
                   Entrenamientos para {format(selectedDate, "EEEE, d 'de' MMMM", { locale: es })}
                 </h3>
                 {getWorkoutsForDate(selectedDate).length === 0 ? (
@@ -278,11 +278,11 @@ const Calendar = () => {
                     No hay entrenamientos programados para este día
                   </p>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {getWorkoutsForDate(selectedDate).map((workout) => (
                       <div
                         key={workout.id}
-                        className="p-4 bg-muted rounded-lg"
+                        className="p-3 bg-muted rounded-lg"
                       >
                         <div className="flex items-start justify-between mb-2">
                           <h4 className="font-semibold">{workout.name}</h4>

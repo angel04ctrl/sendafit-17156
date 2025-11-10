@@ -268,7 +268,7 @@ const Workouts = () => {
         workouts.map((workout) => (
           <Card
             key={workout.id}
-            className={`p-6 shadow-card transition-all ${
+            className={`p-4 sm:p-5 shadow-card transition-all ${
               workout.completed ? "bg-primary/5 border-primary/20" : ""
             }`}
           >
@@ -357,12 +357,12 @@ const Workouts = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <div className="pt-16 sm:pt-20 pb-20 sm:pb-24 px-3 sm:px-4">
-        <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 lg:space-y-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+      <div className="pt-14 sm:pt-16 pb-16 sm:pb-20 px-3 sm:px-4">
+        <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-1 sm:mb-2">Entrenamientos</h1>
-              <p className="text-muted-foreground text-sm sm:text-base">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-1">Entrenamientos</h1>
+              <p className="text-muted-foreground text-xs sm:text-sm">
                 Planifica y registra tus rutinas de ejercicio
               </p>
             </div>

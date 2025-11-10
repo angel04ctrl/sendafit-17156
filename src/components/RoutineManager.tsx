@@ -27,14 +27,14 @@ export function RoutineManager() {
   }
 
   return (
-    <div className="space-y-3 sm:space-y-6 h-full flex flex-col overflow-hidden">
-      <div className="shrink-0 px-3 pt-3 sm:px-6 sm:pt-6">
-        <h1 className="text-xl sm:text-3xl font-bold">Gestor de Rutinas</h1>
+    <div className="space-y-2 sm:space-y-3 h-full flex flex-col overflow-hidden">
+      <div className="shrink-0 px-3 pt-2 sm:px-4 sm:pt-3">
+        <h1 className="text-lg sm:text-2xl font-bold">Gestor de Rutinas</h1>
       </div>
 
       {/* Stats Cards - Más compactas */}
       {statsData && (
-        <div className="grid gap-2 grid-cols-3 shrink-0 px-3 sm:px-6">
+        <div className="grid gap-2 grid-cols-3 shrink-0 px-3 sm:px-4">
           <Card className="shadow-sm">
             <CardHeader className="pb-2 p-3 sm:p-4">
               <CardTitle className="text-xs sm:text-sm font-medium">
@@ -80,10 +80,10 @@ export function RoutineManager() {
       )}
 
       {/* Current Routine */}
-      <div className="flex-1 overflow-y-auto px-3 pb-3 sm:px-6 sm:pb-6">
+      <div className="flex-1 overflow-y-auto px-3 pb-3 sm:px-4 sm:pb-4">
         {routineData?.routine ? (
           <Card className="shadow-sm h-full flex flex-col">
-            <CardHeader className="p-3 sm:p-6 shrink-0">
+            <CardHeader className="p-3 sm:p-4 shrink-0">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <CardTitle className="text-base sm:text-lg truncate">{routineData.routine.nombre_plan}</CardTitle>
@@ -95,7 +95,7 @@ export function RoutineManager() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4 p-3 sm:p-6 pt-0 flex-1 overflow-y-auto">
+            <CardContent className="space-y-3 p-3 sm:p-4 pt-0 flex-1 overflow-y-auto">
               <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm shrink-0">
                 <div>
                   <span className="text-muted-foreground">Objetivo:</span>

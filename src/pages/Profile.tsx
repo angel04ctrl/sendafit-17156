@@ -258,19 +258,19 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <div className="pt-16 sm:pt-20 pb-20 sm:pb-24 px-3 sm:px-4">
-        <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 lg:space-y-8">
+      <div className="pt-14 sm:pt-16 pb-16 sm:pb-20 px-3 sm:px-4">
+        <div className="max-w-4xl mx-auto space-y-3 sm:space-y-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-1 sm:mb-2">Mi Perfil</h1>
-            <p className="text-muted-foreground text-sm sm:text-base">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-1">Mi Perfil</h1>
+            <p className="text-muted-foreground text-xs sm:text-sm">
               Configura tus datos personales y objetivos
             </p>
           </div>
 
-          <Card className="p-4 sm:p-6 shadow-card bg-gradient-card">
-            <div className="flex items-center justify-between mb-4">
+          <Card className="p-3 sm:p-4 shadow-card bg-gradient-card">
+            <div className="flex items-center justify-between mb-3">
               <div>
-                <h3 className="text-xl font-semibold">Plan Actual</h3>
+                <h3 className="text-base sm:text-lg font-semibold">Plan Actual</h3>
                 <p className="text-sm text-muted-foreground">
                   {user?.email}
                 </p>
@@ -309,9 +309,9 @@ const Profile = () => {
             )}
           </Card>
 
-          <Card className="p-4 sm:p-6 shadow-card">
-            <div className="flex items-center justify-between mb-4 sm:mb-6">
-              <h3 className="text-lg sm:text-xl font-semibold">Información Personal</h3>
+          <Card className="p-3 sm:p-4 shadow-card">
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
+              <h3 className="text-base sm:text-lg font-semibold">Información Personal</h3>
                 <Button
                   type="button"
                   variant="outline"

@@ -289,13 +289,13 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <div className="pt-16 sm:pt-20 pb-20 sm:pb-24 px-3 sm:px-4">
+      <div className="pt-14 sm:pt-16 pb-16 sm:pb-20 px-3 sm:px-4">
         {/* Header */}
-        <div className="max-w-7xl mx-auto mb-4">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-1 sm:mb-2">
+        <div className="max-w-7xl mx-auto mb-3">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-1">
             ¡Hola, {profile?.full_name || "Usuario"}!
           </h1>
-          <p className="text-muted-foreground text-sm sm:text-base lg:text-lg">
+          <p className="text-muted-foreground text-xs sm:text-sm">
             {format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}
           </p>
         </div>
@@ -305,8 +305,8 @@ const Dashboard = () => {
           <DashboardMobileCarousel sections={sections} />
         ) : (
           /* Vista desktop: Layout normal */
-          <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 lg:space-y-8">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+          <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
               <StatCard
                 title="Calorías"
                 value={todayMacros.calories}
@@ -335,9 +335,9 @@ const Dashboard = () => {
               />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-              <Card className="p-4 sm:p-6 shadow-card">
-                <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Progreso de Calorías</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+              <Card className="p-3 sm:p-4 shadow-card">
+                <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3">Progreso de Calorías</h3>
                 <div className="space-y-4">
                   <div>
                     <div className="flex justify-between mb-2">
@@ -360,8 +360,8 @@ const Dashboard = () => {
                 </div>
               </Card>
 
-              <Card className="p-4 sm:p-6 shadow-card">
-                <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Entrenamientos de Hoy</h3>
+              <Card className="p-3 sm:p-4 shadow-card">
+                <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3">Entrenamientos de Hoy</h3>
                 {todayWorkouts.length === 0 ? (
                   <p className="text-muted-foreground">No hay entrenamientos programados para hoy</p>
                 ) : (
@@ -391,15 +391,15 @@ const Dashboard = () => {
 
             <RoutineManager />
 
-            <Card className="p-4 sm:p-6 shadow-card bg-gradient-card">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg sm:text-xl font-semibold">Análisis Avanzado</h3>
+            <Card className="p-3 sm:p-4 shadow-card bg-gradient-card">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base sm:text-lg font-semibold">Análisis Avanzado</h3>
                 <Badge variant="default" className="gap-1">
                   <TrendingUp className="w-3 h-3" />
                   PRO
                 </Badge>
               </div>
-              <p className="text-muted-foreground mb-4">
+              <p className="text-sm text-muted-foreground mb-3">
                 Obtén análisis detallados de tu progreso, reportes personalizados y estadísticas avanzadas
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -426,8 +426,8 @@ const Dashboard = () => {
               </div>
             </Card>
 
-            <Card className="p-4 sm:p-6 shadow-card bg-gradient-card">
-              <h3 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Consejos del Día</h3>
+            <Card className="p-3 sm:p-4 shadow-card bg-gradient-card">
+              <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3">Consejos del Día</h3>
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
