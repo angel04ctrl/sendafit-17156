@@ -260,7 +260,7 @@ const Workouts = () => {
   const todayGym = todayWorkouts.filter((w) => w.location === "gimnasio");
   const todayOutdoor = todayWorkouts.filter((w) => w.location === "exterior");
 
-  const WorkoutList = ({ workouts }: { workouts: any[] }) => (
+  const WorkoutList = ({ workouts, isToday = false }: { workouts: any[]; isToday?: boolean }) => (
     <div className="space-y-4">
       {workouts.length === 0 ? (
         <p className="text-muted-foreground">No hay entrenamientos registrados</p>
@@ -284,7 +284,8 @@ const Workouts = () => {
                   </button>
                   <div>
                     {(() => {
-                      const [year, month, day] = workout.scheduled_date.split('-').map(Number);
+                      const dateStr = isToday ? today : workout.scheduled_date;
+                      const [year, month, day] = dateStr.split('-').map(Number);
                       const localDate = new Date(year, month - 1, day);
                       const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
                       const baseName = workout.name.replace(/\s-\s(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo)$/i, '');
@@ -542,16 +543,16 @@ const Workouts = () => {
                   <TabsTrigger value="exterior" className="text-xs sm:text-sm py-2">Exterior</TabsTrigger>
                 </TabsList>
                 <TabsContent value="all" className="mt-6">
-                  <WorkoutList workouts={todayWorkouts} />
+                  <WorkoutList workouts={todayWorkouts} isToday />
                 </TabsContent>
                 <TabsContent value="casa" className="mt-6">
-                  <WorkoutList workouts={todayHome} />
+                  <WorkoutList workouts={todayHome} isToday />
                 </TabsContent>
                 <TabsContent value="gimnasio" className="mt-6">
-                  <WorkoutList workouts={todayGym} />
+                  <WorkoutList workouts={todayGym} isToday />
                 </TabsContent>
                 <TabsContent value="exterior" className="mt-6">
-                  <WorkoutList workouts={todayOutdoor} />
+                  <WorkoutList workouts={todayOutdoor} isToday />
                 </TabsContent>
               </Tabs>
             </div>
