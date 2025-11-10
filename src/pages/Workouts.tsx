@@ -285,7 +285,12 @@ const Workouts = () => {
                   <div>
                     <h3 className="text-lg font-semibold">{workout.name}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {format(new Date(workout.scheduled_date), "d 'de' MMMM, yyyy")}
+                      {(() => {
+                        // Parse date in local timezone to avoid day shift
+                        const [year, month, day] = workout.scheduled_date.split('-').map(Number);
+                        const localDate = new Date(year, month - 1, day);
+                        return format(localDate, "d 'de' MMMM, yyyy");
+                      })()}
                     </p>
                   </div>
                 </div>

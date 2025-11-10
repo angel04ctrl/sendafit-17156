@@ -84,13 +84,13 @@ serve(async (req) => {
       current_plan: profile.assigned_routine_id
     });
 
-    // Calculate week boundaries
+    // Calculate week boundaries in local timezone
     const today = new Date();
-    const currentDayOfWeek = today.getDay();
+    today.setHours(0, 0, 0, 0); // Reset to start of day
+    const currentDayOfWeek = today.getDay(); // 0=Sunday, 1=Monday, etc.
     const daysToMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
     const monday = new Date(today);
     monday.setDate(today.getDate() - daysToMonday);
-    monday.setHours(0, 0, 0, 0);
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
 
@@ -267,17 +267,22 @@ serve(async (req) => {
         return;
       }
 
+      // Calculate workout date based on weekday (1=Monday, 7=Sunday)
       const workoutDate = new Date(monday);
       workoutDate.setDate(monday.getDate() + (weekday - 1));
 
-      // If date passed, schedule for next week
+      // If date has passed, schedule for next week
       if (workoutDate < today) {
         workoutDate.setDate(workoutDate.getDate() + 7);
       }
 
-      const dateStr = workoutDate.toISOString().split('T')[0];
+      // Format date as YYYY-MM-DD in local timezone (not UTC)
+      const year = workoutDate.getFullYear();
+      const month = String(workoutDate.getMonth() + 1).padStart(2, '0');
+      const day = String(workoutDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       
-      // Get the actual day name from the calculated date for consistency
+      // Verify the day name matches the weekday number
       const calculatedDayOfWeek = workoutDate.getDay(); // 0=Sunday, 1=Monday, etc.
       const dayNameMapping: Record<number, string> = {
         1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves',
