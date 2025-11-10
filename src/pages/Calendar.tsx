@@ -48,9 +48,12 @@ const Calendar = () => {
   }, []);
 
   const getWorkoutsForDate = (date: Date) => {
-    return workouts.filter((w) =>
-      isSameDay(new Date(w.scheduled_date), date)
-    );
+    return workouts.filter((w) => {
+      // Parse scheduled_date in local timezone to avoid UTC offset issues
+      const [year, month, day] = w.scheduled_date.split('-').map(Number);
+      const workoutDate = new Date(year, month - 1, day);
+      return isSameDay(workoutDate, date);
+    });
   };
 
   return (
