@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Pencil, Sparkles } from "lucide-react";
 import { calculateMacros, validateProfileData } from "@/lib/macrosCalculator";
 import { PlanChangePreviewModal } from "@/components/PlanChangePreviewModal";
+import { PaymentModal } from "@/components/PaymentModal";
 import { useValidatePlanChange, useAssignRoutine, useRedistributeWorkouts } from "@/hooks/useBackendApi";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -24,6 +25,7 @@ const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [resetOnFirstDayClick, setResetOnFirstDayClick] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [validationData, setValidationData] = useState<any>(null);
   const [formData, setFormData] = useState({
     full_name: "",
@@ -295,13 +297,17 @@ const Profile = () => {
                   </ul>
                 </div>
                 
-                <Button className="w-full" size="lg" disabled>
+                <Button 
+                  className="w-full" 
+                  size="lg"
+                  onClick={() => setPaymentModalOpen(true)}
+                >
                   <Sparkles className="w-4 h-4 mr-2" />
                   Actualizar a PRO
                 </Button>
                 
                 <p className="text-xs text-center text-muted-foreground">
-                  Próximamente disponible
+                  Pago seguro y sin compromisos
                 </p>
               </div>
             )}
@@ -549,6 +555,11 @@ const Profile = () => {
         onConfirm={handleConfirmPlanChange}
         validationData={validationData}
         isLoading={loading}
+      />
+
+      <PaymentModal
+        open={paymentModalOpen}
+        onOpenChange={setPaymentModalOpen}
       />
     </div>
   );
