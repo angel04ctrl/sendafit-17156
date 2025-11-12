@@ -31,8 +31,8 @@ serve(async (req) => {
 
       console.log("Creating Stripe checkout session for user:", userId, "plan:", plan);
 
-      // Define prices based on plan
-      const amount = plan === "anual" ? 10800 : 1000; // in cents (MXN)
+      // Define prices based on plan (in centavos MXN)
+      const amount = plan === "anual" ? 105800 : 9800; // 98 MXN mensual, 1058 MXN anual
       
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",

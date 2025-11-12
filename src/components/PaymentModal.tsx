@@ -49,9 +49,9 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
   const [paypalLoaded, setPaypalLoaded] = useState(false);
   const { user } = useAuth();
 
-  const monthlyPrice = 10;
-  const annualPrice = 108; // $120 with 10% discount
-  const annualPriceBeforeDiscount = 120;
+  const monthlyPrice = 98;
+  const annualPrice = 1058; // $1176 with 10% discount
+  const annualPriceBeforeDiscount = 1176;
   const discount = annualPriceBeforeDiscount - annualPrice;
 
   const currentPrice = billingPeriod === "mensual" ? monthlyPrice : annualPrice;
@@ -271,7 +271,7 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
                 <RadioGroupItem value="mensual" id="mensual" />
                 <Label htmlFor="mensual" className="flex-1 cursor-pointer">
                   <div className="font-medium">Mensual</div>
-                  <div className="text-xs text-muted-foreground">$10 MXN/mes</div>
+                  <div className="text-xs text-muted-foreground">$98 MXN/mes</div>
                 </Label>
               </div>
               <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer hover:bg-accent/50 transition-colors">
@@ -279,7 +279,7 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
                 <Label htmlFor="anual" className="flex-1 cursor-pointer">
                   <div className="font-medium">Anual</div>
                   <div className="text-xs text-muted-foreground">
-                    $108 MXN/año <span className="text-green-600 dark:text-green-400 font-medium">(Ahorra 10%)</span>
+                    $1,058 MXN/año <span className="text-green-600 dark:text-green-400 font-medium">(Ahorra 10%)</span>
                   </div>
                 </Label>
               </div>
