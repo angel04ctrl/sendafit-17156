@@ -13,6 +13,8 @@ import { Pencil, Sparkles } from "lucide-react";
 import { calculateMacros, validateProfileData } from "@/lib/macrosCalculator";
 import { PlanChangePreviewModal } from "@/components/PlanChangePreviewModal";
 import { PaymentModal } from "@/components/PaymentModal";
+import { PaymentSuccessModal } from "@/components/PaymentSuccessModal";
+import { useSearchParams } from "react-router-dom";
 import { useValidatePlanChange, useAssignRoutine, useRedistributeWorkouts } from "@/hooks/useBackendApi";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -26,8 +28,10 @@ const Profile = () => {
   const [resetOnFirstDayClick, setResetOnFirstDayClick] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [validationData, setValidationData] = useState<any>(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({
     full_name: "",
     gender: "femenino",
@@ -51,7 +55,13 @@ const Profile = () => {
 
   useEffect(() => {
     fetchProfile();
-  }, [user]);
+
+    // Check if redirected from successful payment
+    const paymentStatus = searchParams.get("payment");
+    if (paymentStatus === "success") {
+      setShowSuccessModal(true);
+    }
+  }, [user, searchParams]);
 
   // Realtime subscription for profile changes (plan updates)
   useEffect(() => {
@@ -573,6 +583,11 @@ const Profile = () => {
       <PaymentModal
         open={paymentModalOpen}
         onOpenChange={setPaymentModalOpen}
+      />
+
+      <PaymentSuccessModal
+        open={showSuccessModal}
+        onOpenChange={setShowSuccessModal}
       />
     </div>
   );
