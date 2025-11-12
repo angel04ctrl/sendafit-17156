@@ -13,10 +13,8 @@ export const PaymentSuccessModal = ({ open, onOpenChange }: PaymentSuccessModalP
 
   const handleContinue = () => {
     onOpenChange(false);
-    // Remove query parameters from URL
-    navigate("/profile", { replace: true });
-    // Reload to update subscription status
-    window.location.reload();
+    // Remove query parameters from URL and reload
+    window.location.href = "/profile";
   };
 
   return (

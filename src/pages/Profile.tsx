@@ -54,13 +54,23 @@ const Profile = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    fetchProfile();
+    const loadProfile = async () => {
+      setLoading(true);
+      await fetchProfile();
+      
+      // Check if redirected from successful payment
+      const paymentStatus = searchParams.get("payment");
+      if (paymentStatus === "success") {
+        // Wait a bit for webhook to process
+        setTimeout(() => {
+          setShowSuccessModal(true);
+        }, 1000);
+      } else if (paymentStatus === "canceled") {
+        toast.error("Pago cancelado. Puedes intentar de nuevo cuando quieras.");
+      }
+    };
 
-    // Check if redirected from successful payment
-    const paymentStatus = searchParams.get("payment");
-    if (paymentStatus === "success") {
-      setShowSuccessModal(true);
-    }
+    loadProfile();
   }, [user, searchParams]);
 
   // Realtime subscription for profile changes (plan updates)
@@ -92,59 +102,65 @@ const Profile = () => {
   const fetchProfile = async () => {
     if (!user) return;
 
-    const { data: profileData, error: profileError } = await sb
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .maybeSingle();
+    try {
+      const { data: profileData, error: profileError } = await sb
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
 
-    if (profileError) {
-      console.error("Error loading profile:", profileError);
-      toast.error("Error al cargar el perfil");
-      return;
-    }
+      if (profileError) {
+        console.error("Error loading profile:", profileError);
+        toast.error("Error al cargar el perfil");
+        return;
+      }
 
-    if (profileData) {
-      setProfile(profileData);
-      setFormData({
-        full_name: profileData.full_name || "",
-        gender: profileData.gender || "femenino",
-        fitness_level: profileData.fitness_level || "principiante",
-        fitness_goal: profileData.fitness_goal || "mantener_peso",
-        weight: profileData.weight?.toString() || "",
-        height: profileData.height?.toString() || "",
-        age: profileData.age?.toString() || "",
-        available_days_per_week: profileData.available_days_per_week?.toString() || "",
-        available_weekdays: Array.isArray(profileData.available_weekdays)
-          ? ([...new Set((profileData.available_weekdays as any[]).map(String))] as string[])
-          : [],
-        daily_calorie_goal: profileData.daily_calorie_goal?.toString() || "",
-        daily_protein_goal: profileData.daily_protein_goal?.toString() || "",
-        daily_carbs_goal: profileData.daily_carbs_goal?.toString() || "",
-        daily_fat_goal: profileData.daily_fat_goal?.toString() || "",
-      });
-    }
+      if (profileData) {
+        setProfile(profileData);
+        setFormData({
+          full_name: profileData.full_name || "",
+          gender: profileData.gender || "femenino",
+          fitness_level: profileData.fitness_level || "principiante",
+          fitness_goal: profileData.fitness_goal || "mantener_peso",
+          weight: profileData.weight?.toString() || "",
+          height: profileData.height?.toString() || "",
+          age: profileData.age?.toString() || "",
+          available_days_per_week: profileData.available_days_per_week?.toString() || "",
+          available_weekdays: Array.isArray(profileData.available_weekdays)
+            ? ([...new Set((profileData.available_weekdays as any[]).map(String))] as string[])
+            : [],
+          daily_calorie_goal: profileData.daily_calorie_goal?.toString() || "",
+          daily_protein_goal: profileData.daily_protein_goal?.toString() || "",
+          daily_carbs_goal: profileData.daily_carbs_goal?.toString() || "",
+          daily_fat_goal: profileData.daily_fat_goal?.toString() || "",
+        });
+      }
 
-    const { data: roleData } = await sb
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .maybeSingle();
+      const { data: roleData } = await sb
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-    if (roleData) {
-      setUserRole(roleData.role);
-    }
+      if (roleData) {
+        setUserRole(roleData.role);
+      }
 
-    // Check subscription status
-    const { data: subscriptionData } = await sb
-      .from("user_subscriptions")
-      .select("status, plan")
-      .eq("user_id", user.id)
-      .maybeSingle();
+      // Check subscription status
+      const { data: subscriptionData } = await sb
+        .from("user_subscriptions")
+        .select("status, plan")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-    if (subscriptionData?.status === "active") {
-      setSubscriptionStatus("active");
-      setUserRole("pro");
+      if (subscriptionData?.status === "active") {
+        setSubscriptionStatus("active");
+        setUserRole("pro");
+      }
+    } catch (error) {
+      console.error("Error in fetchProfile:", error);
+    } finally {
+      setLoading(false);
     }
   };
 

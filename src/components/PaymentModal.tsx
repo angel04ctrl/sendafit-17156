@@ -83,6 +83,8 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
 
     setIsProcessing(true);
     try {
+      toast.info("Redirigiendo a la pasarela de pago...");
+      
       const { data: functionData, error } = await supabase.functions.invoke(
         "payments/create-checkout-session",
         {
@@ -93,15 +95,20 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
         }
       );
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error from function:", error);
+        throw error;
+      }
 
       if (functionData?.url) {
+        // Redirect to Stripe checkout
         window.location.href = functionData.url;
+      } else {
+        throw new Error("No URL returned from payment service");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating checkout session:", error);
-      toast.error("Error al procesar el pago. Intenta de nuevo.");
-    } finally {
+      toast.error(error.message || "Error al procesar el pago. Intenta de nuevo.");
       setIsProcessing(false);
     }
   };
