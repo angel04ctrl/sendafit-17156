@@ -521,6 +521,51 @@ export type Database = {
           },
         ]
       }
+      user_subscriptions: {
+        Row: {
+          created_at: string
+          end_date: string | null
+          id: string
+          last_event: string | null
+          paypal_subscription_id: string | null
+          plan: string
+          provider: string
+          start_date: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          last_event?: string | null
+          paypal_subscription_id?: string | null
+          plan: string
+          provider: string
+          start_date?: string
+          status: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          last_event?: string | null
+          paypal_subscription_id?: string | null
+          plan?: string
+          provider?: string
+          start_date?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       workout_exercises: {
         Row: {
           created_at: string

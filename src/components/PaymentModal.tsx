@@ -10,7 +10,10 @@ import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "./ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const cardPaymentSchema = z.object({
   cardName: z.string().min(3, "El nombre debe tener al menos 3 caracteres").max(100, "Nombre demasiado largo"),
@@ -41,14 +44,17 @@ interface PaymentModalProps {
 }
 
 export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
-  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
+  const [billingPeriod, setBillingPeriod] = useState<"mensual" | "anual">("mensual");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paypalLoaded, setPaypalLoaded] = useState(false);
+  const { user } = useAuth();
 
   const monthlyPrice = 10;
-  const annualPrice = 108; // $120 con 10% descuento
+  const annualPrice = 108; // $120 with 10% discount
   const annualPriceBeforeDiscount = 120;
   const discount = annualPriceBeforeDiscount - annualPrice;
 
-  const currentPrice = billingPeriod === "monthly" ? monthlyPrice : annualPrice;
+  const currentPrice = billingPeriod === "mensual" ? monthlyPrice : annualPrice;
 
   const cardForm = useForm<CardPaymentForm>({
     resolver: zodResolver(cardPaymentSchema),
@@ -69,15 +75,128 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
     },
   });
 
-  const handleCardSubmit = (data: CardPaymentForm) => {
-    console.log("Card payment data:", data, "Billing period:", billingPeriod, "Price:", currentPrice);
-    // TODO: Integrar con backend de pagos
+  const handleCardSubmit = async (data: CardPaymentForm) => {
+    if (!user) {
+      toast.error("Debes iniciar sesión para continuar");
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const { data: functionData, error } = await supabase.functions.invoke(
+        "payments/create-checkout-session",
+        {
+          body: {
+            plan: billingPeriod,
+            userId: user.id,
+          },
+        }
+      );
+
+      if (error) throw error;
+
+      if (functionData?.url) {
+        window.location.href = functionData.url;
+      }
+    } catch (error) {
+      console.error("Error creating checkout session:", error);
+      toast.error("Error al procesar el pago. Intenta de nuevo.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handlePaypalSubmit = (data: PaypalPaymentForm) => {
-    console.log("PayPal payment data:", data, "Billing period:", billingPeriod, "Price:", currentPrice);
-    // TODO: Integrar con backend de pagos
+    if (!user) {
+      toast.error("Debes iniciar sesión para continuar");
+      return;
+    }
+    // PayPal is handled by the PayPal button integration
+    console.log("PayPal email:", data.paypalEmail);
   };
+
+  // Load PayPal SDK
+  useEffect(() => {
+    if (!open) return;
+
+    const script = document.createElement("script");
+    script.src = `https://www.paypal.com/sdk/js?client-id=${import.meta.env.VITE_PAYPAL_CLIENT_ID || ""}&vault=true&intent=subscription&currency=MXN`;
+    script.async = true;
+    script.onload = () => setPaypalLoaded(true);
+    document.body.appendChild(script);
+
+    return () => {
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+    };
+  }, [open]);
+
+  // Initialize PayPal buttons
+  useEffect(() => {
+    if (!paypalLoaded || !open || !user) return;
+
+    const container = document.getElementById("paypal-button-container");
+    if (!container) return;
+
+    // Clear previous buttons
+    container.innerHTML = "";
+
+    const planId = billingPeriod === "mensual" 
+      ? import.meta.env.VITE_PAYPAL_PLAN_ID_MONTHLY 
+      : import.meta.env.VITE_PAYPAL_PLAN_ID_ANNUAL;
+
+    if (!planId) {
+      console.error("PayPal plan ID not configured");
+      return;
+    }
+
+    (window as any).paypal
+      .Buttons({
+        style: {
+          shape: "rect",
+          color: "gold",
+          layout: "vertical",
+          label: "subscribe",
+        },
+        createSubscription: function (data: any, actions: any) {
+          return actions.subscription.create({
+            plan_id: planId,
+          });
+        },
+        onApprove: async function (data: any) {
+          setIsProcessing(true);
+          try {
+            const { error } = await supabase.functions.invoke(
+              "payments/paypal-confirm",
+              {
+                body: {
+                  subscriptionId: data.subscriptionID,
+                  userId: user.id,
+                  plan: billingPeriod,
+                },
+              }
+            );
+
+            if (error) throw error;
+
+            toast.success("¡Suscripción activada exitosamente!");
+            onOpenChange(false);
+            window.location.reload();
+          } catch (error) {
+            console.error("Error confirming PayPal subscription:", error);
+            toast.error("Error al confirmar la suscripción");
+          } finally {
+            setIsProcessing(false);
+          }
+        },
+        onError: function (err: any) {
+          console.error("PayPal error:", err);
+          toast.error("Error al procesar el pago con PayPal");
+        },
+      })
+      .render("#paypal-button-container");
+  }, [paypalLoaded, billingPeriod, open, user, onOpenChange]);
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 15 }, (_, i) => currentYear + i);
@@ -123,7 +242,7 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
                 <span className="text-2xl font-bold">
                   ${currentPrice} <span className="text-sm text-muted-foreground">MXN</span>
                 </span>
-                {billingPeriod === "annual" && (
+                {billingPeriod === "anual" && (
                   <div className="text-xs text-green-600 dark:text-green-400 font-medium">
                     Ahorra ${discount} MXN
                   </div>
@@ -140,17 +259,17 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
 
           <div className="space-y-3">
             <Label className="text-sm font-semibold">Periodo de facturación</Label>
-            <RadioGroup value={billingPeriod} onValueChange={(value) => setBillingPeriod(value as "monthly" | "annual")}>
+            <RadioGroup value={billingPeriod} onValueChange={(value) => setBillingPeriod(value as "mensual" | "anual")}>
               <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer hover:bg-accent/50 transition-colors">
-                <RadioGroupItem value="monthly" id="monthly" />
-                <Label htmlFor="monthly" className="flex-1 cursor-pointer">
+                <RadioGroupItem value="mensual" id="mensual" />
+                <Label htmlFor="mensual" className="flex-1 cursor-pointer">
                   <div className="font-medium">Mensual</div>
                   <div className="text-xs text-muted-foreground">$10 MXN/mes</div>
                 </Label>
               </div>
               <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer hover:bg-accent/50 transition-colors">
-                <RadioGroupItem value="annual" id="annual" />
-                <Label htmlFor="annual" className="flex-1 cursor-pointer">
+                <RadioGroupItem value="anual" id="anual" />
+                <Label htmlFor="anual" className="flex-1 cursor-pointer">
                   <div className="font-medium">Anual</div>
                   <div className="text-xs text-muted-foreground">
                     $108 MXN/año <span className="text-green-600 dark:text-green-400 font-medium">(Ahorra 10%)</span>
@@ -312,45 +431,34 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
                   )}
                 />
 
-                <Button type="submit" className="w-full" size="lg">
+                <Button type="submit" className="w-full" size="lg" disabled={isProcessing}>
                   <CreditCard className="w-4 h-4 mr-2" />
-                  Pagar ${currentPrice} MXN
+                  {isProcessing ? "Procesando..." : `Pagar $${currentPrice} MXN`}
                 </Button>
               </form>
             </Form>
           </TabsContent>
 
           <TabsContent value="paypal" className="space-y-4 mt-4">
-            <Form {...paypalForm}>
-              <form onSubmit={paypalForm.handleSubmit(handlePaypalSubmit)} className="space-y-4">
-                <FormField
-                  control={paypalForm.control}
-                  name="paypalEmail"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email de PayPal *</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="email"
-                          placeholder="tu-email@example.com" 
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground text-center">
+                Haz clic en el botón de PayPal para continuar con tu suscripción de ${currentPrice} MXN
+              </p>
+              
+              <div id="paypal-button-container" className="w-full min-h-[150px]">
+                {!paypalLoaded && (
+                  <div className="flex items-center justify-center h-[150px]">
+                    <p className="text-sm text-muted-foreground">Cargando PayPal...</p>
+                  </div>
+                )}
+              </div>
 
-                <div className="bg-muted/50 p-4 rounded-lg text-sm text-muted-foreground">
-                  <p>Serás redirigido a PayPal para completar tu pago de forma segura.</p>
-                </div>
-
-                <Button type="submit" className="w-full" size="lg">
-                  <Wallet className="w-4 h-4 mr-2" />
-                  Pagar ${currentPrice} MXN con PayPal
-                </Button>
-              </form>
-            </Form>
+              {isProcessing && (
+                <p className="text-sm text-center text-muted-foreground">
+                  Procesando tu suscripción...
+                </p>
+              )}
+            </div>
           </TabsContent>
         </Tabs>
 

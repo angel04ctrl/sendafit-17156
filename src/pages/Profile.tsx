@@ -27,6 +27,7 @@ const Profile = () => {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [validationData, setValidationData] = useState<any>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     full_name: "",
     gender: "femenino",
@@ -122,6 +123,18 @@ const Profile = () => {
 
     if (roleData) {
       setUserRole(roleData.role);
+    }
+
+    // Check subscription status
+    const { data: subscriptionData } = await sb
+      .from("user_subscriptions")
+      .select("status, plan")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (subscriptionData?.status === "active") {
+      setSubscriptionStatus("active");
+      setUserRole("pro");
     }
   };
 
@@ -278,11 +291,11 @@ const Profile = () => {
                     : user?.email}
                 </p>
               </div>
-              <Badge variant={userRole === "pro" ? "default" : "secondary"} className="text-lg px-4 py-2">
-                {userRole === "pro" ? "PRO" : "Básico"}
+              <Badge variant={userRole === "pro" || subscriptionStatus === "active" ? "default" : "secondary"} className="text-lg px-4 py-2">
+                {userRole === "pro" || subscriptionStatus === "active" ? "PRO" : "Básico"}
               </Badge>
             </div>
-            {userRole === "user" && (
+            {userRole !== "pro" && subscriptionStatus !== "active" && (
               <div className="mt-4 space-y-3">
                 <div className="p-4 bg-primary/10 rounded-lg">
                   <p className="text-sm font-medium mb-2">
