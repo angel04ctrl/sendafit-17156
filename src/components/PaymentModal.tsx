@@ -8,7 +8,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "./ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,13 +19,17 @@ const cardPaymentSchema = z.object({
   cardNumber: z.string()
     .regex(/^\d{16}$/, "El número de tarjeta debe tener 16 dígitos")
     .refine((val) => val.length === 16, "Ingrese 16 dígitos"),
-  expiryMonth: z.string().min(1, "Seleccione el mes"),
-  expiryYear: z.string().min(1, "Seleccione el año"),
+  expiryMonth: z.string()
+    .regex(/^(0[1-9]|1[0-2])$/, "Ingrese mes válido (01-12)")
+    .length(2, "Ingrese 2 dígitos"),
+  expiryYear: z.string()
+    .regex(/^\d{4}$/, "Ingrese año válido (4 dígitos)")
+    .refine((val) => parseInt(val) >= new Date().getFullYear(), "Año debe ser actual o futuro"),
   cvv: z.string()
     .regex(/^\d{3,4}$/, "CVV debe tener 3 o 4 dígitos")
     .min(3, "CVV debe tener al menos 3 dígitos")
     .max(4, "CVV debe tener máximo 4 dígitos"),
-  country: z.string().min(1, "Seleccione su país"),
+  country: z.string().optional(),
 });
 
 const paypalPaymentSchema = z.object({
@@ -205,28 +208,6 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
       .render("#paypal-button-container");
   }, [paypalLoaded, billingPeriod, open, user, onOpenChange]);
 
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 15 }, (_, i) => currentYear + i);
-  const months = [
-    { value: "01", label: "01 - Enero" },
-    { value: "02", label: "02 - Febrero" },
-    { value: "03", label: "03 - Marzo" },
-    { value: "04", label: "04 - Abril" },
-    { value: "05", label: "05 - Mayo" },
-    { value: "06", label: "06 - Junio" },
-    { value: "07", label: "07 - Julio" },
-    { value: "08", label: "08 - Agosto" },
-    { value: "09", label: "09 - Septiembre" },
-    { value: "10", label: "10 - Octubre" },
-    { value: "11", label: "11 - Noviembre" },
-    { value: "12", label: "12 - Diciembre" },
-  ];
-
-  const countries = [
-    "México", "España", "Argentina", "Colombia", "Chile", "Perú", "Venezuela", 
-    "Ecuador", "Guatemala", "Cuba", "Bolivia", "República Dominicana", "Honduras",
-    "Paraguay", "El Salvador", "Nicaragua", "Costa Rica", "Puerto Rico", "Panamá", "Uruguay"
-  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -345,20 +326,17 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Mes *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Mes" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {months.map((month) => (
-                              <SelectItem key={month.value} value={month.value}>
-                                {month.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <Input 
+                            placeholder="11" 
+                            maxLength={2}
+                            {...field}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/\D/g, '');
+                              field.onChange(value);
+                            }}
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -370,20 +348,17 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Año *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Año" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {years.map((year) => (
-                              <SelectItem key={year} value={year.toString()}>
-                                {year}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <Input 
+                            placeholder="2030" 
+                            maxLength={4}
+                            {...field}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/\D/g, '');
+                              field.onChange(value);
+                            }}
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -418,21 +393,13 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
                   name="country"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>País *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccione su país" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {countries.map((country) => (
-                            <SelectItem key={country} value={country}>
-                              {country}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>País (opcional)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="México" 
+                          {...field}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
