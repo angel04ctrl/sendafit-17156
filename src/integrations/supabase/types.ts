@@ -274,6 +274,7 @@ export type Database = {
         Row: {
           age: number | null
           allergies_restrictions: string | null
+          allergies_restrictions_encrypted: string | null
           assigned_routine_id: string | null
           available_days_per_week: number | null
           available_weekdays: string[] | null
@@ -281,6 +282,7 @@ export type Database = {
           created_at: string
           current_calorie_intake: number | null
           current_medications: string | null
+          current_medications_encrypted: string | null
           daily_calorie_goal: number | null
           daily_carbs_goal: number | null
           daily_fat_goal: number | null
@@ -291,11 +293,13 @@ export type Database = {
           full_name: string
           gender: string | null
           health_conditions: string[] | null
+          health_conditions_encrypted: string | null
           height: number | null
           id: string
           initial_measurements: Json | null
           initial_photo_url: string | null
           injuries_limitations: string | null
+          injuries_limitations_encrypted: string | null
           menstrual_auto_sync: boolean | null
           menstrual_tracking_app: string | null
           menstrual_tracking_enabled: boolean | null
@@ -315,6 +319,7 @@ export type Database = {
         Insert: {
           age?: number | null
           allergies_restrictions?: string | null
+          allergies_restrictions_encrypted?: string | null
           assigned_routine_id?: string | null
           available_days_per_week?: number | null
           available_weekdays?: string[] | null
@@ -322,6 +327,7 @@ export type Database = {
           created_at?: string
           current_calorie_intake?: number | null
           current_medications?: string | null
+          current_medications_encrypted?: string | null
           daily_calorie_goal?: number | null
           daily_carbs_goal?: number | null
           daily_fat_goal?: number | null
@@ -332,11 +338,13 @@ export type Database = {
           full_name: string
           gender?: string | null
           health_conditions?: string[] | null
+          health_conditions_encrypted?: string | null
           height?: number | null
           id: string
           initial_measurements?: Json | null
           initial_photo_url?: string | null
           injuries_limitations?: string | null
+          injuries_limitations_encrypted?: string | null
           menstrual_auto_sync?: boolean | null
           menstrual_tracking_app?: string | null
           menstrual_tracking_enabled?: boolean | null
@@ -356,6 +364,7 @@ export type Database = {
         Update: {
           age?: number | null
           allergies_restrictions?: string | null
+          allergies_restrictions_encrypted?: string | null
           assigned_routine_id?: string | null
           available_days_per_week?: number | null
           available_weekdays?: string[] | null
@@ -363,6 +372,7 @@ export type Database = {
           created_at?: string
           current_calorie_intake?: number | null
           current_medications?: string | null
+          current_medications_encrypted?: string | null
           daily_calorie_goal?: number | null
           daily_carbs_goal?: number | null
           daily_fat_goal?: number | null
@@ -373,11 +383,13 @@ export type Database = {
           full_name?: string
           gender?: string | null
           health_conditions?: string[] | null
+          health_conditions_encrypted?: string | null
           height?: number | null
           id?: string
           initial_measurements?: Json | null
           initial_photo_url?: string | null
           injuries_limitations?: string | null
+          injuries_limitations_encrypted?: string | null
           menstrual_auto_sync?: boolean | null
           menstrual_tracking_app?: string | null
           menstrual_tracking_enabled?: boolean | null
@@ -682,6 +694,9 @@ export type Database = {
         Args: { date_val: string }
         Returns: number
       }
+      decrypt_health_data: { Args: { encrypted_data: string }; Returns: string }
+      encrypt_health_data: { Args: { data: string }; Returns: string }
+      get_encryption_key: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
