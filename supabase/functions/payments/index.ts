@@ -30,9 +30,31 @@ serve(async (req) => {
       const { plan, userId } = await req.json();
 
       console.log("Creating Stripe checkout session for user:", userId, "plan:", plan);
+      
+      // Get origin from header or use SUPABASE_URL as fallback
+      const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/');
+      
+      if (!origin) {
+        console.error("No origin or referer header found in request");
+        return new Response(
+          JSON.stringify({ error: "No se pudo determinar la URL de origen" }),
+          { 
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      console.log("Using origin for redirect URLs:", origin);
 
       // Define prices based on plan (in centavos MXN)
       const amount = plan === "anual" ? 105800 : 9800; // 98 MXN mensual, 1058 MXN anual
+      
+      const successUrl = `${origin}/profile?payment=success`;
+      const cancelUrl = `${origin}/profile?payment=canceled`;
+      
+      console.log("Success URL:", successUrl);
+      console.log("Cancel URL:", cancelUrl);
       
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
@@ -55,12 +77,13 @@ serve(async (req) => {
             quantity: 1,
           },
         ],
-        success_url: `${req.headers.get('origin')}/profile?payment=success`,
-        cancel_url: `${req.headers.get('origin')}/profile?payment=canceled`,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
         metadata: { userId, plan },
       });
 
       console.log("Stripe session created:", session.id);
+      console.log("Redirect URL:", session.url);
 
       return new Response(JSON.stringify({ url: session.url }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -72,7 +95,10 @@ serve(async (req) => {
       const sig = req.headers.get("stripe-signature");
       const body = await req.text();
 
+      console.log("=== WEBHOOK RECEIVED ===");
+
       if (!sig) {
+        console.error("ERROR: No stripe-signature header");
         return new Response("No signature", { status: 400 });
       }
 
@@ -83,20 +109,26 @@ serve(async (req) => {
           Deno.env.get("STRIPE_WEBHOOK_SECRET")!
         );
 
-        console.log("Stripe webhook event:", event.type);
+        console.log("Webhook event type:", event.type);
+        console.log("Webhook event ID:", event.id);
 
         if (event.type === "checkout.session.completed") {
           const session = event.data.object as any;
           const { userId, plan } = session.metadata;
 
-          console.log("Processing checkout completion for user:", userId);
+          console.log("=== CHECKOUT COMPLETED ===");
+          console.log("User ID:", userId);
+          console.log("Plan:", plan);
+          console.log("Customer ID:", session.customer);
+          console.log("Subscription ID:", session.subscription);
+          console.log("Payment status:", session.payment_status);
 
           // Get customer and subscription info
           const customerId = session.customer;
           const subscriptionId = session.subscription;
 
           // Insert or update subscription
-          const { error } = await supabase
+          const { data: subData, error: subError } = await supabase
             .from("user_subscriptions")
             .upsert({
               user_id: userId,
@@ -114,12 +146,30 @@ serve(async (req) => {
               onConflict: 'user_id',
             });
 
-          if (error) {
-            console.error("Error inserting subscription:", error);
-            throw error;
+          if (subError) {
+            console.error("ERROR inserting subscription:", subError);
+            throw subError;
           }
 
-          console.log("Subscription activated for user:", userId);
+          console.log("✅ Subscription created/updated");
+
+          // Update user role to PRO
+          const { data: roleData, error: roleError } = await supabase
+            .from("user_roles")
+            .upsert({
+              user_id: userId,
+              role: "pro",
+            }, {
+              onConflict: 'user_id,role',
+            });
+
+          if (roleError) {
+            console.error("ERROR updating user role:", roleError);
+          } else {
+            console.log("✅ User role updated to PRO");
+          }
+
+          console.log("=== CHECKOUT PROCESSING COMPLETE ===");
         }
 
         if (event.type === "invoice.payment_succeeded") {
@@ -168,7 +218,8 @@ serve(async (req) => {
         });
       } catch (err) {
         console.error("Error processing webhook:", err);
-        return new Response(`Webhook Error: ${err.message}`, { 
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        return new Response(`Webhook Error: ${errorMessage}`, { 
           status: 400,
           headers: corsHeaders,
         });
@@ -313,8 +364,9 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Error in payments function:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { 
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
