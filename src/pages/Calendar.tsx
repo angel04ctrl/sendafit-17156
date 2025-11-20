@@ -269,44 +269,100 @@ const Calendar = () => {
                 })}
               </div>
 
-              <Card className="p-3 sm:p-4 shadow-card">
-                <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3">
-                  Entrenamientos para {format(selectedDate, "EEEE, d 'de' MMMM", { locale: es })}
-                </h3>
-                {getWorkoutsForDate(selectedDate).length === 0 ? (
-                  <p className="text-muted-foreground">
-                    No hay entrenamientos programados para este día
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+                {/* Entrenamientos Pendientes */}
+                <Card className="p-3 sm:p-4 shadow-card">
+                  <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3">
+                    Entrenamientos Pendientes
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {format(selectedDate, "EEEE, d 'de' MMMM", { locale: es })}
                   </p>
-                ) : (
-                  <div className="space-y-3">
-                    {getWorkoutsForDate(selectedDate).map((workout) => (
-                      <div
-                        key={workout.id}
-                        className="p-3 bg-muted rounded-lg"
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <h4 className="font-semibold">{workout.name}</h4>
-                          {workout.completed && (
-                            <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">
-                              Completado
-                            </span>
-                          )}
-                        </div>
-                        {workout.description && (
-                          <p className="text-sm text-muted-foreground mb-2">
-                            {workout.description}
-                          </p>
-                        )}
-                        <div className="flex gap-4 text-sm text-muted-foreground">
-                          <span>{workout.duration_minutes} min</span>
-                          <span>~{workout.estimated_calories} kcal</span>
-                          <span className="capitalize">{workout.location}</span>
-                        </div>
+                  {(() => {
+                    const pendingWorkouts = getWorkoutsForDate(selectedDate).filter(w => !w.completed);
+                    
+                    if (pendingWorkouts.length === 0) {
+                      return (
+                        <p className="text-muted-foreground text-center py-6">
+                          No hay entrenamientos pendientes para este día
+                        </p>
+                      );
+                    }
+                    
+                    return (
+                      <div className="space-y-3">
+                        {pendingWorkouts.map((workout) => (
+                          <div
+                            key={workout.id}
+                            className="p-3 bg-muted rounded-lg"
+                          >
+                            <h4 className="font-semibold mb-2">{workout.name}</h4>
+                            {workout.description && (
+                              <p className="text-sm text-muted-foreground mb-2">
+                                {workout.description}
+                              </p>
+                            )}
+                            <div className="flex gap-4 text-sm text-muted-foreground">
+                              <span>{workout.duration_minutes} min</span>
+                              <span>~{workout.estimated_calories} kcal</span>
+                              <span className="capitalize">{workout.location}</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
+                    );
+                  })()}
+                </Card>
+
+                {/* Entrenamientos Completados */}
+                <Card className="p-3 sm:p-4 shadow-card">
+                  <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3">
+                    Entrenamientos Completados
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {format(selectedDate, "EEEE, d 'de' MMMM", { locale: es })}
+                  </p>
+                  {(() => {
+                    const completedWorkouts = getWorkoutsForDate(selectedDate).filter(w => w.completed);
+                    
+                    if (completedWorkouts.length === 0) {
+                      return (
+                        <p className="text-muted-foreground text-center py-6">
+                          Los entrenamientos que completes aparecerán aquí
+                        </p>
+                      );
+                    }
+                    
+                    return (
+                      <div className="space-y-3">
+                        {completedWorkouts.map((workout) => (
+                          <div
+                            key={workout.id}
+                            className="p-3 bg-primary/10 rounded-lg border border-primary/20"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <h4 className="font-semibold">{workout.name}</h4>
+                              <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">
+                                Completado
+                              </span>
+                            </div>
+                            {workout.description && (
+                              <p className="text-sm text-muted-foreground mb-2">
+                                {workout.description}
+                              </p>
+                            )}
+                            <div className="flex gap-4 text-sm text-muted-foreground">
+                              <span>{workout.duration_minutes} min</span>
+                              <span>~{workout.estimated_calories} kcal</span>
+                              <span className="capitalize">{workout.location}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </Card>
+              </div>
             </>
           )}
         </div>
