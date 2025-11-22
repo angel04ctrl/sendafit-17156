@@ -56,6 +56,12 @@ const Dashboard = () => {
           .eq("id", user.id)
           .single();
 
+        console.log('Dashboard - Perfil del usuario:', {
+          available_weekdays: profileData?.available_weekdays,
+          assigned_routine_id: profileData?.assigned_routine_id,
+          available_days_per_week: profileData?.available_days_per_week,
+        });
+
         setProfile(profileData);
 
         const today = format(new Date(), "yyyy-MM-dd");

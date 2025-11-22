@@ -111,9 +111,14 @@ const Workouts = () => {
       // Fetch profile with assigned routine
       const { data: profileData } = await sb
         .from("profiles")
-        .select("assigned_routine_id")
+        .select("assigned_routine_id, available_weekdays")
         .eq("id", user.id)
         .single();
+
+      console.log('Workouts - Perfil del usuario:', {
+        available_weekdays: profileData?.available_weekdays,
+        assigned_routine_id: profileData?.assigned_routine_id,
+      });
 
       setProfile(profileData);
 
@@ -256,6 +261,16 @@ const Workouts = () => {
   
   // Use backend data for today's workouts
   const todayWorkouts = todaysData?.workouts || [];
+  
+  console.log('Workouts - Entrenamientos de hoy:', {
+    count: todayWorkouts.length,
+    workouts: todayWorkouts.map(w => ({ 
+      name: w.name, 
+      weekday: w.weekday, 
+      scheduled_date: w.scheduled_date,
+      plan_id: w.plan_id,
+    })),
+  });
   
   // Filter "other days" workouts to only show current plan's workouts
   const otherDaysWorkouts = workouts.filter((w) => {

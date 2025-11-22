@@ -66,24 +66,31 @@ const Calendar = () => {
   }, []);
 
   // Función para obtener entrenamientos de una fecha específica
-  // Intenta primero match exacto por fecha, luego por día de la semana
+  // Busca primero por fecha exacta (scheduled_date), luego por día de la semana (weekday)
   const getWorkoutsForDate = (date: Date) => {
-    // Normalizar la fecha a medianoche hora local
+    // Normalizar la fecha a medianoche hora local para comparación precisa
     const compareDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-    // First, try strict match by scheduled_date within the fetched range
+    // Estrategia 1: Match exacto por scheduled_date
     const directMatches = workouts.filter((w) => {
       if (!w.scheduled_date) return false;
+      // Parsear scheduled_date como fecha local (no UTC)
       const [year, month, day] = w.scheduled_date.split('-').map(Number);
       const workoutDate = new Date(year, month - 1, day);
       return workoutDate.getTime() === compareDate.getTime();
     });
     if (directMatches.length > 0) return directMatches;
 
-    // Fallback: match by weekday to handle generation date drift
-    const jsDay = compareDate.getDay(); // 0=Sun..6=Sat
-    const weekdayNumber = jsDay === 0 ? 7 : jsDay; // 1=Mon..7=Sun
-    return workouts.filter((w) => w.weekday === weekdayNumber);
+    // Estrategia 2: Match por weekday (fallback para entrenamientos recurrentes)
+    // Convertir JS day (0=Domingo) a weekday format (1=Lunes, 7=Domingo)
+    const jsDay = compareDate.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    const weekdayNumber = jsDay === 0 ? 7 : jsDay; // 1=Mon, 2=Tue, ..., 7=Sun
+    
+    console.log(`Calendar: Buscando workouts para fecha ${format(compareDate, 'yyyy-MM-dd')}, jsDay: ${jsDay}, weekday: ${weekdayNumber}`);
+    const weekdayMatches = workouts.filter((w) => w.weekday === weekdayNumber);
+    console.log(`Calendar: Encontrados ${weekdayMatches.length} workouts con weekday=${weekdayNumber}`, weekdayMatches.map(w => ({ name: w.name, weekday: w.weekday, date: w.scheduled_date })));
+    
+    return weekdayMatches;
   };
 
   return (

@@ -289,6 +289,8 @@ serve(async (req) => {
         5: 'Viernes', 6: 'Sábado', 0: 'Domingo'
       };
       const actualDayName = dayNameMapping[calculatedDayOfWeek];
+      
+      console.log(`Generando workout: dayCode=${dayCode}, weekday=${weekday}, fecha=${dateStr}, JS day=${calculatedDayOfWeek}, nombre=${actualDayName}`);
       const planDayIndex = index % planDays.length;
       const planDay = planDays[planDayIndex];
       const dayExercises = exercisesByDay[planDay];
