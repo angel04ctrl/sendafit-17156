@@ -1,5 +1,15 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+/**
+ * Index.tsx - Página de índice (fallback)
+ * 
+ * Este documento es una página de respaldo que no se usa normalmente en la app.
+ * La ruta raíz redirige directamente a /auth, pero este componente existe como
+ * fallback en caso de que algo falle en la redirección.
+ */
 
+/**
+ * Componente Index
+ * Este bloque muestra un mensaje genérico de bienvenida
+ */
 const Index = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
