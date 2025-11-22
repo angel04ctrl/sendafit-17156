@@ -53,6 +53,17 @@ const Profile = () => {
   const redistributeMutation = useRedistributeWorkouts();
   const queryClient = useQueryClient();
 
+  // Debug logging
+  useEffect(() => {
+    console.log('Profile State Debug:', { 
+      userRole, 
+      subscriptionStatus, 
+      isPro: userRole === "pro", 
+      isActive: subscriptionStatus === "active",
+      showUpgradeButton: userRole !== "pro" && subscriptionStatus !== "active"
+    });
+  }, [userRole, subscriptionStatus]);
+
   useEffect(() => {
     const loadProfile = async () => {
       setLoading(true);
@@ -307,31 +318,30 @@ const Profile = () => {
             </p>
           </div>
 
-          <Card className="p-3 sm:p-4 shadow-card bg-gradient-card">
+           <Card className="p-3 sm:p-4 shadow-card bg-gradient-card">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h3 className="text-base sm:text-lg font-semibold">Plan Actual</h3>
                 <p className="text-sm text-muted-foreground">
-                  {profile?.full_name ? 
-                    `${profile.full_name.split(' ')[0]} ${profile.full_name.split(' ')[1]?.charAt(0) || ''}.` 
-                    : user?.email}
+                  {user?.email}
                 </p>
               </div>
               <Badge variant={userRole === "pro" || subscriptionStatus === "active" ? "default" : "secondary"} className="text-lg px-4 py-2">
                 {userRole === "pro" || subscriptionStatus === "active" ? "PRO" : "Básico"}
               </Badge>
             </div>
-            {userRole !== "pro" && subscriptionStatus !== "active" && (
+            
+            {(userRole !== "pro" && subscriptionStatus !== "active") ? (
               <div className="mt-4 space-y-3">
                 <div className="p-4 bg-primary/10 rounded-lg">
                   <p className="text-sm font-medium mb-2">
-                    🌟 Lo que incluye el plan PRO
+                    🌟 Actualiza a PRO y desbloquea
                   </p>
                   <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Análisis avanzado con IA</li>
+                    <li>• Chat con entrenador IA personalizado</li>
+                    <li>• Análisis avanzado con inteligencia artificial</li>
                     <li>• Integración con apps de ciclo menstrual</li>
-                    <li>• Chat con entrenador virtual 24/7</li>
-                    <li>• Planes personalizados avanzados</li>
+                    <li>• Planes de entrenamiento premium</li>
                     <li>• Estadísticas y gráficos detallados</li>
                   </ul>
                 </div>
@@ -339,14 +349,26 @@ const Profile = () => {
                 <Button 
                   className="w-full" 
                   size="lg"
-                  onClick={() => setPaymentModalOpen(true)}
+                  onClick={() => {
+                    console.log('Opening payment modal');
+                    setPaymentModalOpen(true);
+                  }}
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Actualizar a PRO
+                  Actualizar a PRO - $4.99/mes
                 </Button>
                 
                 <p className="text-xs text-center text-muted-foreground">
-                  Pago seguro y sin compromisos
+                  Cancela cuando quieras • Pago seguro con Stripe
+                </p>
+              </div>
+            ) : (
+              <div className="mt-4 p-4 bg-primary/10 rounded-lg">
+                <p className="text-sm font-medium mb-1">
+                  ✨ Eres miembro PRO
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Disfruta de todas las funciones premium sin límites
                 </p>
               </div>
             )}
