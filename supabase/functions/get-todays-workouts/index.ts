@@ -48,12 +48,13 @@ serve(async (req) => {
       console.error('Error fetching profile:', profileError);
     }
 
-    // Calculate today's weekday (1-7 where 1=Monday)
+    // Calculate today's weekday (1-7 where 1=Monday, 7=Sunday)
+    // IMPORTANTE: Usamos la fecha local del servidor, no UTC
     const now = new Date();
     const dayOfWeek = now.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
     const weekday = dayOfWeek === 0 ? 7 : dayOfWeek; // Convert to 1-7 where 1=Monday, 7=Sunday
 
-    console.log(`Today's weekday: ${weekday}, Assigned plan: ${profile?.assigned_routine_id || 'none'}`);
+    console.log(`Today's date: ${now.toISOString()}, JS day: ${dayOfWeek}, Weekday: ${weekday}, Assigned plan: ${profile?.assigned_routine_id || 'none'}`);
 
     // Fetch today's workouts by weekday and plan_id (more reliable than date)
     let query = supabase
