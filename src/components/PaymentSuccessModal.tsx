@@ -13,7 +13,8 @@ export const PaymentSuccessModal = ({ open, onOpenChange }: PaymentSuccessModalP
 
   const handleContinue = () => {
     onOpenChange(false);
-    // Remove query parameters from URL and reload
+    // Limpiar parámetros de URL y recargar página para refrescar el estado PRO
+    // Esto asegura que todos los componentes vean el nuevo estado
     window.location.href = "/profile";
   };
 

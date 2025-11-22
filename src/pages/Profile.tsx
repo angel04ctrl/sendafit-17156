@@ -91,10 +91,49 @@ const Profile = () => {
       // Verificar si viene desde redirección de pago
       const paymentStatus = searchParams.get("payment");
       if (paymentStatus === "success") {
-        // Esperar un poco para que el webhook procese el pago
-        setTimeout(() => {
-          setShowSuccessModal(true);
-        }, 1000);
+        // Implementar polling para verificar cambio de rol PRO
+        // El webhook de Stripe puede tardar unos segundos en procesar
+        let attempts = 0;
+        const maxAttempts = 10;
+        
+        const checkProStatus = async () => {
+          attempts++;
+          const { data: roleData } = await sb
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", user?.id)
+            .maybeSingle();
+          
+          const { data: subscriptionData } = await sb
+            .from("user_subscriptions")
+            .select("status")
+            .eq("user_id", user?.id)
+            .maybeSingle();
+          
+          // Si ya es PRO, mostrar modal de éxito
+          if (roleData?.role === "pro" || subscriptionData?.status === "active") {
+            setUserRole("pro");
+            setSubscriptionStatus("active");
+            setShowSuccessModal(true);
+            return true;
+          }
+          
+          // Si no es PRO aún y no hemos llegado al máximo de intentos, reintentar
+          if (attempts < maxAttempts) {
+            setTimeout(checkProStatus, 2000); // Reintentar cada 2 segundos
+          } else {
+            // Después de 20 segundos, mostrar el modal de todas formas
+            // El usuario puede refrescar manualmente si es necesario
+            setShowSuccessModal(true);
+            toast.info("Actualizando estado de tu cuenta...", {
+              description: "Si no ves los cambios, recarga la página"
+            });
+          }
+          return false;
+        };
+        
+        // Iniciar verificación después de 1 segundo
+        setTimeout(checkProStatus, 1000);
       } else if (paymentStatus === "canceled") {
         toast.error("Pago cancelado. Puedes intentar de nuevo cuando quieras.");
       }
@@ -103,13 +142,13 @@ const Profile = () => {
     loadProfile();
   }, [user, searchParams]);
 
-  // Bloque de suscripción en tiempo real - Escucha cambios en el perfil (actualizaciones de plan)
-  // Útil cuando el webhook de Stripe actualiza la suscripción
+  // Bloque de suscripción en tiempo real - Escucha cambios en el perfil y roles
+  // Se activa cuando el webhook de Stripe actualiza la suscripción y el rol
   useEffect(() => {
     if (!user) return;
 
     const channel = supabase
-      .channel('profile-changes')
+      .channel('profile-and-roles-changes')
       .on(
         'postgres_changes',
         {
@@ -120,6 +159,34 @@ const Profile = () => {
         },
         (payload) => {
           console.log('Profile updated:', payload);
+          fetchProfile();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // INSERT, UPDATE o DELETE
+          schema: 'public',
+          table: 'user_roles',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('User role updated:', payload);
+          // Recargar perfil inmediatamente cuando cambia el rol
+          fetchProfile();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // INSERT, UPDATE o DELETE
+          schema: 'public',
+          table: 'user_subscriptions',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Subscription updated:', payload);
+          // Recargar perfil inmediatamente cuando cambia la suscripción
           fetchProfile();
         }
       )
