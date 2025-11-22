@@ -1,3 +1,14 @@
+/**
+ * App.tsx - Componente raíz de la aplicación SendaFit
+ * 
+ * Este documento es el punto de entrada principal de la aplicación.
+ * Se encarga de:
+ * - Configurar el enrutamiento de la aplicación con React Router
+ * - Envolver la app con providers necesarios (Query, Theme, Auth)
+ * - Definir todas las rutas disponibles
+ * - Configurar componentes de notificaciones (Toaster, Sonner)
+ */
+
 import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -15,6 +26,12 @@ import Calendar from "./pages/Calendar";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
+/**
+ * Configuración del cliente de React Query
+ * Este bloque configura las opciones por defecto para las consultas de datos:
+ * - retry: 1 intento de reintentar solicitudes fallidas
+ * - refetchOnWindowFocus: false para no refrescar datos automáticamente al enfocar la ventana
+ */
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -24,6 +41,11 @@ const queryClient = new QueryClient({
   },
 });
 
+/**
+ * Componente principal App
+ * Este bloque define la estructura principal de la aplicación con todos los providers
+ * y rutas necesarias
+ */
 const App = () => {
   return (
     <BrowserRouter
@@ -32,21 +54,37 @@ const App = () => {
         v7_relativeSplatPath: true,
       }}
     >
+      {/* Provider de React Query para gestión de estado del servidor */}
       <QueryClientProvider client={queryClient}>
+        {/* Provider de tema para modo claro/oscuro */}
         <ThemeProvider>
+          {/* Provider de autenticación para gestión de usuarios */}
           <AuthProvider>
+            {/* Provider de tooltips para componentes UI */}
             <TooltipProvider>
+              {/* Componentes de notificaciones */}
               <Toaster />
               <Sonner />
+              
+              {/* Definición de todas las rutas de la aplicación */}
               <Routes>
+                {/* Ruta raíz redirige a autenticación */}
                 <Route path="/" element={<Navigate to="/auth" replace />} />
+                {/* Ruta de autenticación (login/registro) */}
                 <Route path="/auth" element={<Auth />} />
+                {/* Ruta de onboarding para nuevos usuarios */}
                 <Route path="/onboarding" element={<OnboardingForm />} />
+                {/* Ruta del dashboard principal */}
                 <Route path="/dashboard" element={<Dashboard />} />
+                {/* Ruta de seguimiento de macros/nutrición */}
                 <Route path="/macros" element={<Macros />} />
+                {/* Ruta de gestión de entrenamientos */}
                 <Route path="/workouts" element={<Workouts />} />
+                {/* Ruta del calendario de entrenamientos */}
                 <Route path="/calendar" element={<Calendar />} />
+                {/* Ruta del perfil de usuario */}
                 <Route path="/profile" element={<Profile />} />
+                {/* Ruta 404 para páginas no encontradas */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </TooltipProvider>

@@ -1,3 +1,15 @@
+/**
+ * TodaysWorkouts.tsx - Componente de entrenamientos del día
+ * 
+ * Este documento muestra los entrenamientos programados para hoy.
+ * Se encarga de:
+ * - Obtener entrenamientos del día desde la API backend
+ * - Mostrar lista de entrenamientos con sus detalles
+ * - Permitir marcar entrenamientos como completados/pendientes
+ * - Mostrar ejercicios asociados a cada entrenamiento
+ * - Actualizar en tiempo real el estado de los entrenamientos
+ */
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,12 +20,26 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+/**
+ * Componente TodaysWorkouts
+ * Este bloque maneja la visualización y gestión de entrenamientos del día
+ */
 export const TodaysWorkouts = () => {
+  /**
+   * Hooks y estado
+   * - useTodaysWorkouts: obtiene los entrenamientos del día desde el backend
+   * - completingWorkout: tracking del workout que se está marcando como completado
+   * - queryClient: para invalidar queries y refrescar datos
+   */
   const { data, isLoading, error } = useTodaysWorkouts();
   const [completingWorkout, setCompletingWorkout] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const sb = supabase as any;
 
+  /**
+   * Handler para marcar workout como completado/incompleto
+   * Este bloque actualiza el estado de un entrenamiento en la base de datos
+   */
   const handleCompleteWorkout = async (workoutId: string, currentStatus: boolean) => {
     setCompletingWorkout(workoutId);
     try {
@@ -27,6 +53,7 @@ export const TodaysWorkouts = () => {
 
       if (error) throw error;
 
+      // Invalidar queries para refrescar los datos
       queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
       queryClient.invalidateQueries({ queryKey: ['progress-stats'] });
       toast.success(!currentStatus ? '¡Entrenamiento completado!' : 'Entrenamiento marcado como incompleto');
@@ -38,6 +65,10 @@ export const TodaysWorkouts = () => {
     }
   };
 
+  /**
+   * Estado de carga
+   * Este bloque muestra un spinner mientras se cargan los datos
+   */
   if (isLoading) {
     return (
       <Card>
@@ -54,6 +85,10 @@ export const TodaysWorkouts = () => {
     );
   }
 
+  /**
+   * Estado de error
+   * Este bloque muestra un mensaje de error si algo falla
+   */
   if (error) {
     return (
       <Card>
@@ -72,6 +107,10 @@ export const TodaysWorkouts = () => {
 
   const workouts = data?.workouts || [];
 
+  /**
+   * Renderizado de entrenamientos
+   * Este bloque muestra la lista de entrenamientos del día con todos sus detalles
+   */
   return (
     <Card className="bg-gradient-card border-primary/20 border-2 shadow-card">
       <CardHeader>
@@ -86,6 +125,7 @@ export const TodaysWorkouts = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Mensaje cuando no hay entrenamientos */}
         {workouts.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Dumbbell className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -93,6 +133,7 @@ export const TodaysWorkouts = () => {
             <p className="text-xs mt-1">¡Disfruta tu día de descanso!</p>
           </div>
         ) : (
+          /* Lista de entrenamientos */
           workouts.map((workout: any) => (
             <div
               key={workout.id}
@@ -104,6 +145,7 @@ export const TodaysWorkouts = () => {
             >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
+                  {/* Checkbox para marcar como completado */}
                   <Checkbox
                     checked={workout.completed}
                     onCheckedChange={() => handleCompleteWorkout(workout.id, workout.completed)}
@@ -111,12 +153,15 @@ export const TodaysWorkouts = () => {
                     className="mt-1 flex-shrink-0"
                   />
                   <div className="flex-1 min-w-0">
+                    {/* Nombre y descripción del entrenamiento */}
                     <h4 className={`font-semibold text-sm sm:text-base mb-1 break-words ${workout.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                       {workout.name}
                     </h4>
                     {workout.description && (
                       <p className="text-xs sm:text-sm text-muted-foreground mb-2 break-words">{workout.description}</p>
                     )}
+                    
+                    {/* Badges con información del entrenamiento */}
                     <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                       {workout.duration_minutes && (
                         <span className="flex items-center gap-1 flex-shrink-0">
@@ -145,6 +190,7 @@ export const TodaysWorkouts = () => {
                 </div>
               </div>
               
+              {/* Lista de ejercicios del entrenamiento */}
               {workout.workout_exercises && workout.workout_exercises.length > 0 && (
                 <div className="mt-3 pt-3 border-t">
                   <p className="text-xs font-medium mb-2 text-muted-foreground">

@@ -1,16 +1,35 @@
+/**
+ * StatCard.tsx - Componente de tarjeta de estadística
+ * 
+ * Este documento define un componente reutilizable para mostrar estadísticas.
+ * Se encarga de:
+ * - Mostrar un valor numérico o de texto destacado
+ * - Incluir un icono representativo
+ * - Soportar múltiples variantes de color (primary, secondary, accent, default)
+ * - Animaciones hover para mejor UX
+ */
+
 import { LucideIcon } from "lucide-react";
 import { Card } from "./ui/card";
 import { cn } from "@/lib/utils";
 
+/**
+ * Interfaz de props del componente StatCard
+ * Define todos los parámetros que acepta el componente
+ */
 interface StatCardProps {
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  icon: LucideIcon;
-  variant?: "default" | "primary" | "secondary" | "accent";
-  className?: string;
+  title: string;          // Título de la estadística
+  value: string | number; // Valor principal a mostrar
+  subtitle?: string;      // Subtítulo opcional (ej: "Meta: 2000 kcal")
+  icon: LucideIcon;       // Icono de Lucide React
+  variant?: "default" | "primary" | "secondary" | "accent"; // Variante de color
+  className?: string;     // Clases adicionales opcionales
 }
 
+/**
+ * Componente StatCard
+ * Este bloque renderiza una tarjeta con estadísticas estilizada
+ */
 export const StatCard = ({
   title,
   value,
@@ -19,6 +38,10 @@ export const StatCard = ({
   variant = "default",
   className,
 }: StatCardProps) => {
+  /**
+   * Definición de variantes de estilo
+   * Cada variante tiene sus propios colores de fondo y borde
+   */
   const variants = {
     default: "bg-gradient-card border-primary/20",
     primary: "bg-gradient-primary text-primary-foreground border-primary/30",
@@ -26,6 +49,10 @@ export const StatCard = ({
     accent: "bg-gradient-accent text-accent-foreground border-accent/30",
   };
 
+  /**
+   * Renderizado de la tarjeta
+   * Este bloque construye la UI de la stat card con todos sus elementos
+   */
   return (
     <Card
       className={cn(
@@ -35,6 +62,7 @@ export const StatCard = ({
       )}
     >
       <div className="flex items-start justify-between gap-2">
+        {/* Sección de texto (título, valor, subtítulo) */}
         <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
           <p className={cn(
             "text-[10px] sm:text-xs font-semibold truncate",
@@ -52,6 +80,8 @@ export const StatCard = ({
             </p>
           )}
         </div>
+        
+        {/* Contenedor del icono con estilo según variante */}
         <div className={cn(
           "p-2 sm:p-2.5 lg:p-3 rounded-xl flex-shrink-0 shadow-card",
           variant === "default" 

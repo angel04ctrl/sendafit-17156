@@ -1,21 +1,40 @@
+/**
+ * ProButton.tsx - Botón para funciones PRO
+ * 
+ * Este documento define un botón especial que promociona funciones premium.
+ * Se encarga de:
+ * - Mostrar un botón con badge "PRO"
+ * - Abrir modal de upgrade al hacer clic
+ * - Mostrar información sobre la función premium
+ * - Incentivar al usuario a actualizar su plan
+ */
+
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { LucideIcon, Lock } from "lucide-react";
 import { useState } from "react";
 import { UpgradeModal } from "./UpgradeModal";
 
+/**
+ * Interfaz de props del componente ProButton
+ * Define todos los parámetros configurables del botón PRO
+ */
 interface ProButtonProps {
-  icon: LucideIcon;
-  label: string;
-  featureTitle: string;
-  featureDescription: string;
-  features: string[];
-  variant?: "default" | "outline" | "ghost";
-  size?: "default" | "sm" | "lg";
-  className?: string;
-  disabled?: boolean;
+  icon: LucideIcon;          // Icono que acompaña al botón
+  label: string;             // Texto del botón
+  featureTitle: string;      // Título de la función PRO en el modal
+  featureDescription: string; // Descripción de la función PRO
+  features: string[];        // Lista de características incluidas
+  variant?: "default" | "outline" | "ghost"; // Estilo del botón
+  size?: "default" | "sm" | "lg";           // Tamaño del botón
+  className?: string;        // Clases CSS adicionales
+  disabled?: boolean;        // Estado deshabilitado
 }
 
+/**
+ * Componente ProButton
+ * Este bloque renderiza un botón promocional que abre el modal de upgrade
+ */
 export const ProButton = ({
   icon: Icon,
   label,
@@ -27,10 +46,19 @@ export const ProButton = ({
   className = "",
   disabled = false,
 }: ProButtonProps) => {
+  /**
+   * Estado del modal de upgrade
+   * Controla la visibilidad del modal de actualización a PRO
+   */
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
 
+  /**
+   * Renderizado del botón y modal
+   * Este bloque muestra el botón PRO y el modal asociado
+   */
   return (
     <>
+      {/* Botón PRO con badge de candado */}
       <Button
         variant={variant}
         size={size}
@@ -46,6 +74,7 @@ export const ProButton = ({
         </Badge>
       </Button>
 
+      {/* Modal de upgrade con detalles de la función PRO */}
       <UpgradeModal
         open={upgradeModalOpen}
         onOpenChange={setUpgradeModalOpen}
