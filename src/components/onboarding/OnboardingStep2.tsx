@@ -1,3 +1,16 @@
+/**
+ * OnboardingStep2.tsx - Paso 2 del onboarding: Objetivos y Nivel
+ * 
+ * Este componente define el plan de entrenamiento del usuario.
+ * Se encarga de:
+ * - Seleccionar objetivo principal (bajar grasa, ganar masa, etc.)
+ * - Definir nivel de fitness (principiante, intermedio, avanzado)
+ * - Elegir tipos de entrenamiento preferidos (gimnasio, casa, funcional, etc.)
+ * - Especificar días por semana disponibles para entrenar
+ * - Definir duración de sesiones de entrenamiento
+ * - Seleccionar días específicos de la semana para entrenar
+ */
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,6 +30,7 @@ const trainingOptions = [
 ];
 
 const OnboardingStep2 = ({ formData, updateFormData }: OnboardingStep2Props) => {
+  // Función para agregar/quitar tipos de entrenamiento de la selección
   const toggleTrainingType = (type: string) => {
     const current = formData.trainingTypes || [];
     const updated = current.includes(type)

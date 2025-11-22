@@ -1,3 +1,15 @@
+/**
+ * OnboardingStep5.tsx - Paso 5 del onboarding: Nutrición y Hábitos
+ * 
+ * Este componente recopila información sobre alimentación y estilo de vida.
+ * Se encarga de:
+ * - Seleccionar preferencias alimenticias (vegano, vegetariano, keto, normal, paleo)
+ * - Registrar alergias o restricciones alimentarias (opcional)
+ * - Ingresar consumo calórico actual estimado (opcional)
+ * - Especificar horas de sueño promedio por noche
+ * - Evaluar nivel de estrés percibido (escala 1-5)
+ */
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +30,8 @@ const dietaryOptions = [
 ];
 
 const OnboardingStep5 = ({ formData, updateFormData }: OnboardingStep5Props) => {
+  // Función para agregar/quitar preferencias alimenticias
+  // Permite múltiples selecciones simultáneas
   const toggleDietaryPreference = (pref: string) => {
     const current = formData.dietaryPreferences || [];
     const updated = current.includes(pref)

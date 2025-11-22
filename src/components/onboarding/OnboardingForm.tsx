@@ -1,3 +1,18 @@
+/**
+ * OnboardingForm.tsx - Formulario principal de onboarding
+ * 
+ * Este componente orquesta todo el proceso de registro y configuración inicial del usuario.
+ * Se encarga de:
+ * - Gestionar 7 pasos de onboarding con validación en cada paso
+ * - Verificar si el usuario ya completó onboarding (redirigir a dashboard)
+ * - Verificar si hay registro pendiente en sessionStorage
+ * - Calcular macros automáticamente basados en datos del perfil
+ * - Crear cuenta de usuario en Supabase Auth
+ * - Crear perfil completo en base de datos
+ * - Asignar rutina automática al finalizar
+ * - Prevenir cierre accidental de ventana durante el proceso
+ */
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -16,20 +31,25 @@ import OnboardingStep7 from "./OnboardingStep7";
 
 const OnboardingForm = () => {
   const navigate = useNavigate();
+  // Estado del paso actual (1-7)
   const [currentStep, setCurrentStep] = useState(1);
+  // Estado de carga durante envío del formulario
   const [loading, setLoading] = useState(false);
+  // Estado de verificación inicial del perfil
   const [checkingProfile, setCheckingProfile] = useState(true);
+  // Datos acumulados del formulario de onboarding
   const [formData, setFormData] = useState<any>({});
   const sb = supabase as any;
 
-  const totalSteps = 7;
-  const progress = (currentStep / totalSteps) * 100;
+  const totalSteps = 7; // Total de pasos en el proceso
+  const progress = (currentStep / totalSteps) * 100; // Porcentaje de progreso
 
-  // Verificar si hay registro pendiente o si ya completó onboarding
+  // Bloque de verificación inicial - Verifica estado de onboarding o registro pendiente
+  // Evita que usuarios autenticados que ya completaron onboarding vuelvan aquí
   useEffect(() => {
     const checkOnboardingStatus = async () => {
       try {
-        // Si hay usuario autenticado, verificar su estado
+        // Verificar si hay usuario autenticado
         const { data: { user } } = await supabase.auth.getUser();
         
         if (user) {
@@ -72,7 +92,8 @@ const OnboardingForm = () => {
     checkOnboardingStatus();
   }, [navigate]);
 
-  // Prevenir cierre de ventana/pestaña sin completar y alertar al usuario
+  // Bloque de prevención de cierre - Evita que el usuario pierda su progreso
+  // Muestra advertencias si intenta cerrar la ventana durante el registro
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (currentStep > 0) {
@@ -104,13 +125,16 @@ const OnboardingForm = () => {
     );
   }
 
+  // Función helper para actualizar datos del formulario de forma incremental
   const updateFormData = (data: any) => {
     setFormData((prev: any) => ({ ...prev, ...data }));
   };
 
+  // Función de validación por paso - Verifica que cada paso tenga datos completos
+  // Retorna true si el paso actual está validado correctamente
   const validateStep = () => {
     switch (currentStep) {
-      case 1:
+      case 1: // Validar datos personales
         if (!formData.fullName || !formData.age || !formData.gender || !formData.height || !formData.weight) {
           toast.error("Por favor completa todos los campos obligatorios");
           return false;
@@ -185,12 +209,14 @@ const OnboardingForm = () => {
     }
   };
 
+  // Función principal de envío - Ejecuta todo el proceso de creación de cuenta
+  // Incluye: crear usuario, calcular macros, crear perfil, asignar rutina
   const handleSubmit = async () => {
     if (!validateStep()) return;
     
     setLoading(true);
     try {
-      // Verificar si hay un usuario ya autenticado
+      // PASO 1: Verificar si hay un usuario ya autenticado
       const { data: { user: existingUser } } = await supabase.auth.getUser();
       
       let userId: string;
@@ -398,17 +424,18 @@ const OnboardingForm = () => {
     }
   };
 
+  // Función para renderizar el paso actual - Switch entre los 7 componentes
   const renderStep = () => {
     const stepProps = { formData, updateFormData };
     
     switch (currentStep) {
-      case 1: return <OnboardingStep1 {...stepProps} />;
-      case 2: return <OnboardingStep2 {...stepProps} />;
-      case 3: return <OnboardingStep3 {...stepProps} />;
-      case 4: return <OnboardingStep4 {...stepProps} />;
-      case 5: return <OnboardingStep5 {...stepProps} />;
-      case 6: return <OnboardingStep6 {...stepProps} />;
-      case 7: return <OnboardingStep7 {...stepProps} />;
+      case 1: return <OnboardingStep1 {...stepProps} />; // Datos personales
+      case 2: return <OnboardingStep2 {...stepProps} />; // Objetivos y nivel
+      case 3: return <OnboardingStep3 {...stepProps} />; // Salud y condiciones
+      case 4: return <OnboardingStep4 {...stepProps} />; // Ciclo menstrual (opcional)
+      case 5: return <OnboardingStep5 {...stepProps} />; // Nutrición y hábitos
+      case 6: return <OnboardingStep6 {...stepProps} />; // Medidas iniciales
+      case 7: return <OnboardingStep7 {...stepProps} />; // Preferencias y términos
       default: return null;
     }
   };

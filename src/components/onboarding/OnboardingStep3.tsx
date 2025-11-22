@@ -1,3 +1,14 @@
+/**
+ * OnboardingStep3.tsx - Paso 3 del onboarding: Salud y Condiciones
+ * 
+ * Este componente recopila información médica importante para personalizar el plan.
+ * Se encarga de:
+ * - Seleccionar condiciones de salud diagnosticadas (hipotiroidismo, diabetes, etc.)
+ * - Registrar medicamentos actuales (opcional)
+ * - Documentar lesiones o limitaciones físicas (opcional)
+ * - Validar que se marque al menos una opción (incluido "ninguna")
+ */
+
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,20 +30,26 @@ const healthConditions = [
 ];
 
 const OnboardingStep3 = ({ formData, updateFormData }: OnboardingStep3Props) => {
+  // Función para agregar/quitar condiciones de salud
+  // Si se selecciona "ninguna", limpia las demás opciones
+  // Si se selecciona otra opción, quita "ninguna" de la lista
   const toggleCondition = (condition: string) => {
     let current = formData.healthConditions || [];
     
+    // Si marca "ninguna", limpiar todo y solo dejar esa
     if (condition === "ninguna") {
       updateFormData({ healthConditions: ["ninguna"] });
       return;
     }
     
+    // Quitar "ninguna" si se selecciona otra condición
     current = current.filter((c: string) => c !== "ninguna");
     
     const updated = current.includes(condition)
       ? current.filter((c: string) => c !== condition)
       : [...current, condition];
     
+    // Si queda vacío, volver a marcar "ninguna"
     updateFormData({ healthConditions: updated.length ? updated : ["ninguna"] });
   };
 
