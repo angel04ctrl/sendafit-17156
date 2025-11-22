@@ -1,3 +1,16 @@
+/**
+ * Dashboard.tsx - Página principal del dashboard
+ * 
+ * Este documento muestra el resumen principal de la aplicación del usuario.
+ * Se encarga de:
+ * - Mostrar estadísticas de calorías, proteínas, ejercicio y nivel
+ * - Visualizar progreso de macros diarios
+ * - Listar entrenamientos del día (completados y pendientes)
+ * - Mostrar el gestor de rutinas con plan asignado
+ * - Ofrecer funciones PRO (análisis avanzado, consejos)
+ * - Adaptar vista móvil con carousel y vista desktop con grid
+ */
+
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { StatCard } from "@/components/StatCard";
@@ -17,22 +30,26 @@ import { DashboardMobileCarousel } from "@/components/DashboardMobileCarousel";
 import { useTodaysWorkouts } from "@/hooks/useBackendApi";
 
 const Dashboard = () => {
+  // Hook de autenticación
   const { user } = useAuth();
   const sb = supabase as any;
+  // Estados de datos del usuario
   const [profile, setProfile] = useState<any>(null);
   const [todayMacros, setTodayMacros] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
   const [loading, setLoading] = useState(true);
   const isMobile = useIsMobile();
   
-  // Use backend API for today's workouts
+  // Hook para obtener entrenamientos del día desde backend API
   const { data: todaysData } = useTodaysWorkouts();
   const todayWorkouts = todaysData?.workouts || [];
 
+  // Bloque de carga inicial - Obtiene perfil del usuario y comidas del día
   useEffect(() => {
     const fetchData = async () => {
       if (!user) return;
 
       try {
+        // Obtener perfil del usuario
         const { data: profileData } = await sb
           .from("profiles")
           .select("*")
@@ -43,6 +60,7 @@ const Dashboard = () => {
 
         const today = format(new Date(), "yyyy-MM-dd");
 
+        // Obtener comidas del día
         const { data: mealsData } = await sb
           .from("meals")
           .select("*")

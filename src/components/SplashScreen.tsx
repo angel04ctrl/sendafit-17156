@@ -1,3 +1,14 @@
+/**
+ * SplashScreen.tsx - Pantalla de carga inicial
+ * 
+ * Este componente muestra una animación de carga al iniciar la aplicación.
+ * Se encarga de:
+ * - Mostrar logo de SendaFit con animación
+ * - Animar barra de progreso de 0 a 100%
+ * - Llamar callback onComplete cuando termina la animación
+ * - Proporcionar una transición suave antes de mostrar contenido principal
+ */
+
 import { useEffect, useState } from "react";
 import { Dumbbell } from "lucide-react";
 
@@ -6,17 +17,20 @@ interface SplashScreenProps {
 }
 
 const SplashScreen = ({ onComplete }: SplashScreenProps) => {
+  // Estado del progreso de carga (0-100)
   const [progress, setProgress] = useState(0);
 
+  // Bloque de efecto - Incrementa progreso automáticamente cada 30ms
   useEffect(() => {
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
+          // Al llegar a 100%, limpiar intervalo y llamar callback
           clearInterval(interval);
           setTimeout(onComplete, 300);
           return 100;
         }
-        return prev + 2;
+        return prev + 2; // Incrementar 2% cada vez
       });
     }, 30);
 

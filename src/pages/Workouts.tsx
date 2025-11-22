@@ -1,3 +1,17 @@
+/**
+ * Workouts.tsx - Página de gestión de entrenamientos
+ * 
+ * Este documento gestiona todos los entrenamientos del usuario.
+ * Se encarga de:
+ * - Mostrar entrenamientos del día por ubicación (casa, gimnasio, exterior)
+ * - Listar entrenamientos de otros días del plan actual
+ * - Crear nuevos entrenamientos personalizados con ejercicios
+ * - Marcar entrenamientos como completados/pendientes
+ * - Eliminar entrenamientos
+ * - Agregar ejercicios desde base de datos o escanear productos (PRO)
+ * - Actualizar en tiempo real al completar entrenamientos
+ */
+
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";

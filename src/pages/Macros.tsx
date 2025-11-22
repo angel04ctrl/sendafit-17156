@@ -1,3 +1,18 @@
+/**
+ * Macros.tsx - Página de seguimiento de macros nutricionales
+ * 
+ * Este documento gestiona el seguimiento de nutrición del usuario.
+ * Se encarga de:
+ * - Mostrar resumen de macros del día (calorías, proteínas, carbos, grasas)
+ * - Registrar comidas desde base de datos de alimentos
+ * - Registrar comidas manualmente con valores personalizados
+ * - Calcular porciones y macros automáticamente
+ * - Eliminar comidas registradas
+ * - Agrupar comidas por tipo (desayuno, colaciones, almuerzo, cena)
+ * - Identificar comidas con IA usando cámara (función PRO)
+ * - Adaptar vista móvil con carousel y vista desktop con grid
+ */
+
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
