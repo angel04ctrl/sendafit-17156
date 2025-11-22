@@ -1,45 +1,18 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Button } from "./ui/button";
-import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { CreditCard, Wallet, Sparkles } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "./ui/form";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements } from "@stripe/react-stripe-js";
+import { StripePaymentForm } from "./StripePaymentForm";
 
-const cardPaymentSchema = z.object({
-  cardName: z.string().min(3, "El nombre debe tener al menos 3 caracteres").max(100, "Nombre demasiado largo"),
-  cardNumber: z.string()
-    .regex(/^\d{16}$/, "El número de tarjeta debe tener 16 dígitos")
-    .refine((val) => val.length === 16, "Ingrese 16 dígitos"),
-  expiryMonth: z.string()
-    .regex(/^(0[1-9]|1[0-2])$/, "Ingrese mes válido (01-12)")
-    .length(2, "Ingrese 2 dígitos"),
-  expiryYear: z.string()
-    .regex(/^\d{4}$/, "Ingrese año válido (4 dígitos)")
-    .refine((val) => parseInt(val) >= new Date().getFullYear(), "Año debe ser actual o futuro"),
-  cvv: z.string()
-    .regex(/^\d{3,4}$/, "CVV debe tener 3 o 4 dígitos")
-    .min(3, "CVV debe tener al menos 3 dígitos")
-    .max(4, "CVV debe tener máximo 4 dígitos"),
-  country: z.string().optional(),
-});
-
-const paypalPaymentSchema = z.object({
-  paypalEmail: z.string()
-    .email("Ingrese un email válido")
-    .min(1, "El email es obligatorio"),
-});
-
-type CardPaymentForm = z.infer<typeof cardPaymentSchema>;
-type PaypalPaymentForm = z.infer<typeof paypalPaymentSchema>;
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
 
 interface PaymentModalProps {
   open: boolean;
@@ -48,82 +21,51 @@ interface PaymentModalProps {
 
 export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
   const [billingPeriod, setBillingPeriod] = useState<"mensual" | "anual">("mensual");
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [clientSecret, setClientSecret] = useState<string>("");
+  const [customerId, setCustomerId] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
   const [paypalLoaded, setPaypalLoaded] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const { user } = useAuth();
 
   const monthlyPrice = 98;
-  const annualPrice = 1058; // $1176 with 10% discount
+  const annualPrice = 1058;
   const annualPriceBeforeDiscount = 1176;
   const discount = annualPriceBeforeDiscount - annualPrice;
 
   const currentPrice = billingPeriod === "mensual" ? monthlyPrice : annualPrice;
 
-  const cardForm = useForm<CardPaymentForm>({
-    resolver: zodResolver(cardPaymentSchema),
-    defaultValues: {
-      cardName: "",
-      cardNumber: "",
-      expiryMonth: "",
-      expiryYear: "",
-      cvv: "",
-      country: "",
-    },
-  });
+  // Create SetupIntent when modal opens or billing period changes
+  useEffect(() => {
+    if (!open || !user) return;
 
-  const paypalForm = useForm<PaypalPaymentForm>({
-    resolver: zodResolver(paypalPaymentSchema),
-    defaultValues: {
-      paypalEmail: "",
-    },
-  });
+    const createSetupIntent = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke(
+          "payments/create-setup-intent",
+          {
+            body: {
+              plan: billingPeriod,
+              userId: user.id,
+            },
+          }
+        );
 
-  const handleCardSubmit = async (data: CardPaymentForm) => {
-    if (!user) {
-      toast.error("Debes iniciar sesión para continuar");
-      return;
-    }
+        if (error) throw error;
 
-    setIsProcessing(true);
-    try {
-      toast.info("Redirigiendo a la pasarela de pago...");
-      
-      const { data: functionData, error } = await supabase.functions.invoke(
-        "payments/create-checkout-session",
-        {
-          body: {
-            plan: billingPeriod,
-            userId: user.id,
-          },
-        }
-      );
-
-      if (error) {
-        console.error("Error from function:", error);
-        throw error;
+        setClientSecret(data.clientSecret);
+        setCustomerId(data.customerId);
+      } catch (error: any) {
+        console.error("Error creating setup intent:", error);
+        toast.error("Error al inicializar el pago");
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      if (functionData?.url) {
-        // Redirect to Stripe checkout
-        window.location.href = functionData.url;
-      } else {
-        throw new Error("No URL returned from payment service");
-      }
-    } catch (error: any) {
-      console.error("Error creating checkout session:", error);
-      toast.error(error.message || "Error al procesar el pago. Intenta de nuevo.");
-      setIsProcessing(false);
-    }
-  };
-
-  const handlePaypalSubmit = (data: PaypalPaymentForm) => {
-    if (!user) {
-      toast.error("Debes iniciar sesión para continuar");
-      return;
-    }
-    // PayPal is handled by the PayPal button integration
-    console.log("PayPal email:", data.paypalEmail);
-  };
+    createSetupIntent();
+  }, [open, user, billingPeriod]);
 
   // Load PayPal SDK
   useEffect(() => {
@@ -149,7 +91,6 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
     const container = document.getElementById("paypal-button-container");
     if (!container) return;
 
-    // Clear previous buttons
     container.innerHTML = "";
 
     const planId = billingPeriod === "mensual" 
@@ -207,7 +148,6 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
       })
       .render("#paypal-button-container");
   }, [paypalLoaded, billingPeriod, open, user, onOpenChange]);
-
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -281,136 +221,42 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
           </TabsList>
 
           <TabsContent value="card" className="space-y-4 mt-4">
-            <Form {...cardForm}>
-              <form onSubmit={cardForm.handleSubmit(handleCardSubmit)} className="space-y-4">
-                <FormField
-                  control={cardForm.control}
-                  name="cardName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nombre del titular *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Como aparece en la tarjeta" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-sm text-muted-foreground">Cargando formulario de pago...</p>
+              </div>
+            ) : clientSecret && user ? (
+              <Elements
+                stripe={stripePromise}
+                options={{
+                  clientSecret,
+                  appearance: {
+                    theme: "stripe",
+                    variables: {
+                      colorPrimary: "hsl(var(--primary))",
+                      colorBackground: "hsl(var(--background))",
+                      colorText: "hsl(var(--foreground))",
+                      colorDanger: "hsl(var(--destructive))",
+                      fontFamily: "system-ui, sans-serif",
+                      borderRadius: "0.5rem",
+                    },
+                  },
+                  locale: "es",
+                }}
+              >
+                <StripePaymentForm
+                  billingPeriod={billingPeriod}
+                  currentPrice={currentPrice}
+                  customerId={customerId}
+                  userId={user.id}
+                  onSuccess={() => {
+                    toast.success("¡Suscripción activada exitosamente!");
+                    onOpenChange(false);
+                    window.location.reload();
+                  }}
                 />
-
-                <FormField
-                  control={cardForm.control}
-                  name="cardNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Número de tarjeta *</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="1234 5678 9012 3456" 
-                          maxLength={16}
-                          {...field}
-                          onChange={(e) => {
-                            const value = e.target.value.replace(/\D/g, '');
-                            field.onChange(value);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="grid grid-cols-3 gap-3">
-                  <FormField
-                    control={cardForm.control}
-                    name="expiryMonth"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Mes *</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="11" 
-                            maxLength={2}
-                            {...field}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/\D/g, '');
-                              field.onChange(value);
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={cardForm.control}
-                    name="expiryYear"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Año *</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="2030" 
-                            maxLength={4}
-                            {...field}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/\D/g, '');
-                              field.onChange(value);
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={cardForm.control}
-                    name="cvv"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>CVV *</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="123" 
-                            maxLength={4}
-                            type="password"
-                            {...field}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/\D/g, '');
-                              field.onChange(value);
-                            }}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={cardForm.control}
-                  name="country"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>País (opcional)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="México" 
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <Button type="submit" className="w-full" size="lg" disabled={isProcessing}>
-                  <CreditCard className="w-4 h-4 mr-2" />
-                  {isProcessing ? "Procesando..." : `Pagar $${currentPrice} MXN`}
-                </Button>
-              </form>
-            </Form>
+              </Elements>
+            ) : null}
           </TabsContent>
 
           <TabsContent value="paypal" className="space-y-4 mt-4">

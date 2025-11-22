@@ -25,69 +25,128 @@ serve(async (req) => {
   const { pathname } = new URL(req.url);
 
   try {
-    // Create Stripe checkout session
-    if (pathname === "/payments/create-checkout-session" && req.method === "POST") {
+    // Create Stripe SetupIntent for subscription
+    if (pathname === "/payments/create-setup-intent" && req.method === "POST") {
       const { plan, userId } = await req.json();
 
-      console.log("Creating Stripe checkout session for user:", userId, "plan:", plan);
+      console.log("Creating Stripe SetupIntent for user:", userId, "plan:", plan);
       
-      // Get origin from header or use SUPABASE_URL as fallback
-      const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/');
-      
-      if (!origin) {
-        console.error("No origin or referer header found in request");
-        return new Response(
-          JSON.stringify({ error: "No se pudo determinar la URL de origen" }),
-          { 
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+      // Create or retrieve customer
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", userId)
+        .single();
+
+      const { data: existingSub } = await supabase
+        .from("user_subscriptions")
+        .select("stripe_customer_id")
+        .eq("user_id", userId)
+        .eq("provider", "stripe")
+        .single();
+
+      let customerId = existingSub?.stripe_customer_id;
+
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          metadata: { userId },
+          name: profile?.full_name,
+        });
+        customerId = customer.id;
+        console.log("Created new customer:", customerId);
       }
 
-      console.log("Using origin for redirect URLs:", origin);
-
-      // Define prices based on plan (in centavos MXN)
-      const amount = plan === "anual" ? 105800 : 9800; // 98 MXN mensual, 1058 MXN anual
-      
-      const successUrl = `${origin}/profile?payment=success`;
-      const cancelUrl = `${origin}/profile?payment=canceled`;
-      
-      console.log("Success URL:", successUrl);
-      console.log("Cancel URL:", cancelUrl);
-      
-      const session = await stripe.checkout.sessions.create({
-        mode: "subscription",
+      // Create SetupIntent
+      const setupIntent = await stripe.setupIntents.create({
+        customer: customerId,
         payment_method_types: ["card"],
-        line_items: [
-          {
-            price_data: {
-              currency: "mxn",
-              product_data: {
-                name: plan === "anual" ? "SendaFit Pro - Plan Anual" : "SendaFit Pro - Plan Mensual",
-                description: plan === "anual" 
-                  ? "Suscripción anual con 10% de descuento" 
-                  : "Suscripción mensual",
-              },
-              recurring: {
-                interval: plan === "anual" ? "year" : "month",
-              },
-              unit_amount: amount,
-            },
-            quantity: 1,
-          },
-        ],
-        success_url: successUrl,
-        cancel_url: cancelUrl,
         metadata: { userId, plan },
       });
 
-      console.log("Stripe session created:", session.id);
-      console.log("Redirect URL:", session.url);
+      console.log("SetupIntent created:", setupIntent.id);
 
-      return new Response(JSON.stringify({ url: session.url }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(
+        JSON.stringify({ 
+          clientSecret: setupIntent.client_secret,
+          customerId 
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Create subscription after payment method is confirmed
+    if (pathname === "/payments/create-subscription" && req.method === "POST") {
+      const { plan, userId, paymentMethodId, customerId } = await req.json();
+
+      console.log("Creating subscription for user:", userId, "plan:", plan);
+
+      // Define prices based on plan (in centavos MXN)
+      const amount = plan === "anual" ? 105800 : 9800;
+
+      // Create price
+      const price = await stripe.prices.create({
+        unit_amount: amount,
+        currency: "mxn",
+        recurring: {
+          interval: plan === "anual" ? "year" : "month",
+        },
+        product_data: {
+          name: plan === "anual" ? "SendaFit Pro - Plan Anual" : "SendaFit Pro - Plan Mensual",
+        },
       });
+
+      // Create subscription
+      const subscription = await stripe.subscriptions.create({
+        customer: customerId,
+        items: [{ price: price.id }],
+        default_payment_method: paymentMethodId,
+        metadata: { userId, plan },
+      });
+
+      console.log("Subscription created:", subscription.id);
+
+      // Save subscription to database
+      const { error: subError } = await supabase
+        .from("user_subscriptions")
+        .upsert({
+          user_id: userId,
+          plan,
+          provider: "stripe",
+          status: subscription.status === "active" ? "active" : "pending",
+          stripe_customer_id: customerId,
+          stripe_subscription_id: subscription.id,
+          last_event: "subscription.created",
+          start_date: new Date().toISOString(),
+          end_date: plan === "anual" 
+            ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+            : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        }, {
+          onConflict: 'user_id',
+        });
+
+      if (subError) {
+        console.error("Error saving subscription:", subError);
+        throw subError;
+      }
+
+      // Update user role to PRO
+      await supabase
+        .from("user_roles")
+        .upsert({
+          user_id: userId,
+          role: "pro",
+        }, {
+          onConflict: 'user_id,role',
+        });
+
+      return new Response(
+        JSON.stringify({ success: true, subscriptionId: subscription.id }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     // Handle Stripe webhooks
