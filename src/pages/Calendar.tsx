@@ -1,3 +1,15 @@
+/**
+ * Calendar.tsx - Página de calendario semanal
+ * 
+ * Este documento muestra el calendario semanal de entrenamientos del usuario.
+ * Se encarga de:
+ * - Mostrar los días de la semana con indicadores de entrenamientos
+ * - Visualizar entrenamientos pendientes y completados por día
+ * - Soportar vista móvil con carousel y vista desktop con grid
+ * - Actualizar en tiempo real cuando se completan entrenamientos
+ * - Permitir seleccionar un día para ver sus entrenamientos
+ */
+
 import { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Card } from "@/components/ui/card";
@@ -10,13 +22,17 @@ import { useWorkoutsByDate } from "@/hooks/useBackendApi";
 import { supabase } from "@/integrations/supabase/client";
 
 const Calendar = () => {
+  // Hook para detectar si es móvil
   const isMobile = useIsMobile();
+  // Estado del día seleccionado
   const [selectedDate, setSelectedDate] = useState(new Date());
+  // Estado para mostrar todos los entrenamientos pendientes en móvil
   const [showAllPending, setShowAllPending] = useState(false);
 
+  // Calcular el inicio de la semana (Lunes) y generar array de 7 días
   const weekStart = startOfWeek(new Date(), { locale: es, weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const twoWeeksEnd = addDays(weekStart, 13);
+  const twoWeeksEnd = addDays(weekStart, 13); // Cargar datos de 2 semanas
 
   const { data: weekData } = useWorkoutsByDate({
     start_date: format(weekDays[0], 'yyyy-MM-dd'),
@@ -25,7 +41,8 @@ const Calendar = () => {
 
   const workouts = weekData?.workouts || [];
 
-  // Realtime subscription for workout changes
+  // Bloque de suscripción en tiempo real - Escucha cambios en entrenamientos
+  // Actualiza automáticamente cuando se marca un entrenamiento como completado
   useEffect(() => {
     const channel = supabase
       .channel('calendar-workouts')
@@ -38,7 +55,7 @@ const Calendar = () => {
         },
         (payload) => {
           console.log('Workout updated in calendar:', payload);
-          // Query will auto-refetch due to React Query
+          // React Query refetch automáticamente
         }
       )
       .subscribe();
@@ -48,8 +65,10 @@ const Calendar = () => {
     };
   }, []);
 
+  // Función para obtener entrenamientos de una fecha específica
+  // Intenta primero match exacto por fecha, luego por día de la semana
   const getWorkoutsForDate = (date: Date) => {
-    // Normalize the comparison date to midnight local time
+    // Normalizar la fecha a medianoche hora local
     const compareDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
     // First, try strict match by scheduled_date within the fetched range

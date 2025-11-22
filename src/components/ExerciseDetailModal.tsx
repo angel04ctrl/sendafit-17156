@@ -1,3 +1,15 @@
+/**
+ * ExerciseDetailModal.tsx - Modal de detalles de ejercicio
+ * 
+ * Este componente muestra información detallada de un ejercicio específico.
+ * Se encarga de:
+ * - Mostrar video o imagen del ejercicio
+ * - Visualizar información del ejercicio (grupo muscular, nivel, lugar)
+ * - Mostrar recomendaciones de series y repeticiones
+ * - Indicar equipamiento necesario
+ * - Mostrar descripción detallada del ejercicio
+ */
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +33,7 @@ interface ExerciseDetailModalProps {
 }
 
 export const ExerciseDetailModal = ({ open, onOpenChange, exercise }: ExerciseDetailModalProps) => {
+  // Si no hay ejercicio, no renderizar nada
   if (!exercise) return null;
 
   return (
@@ -31,7 +44,7 @@ export const ExerciseDetailModal = ({ open, onOpenChange, exercise }: ExerciseDe
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Video or Image */}
+          {/* Bloque de video o imagen del ejercicio */}
           {exercise.video ? (
             <div className="aspect-video bg-muted rounded-lg overflow-hidden">
               <video 
@@ -57,7 +70,7 @@ export const ExerciseDetailModal = ({ open, onOpenChange, exercise }: ExerciseDe
             </div>
           )}
 
-          {/* Exercise Info Tags */}
+          {/* Bloque de badges informativos - Grupo muscular, nivel y lugar */}
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary" className="gap-1">
               <Target className="w-3 h-3" />
@@ -73,7 +86,7 @@ export const ExerciseDetailModal = ({ open, onOpenChange, exercise }: ExerciseDe
             </Badge>
           </div>
 
-          {/* Suggested Sets and Reps */}
+          {/* Bloque de recomendaciones - Series y repeticiones sugeridas */}
           {(exercise.series_sugeridas || exercise.repeticiones_sugeridas) && (
             <Card className="p-4 bg-primary/5 border-primary/20">
               <h3 className="font-semibold mb-2">Recomendación</h3>
@@ -94,7 +107,7 @@ export const ExerciseDetailModal = ({ open, onOpenChange, exercise }: ExerciseDe
             </Card>
           )}
 
-          {/* Equipment */}
+          {/* Bloque de equipamiento necesario */}
           {exercise.equipamiento && (
             <div>
               <h3 className="font-semibold mb-2">Equipamiento necesario</h3>
@@ -102,7 +115,7 @@ export const ExerciseDetailModal = ({ open, onOpenChange, exercise }: ExerciseDe
             </div>
           )}
 
-          {/* Description */}
+          {/* Bloque de descripción detallada del ejercicio */}
           <div>
             <h3 className="font-semibold mb-2">Descripción</h3>
             <p className="text-muted-foreground leading-relaxed whitespace-pre-line">

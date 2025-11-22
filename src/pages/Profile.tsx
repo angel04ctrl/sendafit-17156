@@ -1,3 +1,16 @@
+/**
+ * Profile.tsx - Página de perfil de usuario
+ * 
+ * Este documento gestiona la visualización y edición del perfil del usuario.
+ * Se encarga de:
+ * - Mostrar y editar datos personales (nombre, género, edad, peso, altura)
+ * - Configurar objetivos de fitness y días de entrenamiento
+ * - Gestionar la suscripción PRO y mostrar opciones de pago
+ * - Validar cambios en el plan de entrenamiento
+ * - Actualizar macros nutricionales automáticamente según perfil
+ * - Detectar pagos exitosos desde el parámetro URL
+ */
+
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,19 +32,23 @@ import { useValidatePlanChange, useAssignRoutine, useRedistributeWorkouts } from
 import { useQueryClient } from "@tanstack/react-query";
 
 const Profile = () => {
+  // Hook de autenticación para obtener usuario actual
   const { user } = useAuth();
   const sb = supabase as any;
+  
+  // Estado del perfil y datos del formulario
   const [profile, setProfile] = useState<any>(null);
-  const [userRole, setUserRole] = useState<string>("user");
-  const [loading, setLoading] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [resetOnFirstDayClick, setResetOnFirstDayClick] = useState(false);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [validationData, setValidationData] = useState<any>(null);
-  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
-  const [searchParams] = useSearchParams();
+  // Estados de UI y control
+  const [userRole, setUserRole] = useState<string>("user"); // Rol del usuario (user/pro)
+  const [loading, setLoading] = useState(false); // Estado de carga
+  const [isEditing, setIsEditing] = useState(false); // Modo edición activado
+  const [resetOnFirstDayClick, setResetOnFirstDayClick] = useState(false); // Reset de días al primer click
+  const [showPreviewModal, setShowPreviewModal] = useState(false); // Modal de vista previa de cambios
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false); // Modal de pago abierto
+  const [showSuccessModal, setShowSuccessModal] = useState(false); // Modal de éxito en pago
+  const [validationData, setValidationData] = useState<any>(null); // Datos de validación de cambios
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null); // Estado de suscripción
+  const [searchParams] = useSearchParams(); // Parámetros de URL para detectar pagos
   const [formData, setFormData] = useState({
     full_name: "",
     gender: "femenino",
@@ -53,7 +70,7 @@ const Profile = () => {
   const redistributeMutation = useRedistributeWorkouts();
   const queryClient = useQueryClient();
 
-  // Debug logging
+  // Bloque de debug logging - Registra el estado del perfil y suscripción
   useEffect(() => {
     console.log('Profile State Debug:', { 
       userRole, 
@@ -64,15 +81,17 @@ const Profile = () => {
     });
   }, [userRole, subscriptionStatus]);
 
+  // Bloque de carga inicial del perfil - Se ejecuta al montar el componente
+  // Detecta si el usuario viene desde un pago exitoso o cancelado
   useEffect(() => {
     const loadProfile = async () => {
       setLoading(true);
       await fetchProfile();
       
-      // Check if redirected from successful payment
+      // Verificar si viene desde redirección de pago
       const paymentStatus = searchParams.get("payment");
       if (paymentStatus === "success") {
-        // Wait a bit for webhook to process
+        // Esperar un poco para que el webhook procese el pago
         setTimeout(() => {
           setShowSuccessModal(true);
         }, 1000);
@@ -84,7 +103,8 @@ const Profile = () => {
     loadProfile();
   }, [user, searchParams]);
 
-  // Realtime subscription for profile changes (plan updates)
+  // Bloque de suscripción en tiempo real - Escucha cambios en el perfil (actualizaciones de plan)
+  // Útil cuando el webhook de Stripe actualiza la suscripción
   useEffect(() => {
     if (!user) return;
 
@@ -110,10 +130,13 @@ const Profile = () => {
     };
   }, [user]);
 
+  // Función para obtener los datos del perfil del usuario desde la base de datos
+  // También obtiene el rol del usuario y el estado de su suscripción
   const fetchProfile = async () => {
     if (!user) return;
 
     try {
+      // Obtener datos del perfil
       const { data: profileData, error: profileError } = await sb
         .from("profiles")
         .select("*")
@@ -126,6 +149,7 @@ const Profile = () => {
         return;
       }
 
+      // Actualizar estado del perfil y formulario con datos obtenidos
       if (profileData) {
         setProfile(profileData);
         setFormData({
@@ -147,6 +171,7 @@ const Profile = () => {
         });
       }
 
+      // Obtener rol del usuario (user/pro)
       const { data: roleData } = await sb
         .from("user_roles")
         .select("role")
@@ -157,7 +182,7 @@ const Profile = () => {
         setUserRole(roleData.role);
       }
 
-      // Check subscription status
+      // Verificar estado de suscripción PRO del usuario
       const { data: subscriptionData } = await sb
         .from("user_subscriptions")
         .select("status, plan")
@@ -175,10 +200,12 @@ const Profile = () => {
     }
   };
 
+  // Función para manejar el envío del formulario de perfil
+  // Valida si hubo cambios en el objetivo o días de entrenamiento
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if plan-related fields changed
+    // Verificar si cambiaron campos relacionados con el plan de entrenamiento
     const oldGoal = profile?.fitness_goal;
     const newGoal = formData.fitness_goal;
     const oldWeekdays = profile?.available_weekdays || [];
@@ -188,7 +215,8 @@ const Profile = () => {
     const weekdaysChanged = oldWeekdays.length !== newWeekdays.length || 
       !oldWeekdays.every((day: string) => newWeekdays.includes(day));
 
-    // If goal or weekdays changed, validate first
+    // Si cambió el objetivo o días, validar primero los cambios
+    // Esto previene perder entrenamientos programados sin confirmación
     if (goalChanged || weekdaysChanged) {
       try {
         const validation = await validateMutation.mutateAsync({
@@ -199,7 +227,7 @@ const Profile = () => {
         if (validation.action !== 'none') {
           setValidationData(validation);
           setShowPreviewModal(true);
-          return; // Wait for user confirmation
+          return; // Esperar confirmación del usuario
         }
       } catch (error) {
         console.error('Error validating changes:', error);
@@ -208,14 +236,16 @@ const Profile = () => {
       }
     }
 
-    // No plan changes, proceed with normal update
+    // No hubo cambios en el plan, proceder con actualización normal
     await updateProfile();
   };
 
+  // Función para actualizar el perfil en la base de datos
+  // Recalcula macros automáticamente si hay información completa
   const updateProfile = async () => {
     setLoading(true);
 
-    // Recalcular macros si hay información completa
+    // Recalcular macros nutricionales si hay información completa del usuario
     let calculatedMacros = null;
     const profileData = {
       gender: formData.gender,

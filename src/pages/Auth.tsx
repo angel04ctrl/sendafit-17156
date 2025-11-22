@@ -1,3 +1,15 @@
+/**
+ * Auth.tsx - Página de autenticación
+ * 
+ * Este documento gestiona el proceso de login y registro de usuarios.
+ * Se encarga de:
+ * - Mostrar formularios de inicio de sesión y registro
+ * - Validar datos de email y contraseña con Zod
+ * - Autenticar usuarios existentes con Supabase Auth
+ * - Guardar datos de registro temporal para completar onboarding
+ * - Redirigir a dashboard si completó onboarding, o a onboarding si no
+ */
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +23,7 @@ import { Dumbbell } from "lucide-react";
 import heroImage from "@/assets/hero-fitness.jpg";
 import { z } from "zod";
 
+// Esquema de validación de datos de autenticación con Zod
 const authSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
@@ -19,18 +32,23 @@ const authSchema = z.object({
 
 const Auth = () => {
   const navigate = useNavigate();
+  // Estado de carga para deshabilitar botones durante el proceso
   const [loading, setLoading] = useState(false);
+  // Estados del formulario
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
 
+  // Bloque de inicio de sesión - Autentica usuario existente
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      // Validar datos con Zod
       const validation = authSchema.parse({ email, password });
       
+      // Autenticar con Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
         email: validation.email,
         password: validation.password,
@@ -38,7 +56,7 @@ const Auth = () => {
 
       if (error) throw error;
       
-      // Verificar si completó el onboarding
+      // Verificar si el usuario completó el onboarding
       if (data.user) {
         const { data: profile } = await (supabase as any)
           .from("profiles")
@@ -46,6 +64,7 @@ const Auth = () => {
           .eq("id", data.user.id)
           .maybeSingle();
 
+        // Redirigir según estado de onboarding
         if (profile?.onboarding_completed) {
           toast.success("¡Bienvenida de vuelta!");
           navigate("/dashboard");
@@ -55,6 +74,7 @@ const Auth = () => {
         }
       }
     } catch (error: any) {
+      // Manejar errores de validación o autenticación
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
       } else {
@@ -65,14 +85,17 @@ const Auth = () => {
     }
   };
 
+  // Bloque de registro - Guarda datos temporales y redirige a onboarding
+  // No crea la cuenta aquí, se crea al completar el onboarding
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      // Validar datos con Zod
       const validation = authSchema.parse({ email, password, fullName });
       
-      // Guardar datos temporalmente para crear la cuenta al finalizar el formulario
+      // Guardar datos en sessionStorage para usarlos en onboarding
       sessionStorage.setItem('pendingRegistration', JSON.stringify({
         email: validation.email,
         password: validation.password,
@@ -82,6 +105,7 @@ const Auth = () => {
       toast.success("¡Perfecto! Ahora completa tu perfil");
       navigate("/onboarding");
     } catch (error: any) {
+      // Manejar errores de validación
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
       } else {

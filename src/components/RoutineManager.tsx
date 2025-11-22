@@ -1,3 +1,14 @@
+/**
+ * RoutineManager.tsx - Componente gestor de rutinas
+ * 
+ * Este componente muestra la rutina asignada al usuario y sus estadísticas de progreso.
+ * Se encarga de:
+ * - Mostrar estadísticas de entrenamientos, racha y cambio de peso
+ * - Visualizar la rutina actual con sus ejercicios por día
+ * - Permitir expandir/colapsar ejercicios de cada día
+ * - Adaptarse a móvil y desktop con diseño responsivo
+ */
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Dumbbell, TrendingUp, ChevronDown } from "lucide-react";
@@ -8,16 +19,14 @@ import {
 } from "@/hooks/useBackendApi";
 import { planDayToShort } from "@/lib/dayMapping";
 
-/**
- * Displays user's assigned routine and progress statistics
- */
 export function RoutineManager() {
-  // Fetch user's assigned routine
+  // Hook para obtener la rutina asignada al usuario
   const { data: routineData, isLoading: isLoadingRoutine } = useUserRoutine();
   
-  // Fetch progress stats
+  // Hook para obtener estadísticas de progreso (últimos 30 días)
   const { data: statsData } = useProgressStats(30);
 
+  // Mostrar spinner de carga mientras se obtiene la rutina
   if (isLoadingRoutine) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -32,9 +41,10 @@ export function RoutineManager() {
         <h1 className="text-lg sm:text-2xl font-bold">Gestor de Rutinas</h1>
       </div>
 
-      {/* Stats Cards - Más compactas */}
+      {/* Bloque de tarjetas de estadísticas - Entrenamientos, racha y peso */}
       {statsData && (
         <div className="grid gap-2 grid-cols-3 shrink-0 px-3 sm:px-4">
+          {/* Card de total de entrenamientos */}
           <Card className="shadow-sm">
             <CardHeader className="pb-2 p-3 sm:p-4">
               <CardTitle className="text-xs sm:text-sm font-medium">
@@ -47,6 +57,7 @@ export function RoutineManager() {
             </CardContent>
           </Card>
 
+          {/* Card de racha de días consecutivos */}
           <Card className="shadow-sm">
             <CardHeader className="pb-2 p-3 sm:p-4">
               <CardTitle className="text-xs sm:text-sm font-medium">
@@ -59,6 +70,7 @@ export function RoutineManager() {
             </CardContent>
           </Card>
 
+          {/* Card de cambio de peso */}
           <Card className="shadow-sm">
             <CardHeader className="pb-2 p-3 sm:p-4">
               <CardTitle className="text-xs sm:text-sm font-medium">
@@ -79,10 +91,11 @@ export function RoutineManager() {
         </div>
       )}
 
-      {/* Current Routine */}
+      {/* Bloque de rutina actual - Muestra detalles del plan asignado */}
       <div className="flex-1 overflow-y-auto px-3 pb-3 sm:px-4 sm:pb-4">
         {routineData?.routine ? (
           <Card className="shadow-sm h-full flex flex-col">
+            {/* Header de la rutina con nombre, descripción y badges */}
             <CardHeader className="p-3 sm:p-4 shrink-0">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
@@ -107,16 +120,20 @@ export function RoutineManager() {
                 </div>
               </div>
 
+              {/* Bloque de distribución semanal - Lista de ejercicios por día colapsables */}
               {routineData.routine.days && Object.keys(routineData.routine.days).length > 0 ? (
                 <div className="space-y-2">
                   <h4 className="font-semibold text-sm sm:text-base shrink-0">Distribución Semanal:</h4>
                   <div className="space-y-2">
+                    {/* Mapear cada día de la semana con sus ejercicios */}
                     {Object.entries(routineData.routine.days).map(([day, exercises]: [string, any[]]) => (
                        <Collapsible key={day} className="space-y-1">
+                        {/* Trigger para expandir/colapsar día */}
                         <CollapsibleTrigger className="w-full flex justify-between items-center p-2 bg-muted rounded-md text-left hover:bg-muted/80 transition-colors">
                           <span className="font-medium text-sm">{planDayToShort(parseInt(day))}: {exercises[0]?.grupo_muscular || 'Variado'}</span>
                           <ChevronDown className="h-4 w-4 transition-transform duration-200 data-[state=open]:rotate-180" />
                         </CollapsibleTrigger>
+                        {/* Contenido colapsable con lista de ejercicios */}
                         <CollapsibleContent className="overflow-hidden">
                           <ul className="space-y-1.5 p-2 border rounded-md bg-card/50 max-h-60 overflow-y-auto">
                             {exercises.map((exercise: any, idx: number) => (
