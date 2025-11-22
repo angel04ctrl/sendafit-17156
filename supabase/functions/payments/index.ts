@@ -1,7 +1,35 @@
+/**
+ * PAYMENTS EDGE FUNCTION
+ * 
+ * Gestiona todo el flujo de pagos y suscripciones PRO de SendaFit
+ * Soporta dos proveedores: Stripe y PayPal
+ * 
+ * MÉTODO DE PAGO:
+ * - Stripe Checkout: Redirige al usuario a la página de pago segura de Stripe (hosted checkout)
+ * - NO se usa Stripe Elements (formulario embebido) para evitar conflictos de dependencias React
+ * 
+ * ENDPOINTS:
+ * 1. POST /payments/create-checkout-session - Crea sesión de pago Stripe y retorna URL
+ * 2. POST /payments/stripe-webhook - Recibe eventos de Stripe (pagos completados, cancelaciones)
+ * 3. POST /payments/paypal-confirm - Confirma suscripción PayPal después de aprobación
+ * 4. POST /payments/paypal-webhook - Recibe eventos de PayPal (activaciones, cancelaciones)
+ * 
+ * FLUJO STRIPE:
+ * 1. Cliente solicita crear sesión → retorna URL de Stripe Checkout
+ * 2. Usuario completa pago en Stripe → webhook checkout.session.completed
+ * 3. Se crea registro en user_subscriptions y se actualiza role a 'pro'
+ * 
+ * SEGURIDAD:
+ * - Los webhooks de Stripe verifican firma para autenticidad
+ * - No se almacenan datos de tarjeta (manejados por Stripe)
+ * - CORS habilitado para permitir llamadas desde el cliente
+ */
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.0.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Headers CORS para permitir peticiones desde el cliente web
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -25,13 +53,23 @@ serve(async (req) => {
   const { pathname } = new URL(req.url);
 
   try {
-    // Create Stripe checkout session
+    /**
+     * ENDPOINT: Create Stripe Checkout Session
+     * POST /payments/create-checkout-session
+     * 
+     * Crea una sesión de Stripe Checkout y retorna la URL para redirigir al usuario.
+     * El usuario completa el pago en la página de Stripe (no en nuestra app).
+     * 
+     * Body: { plan: "mensual" | "anual", userId: string }
+     * Returns: { url: string } - URL de la página de pago de Stripe
+     */
     if (pathname === "/payments/create-checkout-session" && req.method === "POST") {
       const { plan, userId } = await req.json();
 
       console.log("Creating Stripe checkout session for user:", userId, "plan:", plan);
       
-      // Get origin from header or use SUPABASE_URL as fallback
+      // Obtener el origen de la petición para construir las URLs de redirección
+      // Necesario porque el usuario regresará a nuestra app después del pago
       const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/');
       
       if (!origin) {
@@ -47,8 +85,9 @@ serve(async (req) => {
 
       console.log("Using origin for redirect URLs:", origin);
 
-      // Define prices based on plan (in centavos MXN)
-      const amount = plan === "anual" ? 105800 : 9800; // 98 MXN mensual, 1058 MXN anual
+      // Definir precios según el plan seleccionado (en centavos MXN para Stripe)
+      // Mensual: $98 MXN = 9800 centavos | Anual: $1058 MXN = 105800 centavos (10% descuento)
+      const amount = plan === "anual" ? 105800 : 9800;
       
       const successUrl = `${origin}/profile?payment=success`;
       const cancelUrl = `${origin}/profile?payment=canceled`;
@@ -90,7 +129,18 @@ serve(async (req) => {
       });
     }
 
-    // Handle Stripe webhooks
+    /**
+     * ENDPOINT: Stripe Webhooks
+     * POST /payments/stripe-webhook
+     * 
+     * Recibe eventos de Stripe para mantener sincronizado el estado de suscripciones.
+     * Eventos manejados:
+     * - checkout.session.completed: Pago inicial exitoso → crea suscripción y actualiza role
+     * - invoice.payment_succeeded: Renovación exitosa → actualiza status a active
+     * - customer.subscription.deleted: Cancelación → actualiza status a canceled
+     * 
+     * IMPORTANTE: Verifica la firma del webhook con STRIPE_WEBHOOK_SECRET
+     */
     if (pathname === "/payments/stripe-webhook" && req.method === "POST") {
       const sig = req.headers.get("stripe-signature");
       const body = await req.text();
@@ -123,11 +173,12 @@ serve(async (req) => {
           console.log("Subscription ID:", session.subscription);
           console.log("Payment status:", session.payment_status);
 
-          // Get customer and subscription info
+          // Extraer información de Stripe para almacenar en nuestra base de datos
           const customerId = session.customer;
           const subscriptionId = session.subscription;
 
-          // Insert or update subscription
+          // Crear o actualizar el registro de suscripción en user_subscriptions
+          // upsert asegura que no haya duplicados (usa user_id como clave única)
           const { data: subData, error: subError } = await supabase
             .from("user_subscriptions")
             .upsert({
@@ -153,7 +204,8 @@ serve(async (req) => {
 
           console.log("✅ Subscription created/updated");
 
-          // Update user role to PRO
+          // Actualizar el rol del usuario a 'pro' para habilitar funcionalidades premium
+          // Se guarda en user_roles para verificación mediante has_role() en RLS policies
           const { data: roleData, error: roleError } = await supabase
             .from("user_roles")
             .upsert({
@@ -172,13 +224,14 @@ serve(async (req) => {
           console.log("=== CHECKOUT PROCESSING COMPLETE ===");
         }
 
+        // Webhook: Pago de renovación exitoso (mensual o anual)
         if (event.type === "invoice.payment_succeeded") {
           const invoice = event.data.object as any;
           const subscriptionId = invoice.subscription;
 
           console.log("Payment succeeded for subscription:", subscriptionId);
 
-          // Update subscription status
+          // Actualizar el estado de la suscripción para confirmar que sigue activa
           const { error } = await supabase
             .from("user_subscriptions")
             .update({ 
@@ -192,12 +245,13 @@ serve(async (req) => {
           }
         }
 
+        // Webhook: Suscripción cancelada (por el usuario o por fallo de pago)
         if (event.type === "customer.subscription.deleted") {
           const subscription = event.data.object as any;
 
           console.log("Subscription deleted:", subscription.id);
 
-          // Update subscription status to canceled
+          // Marcar la suscripción como cancelada y establecer end_date a ahora
           const { error } = await supabase
             .from("user_subscriptions")
             .update({ 
@@ -226,13 +280,23 @@ serve(async (req) => {
       }
     }
 
-    // Handle PayPal confirmation
+    /**
+     * ENDPOINT: PayPal Confirmation
+     * POST /payments/paypal-confirm
+     * 
+     * Confirma y activa una suscripción PayPal después de que el usuario la aprueba.
+     * Verifica el estado con la API de PayPal antes de activar en nuestra DB.
+     * 
+     * Body: { subscriptionId: string, userId: string, plan: string }
+     * Returns: { success: boolean }
+     */
     if (pathname === "/payments/paypal-confirm" && req.method === "POST") {
       const { subscriptionId, userId, plan } = await req.json();
 
       console.log("Processing PayPal confirmation for user:", userId);
 
-      // Verify subscription with PayPal
+      // Verificar el estado de la suscripción directamente con PayPal API
+      // para asegurar que realmente fue aprobada antes de activar en nuestra DB
       const paypalAuth = btoa(
         `${Deno.env.get("PAYPAL_CLIENT_ID")}:${Deno.env.get("PAYPAL_SECRET")}`
       );
@@ -256,8 +320,9 @@ serve(async (req) => {
 
       console.log("PayPal subscription data:", subscriptionData);
 
+      // Solo activar si PayPal confirma que la suscripción está ACTIVE
       if (subscriptionData.status === "ACTIVE") {
-        // Insert or update subscription
+        // Crear el registro en user_subscriptions (similar al flujo de Stripe)
         const { error } = await supabase
           .from("user_subscriptions")
           .upsert({
@@ -291,7 +356,16 @@ serve(async (req) => {
       );
     }
 
-    // Handle PayPal webhooks
+    /**
+     * ENDPOINT: PayPal Webhooks
+     * POST /payments/paypal-webhook
+     * 
+     * Recibe eventos de PayPal para mantener sincronizado el estado de suscripciones.
+     * Eventos manejados:
+     * - BILLING.SUBSCRIPTION.ACTIVATED: Suscripción activada
+     * - BILLING.SUBSCRIPTION.CANCELLED: Suscripción cancelada por el usuario
+     * - PAYMENT.SALE.COMPLETED: Pago exitoso (renovación)
+     */
     if (pathname === "/payments/paypal-webhook" && req.method === "POST") {
       const event = await req.json();
 

@@ -1,3 +1,30 @@
+/**
+ * PAYMENT MODAL COMPONENT
+ * 
+ * Modal para que los usuarios actualicen su cuenta a Plan PRO.
+ * Soporta dos métodos de pago:
+ * 1. Stripe (Tarjeta de crédito/débito) - Redirige a Stripe Checkout
+ * 2. PayPal - SDK embebido con botones de suscripción
+ * 
+ * FLUJO STRIPE:
+ * 1. Usuario selecciona plan (mensual/anual) y hace clic en "Pagar con Tarjeta"
+ * 2. Se llama a la edge function "payments/create-checkout-session"
+ * 3. Se recibe una URL y se redirige al usuario a Stripe Checkout
+ * 4. Stripe maneja todo el flujo de pago (NO se usa Stripe Elements)
+ * 5. Después del pago, Stripe redirige de vuelta a /profile?payment=success
+ * 
+ * FLUJO PAYPAL:
+ * 1. Usuario selecciona plan y hace clic en botón PayPal
+ * 2. Se abre popup de PayPal para aprobar suscripción
+ * 3. Al aprobar, se llama a "payments/paypal-confirm" para activar
+ * 4. Se recarga la página para mostrar el nuevo estado PRO
+ * 
+ * NOTA TÉCNICA:
+ * No se usa Stripe Elements (formulario de pago embebido) porque causaba
+ * conflictos de versiones de React. Stripe Checkout es igualmente seguro
+ * y no requiere manejar datos de tarjeta en el cliente.
+ */
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Label } from "./ui/label";
@@ -27,6 +54,16 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
 
   const currentPrice = billingPeriod === "mensual" ? monthlyPrice : annualPrice;
 
+  /**
+   * Inicia el proceso de pago con Stripe Checkout
+   * 
+   * 1. Llama a la edge function para crear una sesión de checkout
+   * 2. Recibe una URL de Stripe
+   * 3. Redirige al usuario a esa URL (página de pago de Stripe)
+   * 4. El usuario completa el pago en Stripe
+   * 5. Stripe envía webhook a nuestro backend
+   * 6. El usuario es redirigido de vuelta a /profile?payment=success
+   */
   const handleStripePayment = async () => {
     if (!user) {
       toast.error("Debes iniciar sesión para continuar");
@@ -53,7 +90,8 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
       }
 
       if (functionData?.url) {
-        // Redirect to Stripe checkout
+        // Redirigir al usuario a la página de pago segura de Stripe
+        // Stripe manejará la recopilación de datos de tarjeta de forma segura
         window.location.href = functionData.url;
       } else {
         throw new Error("No URL returned from payment service");
@@ -65,7 +103,10 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
     }
   };
 
-  // Load PayPal SDK
+  /**
+   * Carga el SDK de PayPal dinámicamente cuando se abre el modal
+   * Se configura con el client-id desde variables de entorno
+   */
   useEffect(() => {
     if (!open) return;
 
@@ -82,7 +123,10 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
     };
   }, [open]);
 
-  // Initialize PayPal buttons
+  /**
+   * Inicializa los botones de PayPal después de que el SDK se carga
+   * Configura el flujo de suscripción con el plan_id correspondiente
+   */
   useEffect(() => {
     if (!paypalLoaded || !open || !user) return;
 
