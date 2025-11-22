@@ -1,13 +1,24 @@
+/**
+ * Select.tsx - Componente de selector desplegable de shadcn/ui
+ * 
+ * Este componente provee un menú desplegable para seleccionar una opción de una lista.
+ * Se usa en formularios para campos con opciones predefinidas.
+ * Basado en Radix UI Select con estilos personalizados y accesibilidad mejorada.
+ */
+
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+// Componente raíz del selector - Controla el estado y valor seleccionado
 const Select = SelectPrimitive.Root;
 
+// Agrupa opciones relacionadas dentro del selector
 const SelectGroup = SelectPrimitive.Group;
 
+// Muestra el valor actualmente seleccionado en el trigger
 const SelectValue = SelectPrimitive.Value;
 
 const SelectTrigger = React.forwardRef<

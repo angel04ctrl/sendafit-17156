@@ -1,3 +1,11 @@
+/**
+ * Sheet.tsx - Componente de panel lateral deslizante de shadcn/ui
+ * 
+ * Este componente provee paneles deslizantes desde los bordes de la pantalla.
+ * Se usa para menús de navegación, configuraciones, filtros, etc.
+ * Basado en Radix UI Dialog con animaciones de deslizamiento desde diferentes direcciones.
+ */
+
 import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
@@ -5,12 +13,16 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+// Componente raíz del sheet - Controla el estado abierto/cerrado
 const Sheet = SheetPrimitive.Root;
 
+// Elemento que abre el sheet cuando se hace clic
 const SheetTrigger = SheetPrimitive.Trigger;
 
+// Botón para cerrar el sheet
 const SheetClose = SheetPrimitive.Close;
 
+// Portal para renderizar el sheet fuera del árbol DOM normal
 const SheetPortal = SheetPrimitive.Portal;
 
 const SheetOverlay = React.forwardRef<
