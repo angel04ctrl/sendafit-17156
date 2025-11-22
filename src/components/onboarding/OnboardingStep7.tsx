@@ -1,3 +1,16 @@
+/**
+ * OnboardingStep7.tsx - Paso 7 del onboarding: Preferencias de App
+ * 
+ * Este componente final configura preferencias de la aplicación.
+ * Se encarga de:
+ * - Seleccionar tema de interfaz (claro, oscuro, automático)
+ * - Activar/desactivar notificaciones push
+ * - Mostrar opción de sincronización con wearables (función PRO)
+ * - Solicitar aceptación de términos y condiciones (obligatorio)
+ * - Validar aceptación de términos antes de permitir finalizar
+ * - Mostrar mensaje informativo sobre creación de plan personalizado
+ */
+
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

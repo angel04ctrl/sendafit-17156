@@ -1,3 +1,16 @@
+/**
+ * OnboardingStep6.tsx - Paso 6 del onboarding: Progreso Inicial
+ * 
+ * Este componente captura medidas corporales iniciales para seguimiento.
+ * Se encarga de:
+ * - Registrar medida de cintura en centímetros (opcional)
+ * - Registrar medida de pecho en centímetros (opcional)
+ * - Registrar medida de brazos en centímetros (opcional)
+ * - Registrar medida de piernas en centímetros (opcional)
+ * - Capturar frase motivacional o meta personal (opcional, máx 200 caracteres)
+ * - Todas las medidas son opcionales pero útiles para visualizar progreso
+ */
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";

@@ -1,3 +1,15 @@
+/**
+ * OnboardingStep1.tsx - Paso 1 del onboarding: Datos Personales
+ * 
+ * Este componente recopila la información básica del usuario.
+ * Se encarga de:
+ * - Capturar nombre completo del usuario
+ * - Solicitar edad (13-120 años)
+ * - Seleccionar sexo biológico (masculino/femenino)
+ * - Ingresar altura en centímetros
+ * - Ingresar peso actual en kilogramos
+ */
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
