@@ -8,11 +8,6 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { loadStripe } from "@stripe/stripe-js";
-import { Elements } from "@stripe/react-stripe-js";
-import { StripePaymentForm } from "./StripePaymentForm";
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "");
 
 interface PaymentModalProps {
   open: boolean;
@@ -21,11 +16,8 @@ interface PaymentModalProps {
 
 export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
   const [billingPeriod, setBillingPeriod] = useState<"mensual" | "anual">("mensual");
-  const [clientSecret, setClientSecret] = useState<string>("");
-  const [customerId, setCustomerId] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [paypalLoaded, setPaypalLoaded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paypalLoaded, setPaypalLoaded] = useState(false);
   const { user } = useAuth();
 
   const monthlyPrice = 98;
@@ -35,37 +27,43 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
 
   const currentPrice = billingPeriod === "mensual" ? monthlyPrice : annualPrice;
 
-  // Create SetupIntent when modal opens or billing period changes
-  useEffect(() => {
-    if (!open || !user) return;
+  const handleStripePayment = async () => {
+    if (!user) {
+      toast.error("Debes iniciar sesión para continuar");
+      return;
+    }
 
-    const createSetupIntent = async () => {
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase.functions.invoke(
-          "payments/create-setup-intent",
-          {
-            body: {
-              plan: billingPeriod,
-              userId: user.id,
-            },
-          }
-        );
+    setIsProcessing(true);
+    try {
+      toast.info("Redirigiendo a la pasarela de pago segura...");
+      
+      const { data: functionData, error } = await supabase.functions.invoke(
+        "payments/create-checkout-session",
+        {
+          body: {
+            plan: billingPeriod,
+            userId: user.id,
+          },
+        }
+      );
 
-        if (error) throw error;
-
-        setClientSecret(data.clientSecret);
-        setCustomerId(data.customerId);
-      } catch (error: any) {
-        console.error("Error creating setup intent:", error);
-        toast.error("Error al inicializar el pago");
-      } finally {
-        setIsLoading(false);
+      if (error) {
+        console.error("Error from function:", error);
+        throw error;
       }
-    };
 
-    createSetupIntent();
-  }, [open, user, billingPeriod]);
+      if (functionData?.url) {
+        // Redirect to Stripe checkout
+        window.location.href = functionData.url;
+      } else {
+        throw new Error("No URL returned from payment service");
+      }
+    } catch (error: any) {
+      console.error("Error creating checkout session:", error);
+      toast.error(error.message || "Error al procesar el pago. Intenta de nuevo.");
+      setIsProcessing(false);
+    }
+  };
 
   // Load PayPal SDK
   useEffect(() => {
@@ -158,7 +156,7 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
             <DialogTitle className="text-xl">Actualizar a Plan PRO</DialogTitle>
           </div>
           <DialogDescription>
-            Desbloquea todas las funcionalidades premium
+            Desbloquea todas las funcionalidades premium con pago 100% seguro
           </DialogDescription>
         </DialogHeader>
 
@@ -221,42 +219,23 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
           </TabsList>
 
           <TabsContent value="card" className="space-y-4 mt-4">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <p className="text-sm text-muted-foreground">Cargando formulario de pago...</p>
+            <div className="space-y-4">
+              <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground">
+                <p className="mb-2">✓ Formulario de pago seguro de Stripe</p>
+                <p className="mb-2">✓ Encriptación de extremo a extremo</p>
+                <p>✓ Sin guardar datos de tarjeta en nuestros servidores</p>
               </div>
-            ) : clientSecret && user ? (
-              <Elements
-                stripe={stripePromise}
-                options={{
-                  clientSecret,
-                  appearance: {
-                    theme: "stripe",
-                    variables: {
-                      colorPrimary: "hsl(var(--primary))",
-                      colorBackground: "hsl(var(--background))",
-                      colorText: "hsl(var(--foreground))",
-                      colorDanger: "hsl(var(--destructive))",
-                      fontFamily: "system-ui, sans-serif",
-                      borderRadius: "0.5rem",
-                    },
-                  },
-                  locale: "es",
-                }}
+              
+              <Button 
+                onClick={handleStripePayment} 
+                className="w-full" 
+                size="lg" 
+                disabled={isProcessing}
               >
-                <StripePaymentForm
-                  billingPeriod={billingPeriod}
-                  currentPrice={currentPrice}
-                  customerId={customerId}
-                  userId={user.id}
-                  onSuccess={() => {
-                    toast.success("¡Suscripción activada exitosamente!");
-                    onOpenChange(false);
-                    window.location.reload();
-                  }}
-                />
-              </Elements>
-            ) : null}
+                <CreditCard className="w-4 h-4 mr-2" />
+                {isProcessing ? "Procesando..." : `Pagar $${currentPrice} MXN con Tarjeta`}
+              </Button>
+            </div>
           </TabsContent>
 
           <TabsContent value="paypal" className="space-y-4 mt-4">
@@ -283,7 +262,7 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
         </Tabs>
 
         <p className="text-xs text-center text-muted-foreground mt-4">
-          🔒 Pago seguro • Cancela cuando quieras • Sin compromisos
+          🔒 Pago 100% seguro con Stripe • Cancela cuando quieras • Sin compromisos
         </p>
       </DialogContent>
     </Dialog>
