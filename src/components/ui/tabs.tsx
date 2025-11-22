@@ -1,10 +1,21 @@
+/**
+ * Tabs.tsx - Componente de pestañas de shadcn/ui
+ * 
+ * Este componente permite organizar contenido en pestañas navegables.
+ * Se usa para separar información relacionada en secciones que el usuario puede alternar.
+ * Basado en Radix UI Tabs con estilos personalizados.
+ */
+
 import * as React from "react";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 
 import { cn } from "@/lib/utils";
 
+// Componente raíz de las pestañas - Controla qué pestaña está activa
 const Tabs = TabsPrimitive.Root;
 
+// Contenedor de los botones de las pestañas
+// Muestra todas las opciones de pestañas disponibles en una fila horizontal
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
@@ -20,6 +31,8 @@ const TabsList = React.forwardRef<
 ));
 TabsList.displayName = TabsPrimitive.List.displayName;
 
+// Botón individual de cada pestaña
+// Cambia el contenido visible cuando se hace clic
 const TabsTrigger = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
@@ -35,6 +48,8 @@ const TabsTrigger = React.forwardRef<
 ));
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
 
+// Contenedor del contenido de cada pestaña
+// Solo el contenido de la pestaña activa es visible
 const TabsContent = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>

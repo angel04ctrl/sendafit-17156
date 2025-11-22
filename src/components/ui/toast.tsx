@@ -1,3 +1,11 @@
+/**
+ * Toast.tsx - Componente de notificaciones toast de shadcn/ui
+ * 
+ * Este componente muestra notificaciones temporales en la esquina de la pantalla.
+ * Se usa para feedback de acciones del usuario, errores, confirmaciones, etc.
+ * Basado en Radix UI Toast con variantes de estilo y animaciones.
+ */
+
 import * as React from "react";
 import * as ToastPrimitives from "@radix-ui/react-toast";
 import { cva, type VariantProps } from "class-variance-authority";
@@ -5,8 +13,11 @@ import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+// Provider que envuelve la app para habilitar las notificaciones toast
 const ToastProvider = ToastPrimitives.Provider;
 
+// Contenedor donde se muestran los toasts en la pantalla
+// Por defecto aparecen en la esquina inferior derecha
 const ToastViewport = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Viewport>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Viewport>
