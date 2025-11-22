@@ -66,31 +66,49 @@ const Calendar = () => {
   }, []);
 
   // Función para obtener entrenamientos de una fecha específica
-  // Busca primero por fecha exacta (scheduled_date), luego por día de la semana (weekday)
+  // Busca por fecha exacta prioritariamente
   const getWorkoutsForDate = (date: Date) => {
     // Normalizar la fecha a medianoche hora local para comparación precisa
     const compareDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const compareDateStr = format(compareDate, 'yyyy-MM-dd');
 
-    // Estrategia 1: Match exacto por scheduled_date
+    // Estrategia 1: Match exacto por scheduled_date (prioritario)
     const directMatches = workouts.filter((w) => {
       if (!w.scheduled_date) return false;
-      // Parsear scheduled_date como fecha local (no UTC)
-      const [year, month, day] = w.scheduled_date.split('-').map(Number);
-      const workoutDate = new Date(year, month - 1, day);
-      return workoutDate.getTime() === compareDate.getTime();
+      return w.scheduled_date === compareDateStr;
     });
-    if (directMatches.length > 0) return directMatches;
+    
+    console.log(`Calendar: Buscando workouts para ${compareDateStr}, encontrados ${directMatches.length} por fecha exacta`);
+    
+    if (directMatches.length > 0) {
+      return directMatches;
+    }
 
-    // Estrategia 2: Match por weekday (fallback para entrenamientos recurrentes)
-    // Convertir JS day (0=Domingo) a weekday format (1=Lunes, 7=Domingo)
-    const jsDay = compareDate.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-    const weekdayNumber = jsDay === 0 ? 7 : jsDay; // 1=Mon, 2=Tue, ..., 7=Sun
+    // Estrategia 2: Match por weekday solo para fechas futuras o de esta semana
+    // (no mostrar workouts viejos solo porque coincide el día de la semana)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekStart = startOfWeek(today, { locale: es, weekStartsOn: 1 });
     
-    console.log(`Calendar: Buscando workouts para fecha ${format(compareDate, 'yyyy-MM-dd')}, jsDay: ${jsDay}, weekday: ${weekdayNumber}`);
-    const weekdayMatches = workouts.filter((w) => w.weekday === weekdayNumber);
-    console.log(`Calendar: Encontrados ${weekdayMatches.length} workouts con weekday=${weekdayNumber}`, weekdayMatches.map(w => ({ name: w.name, weekday: w.weekday, date: w.scheduled_date })));
+    // Solo usar weekday si la fecha es de esta semana o posterior
+    if (compareDate >= weekStart) {
+      const jsDay = compareDate.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+      const weekdayNumber = jsDay === 0 ? 7 : jsDay; // 1=Mon, 2=Tue, ..., 7=Sun
+      
+      const weekdayMatches = workouts.filter((w) => {
+        if (!w.weekday) return false;
+        // Solo workouts de esta semana o futuros
+        if (w.scheduled_date) {
+          return w.weekday === weekdayNumber && w.scheduled_date >= format(weekStart, 'yyyy-MM-dd');
+        }
+        return false;
+      });
+      
+      console.log(`Calendar: Búsqueda secundaria por weekday=${weekdayNumber}, encontrados ${weekdayMatches.length}`);
+      return weekdayMatches;
+    }
     
-    return weekdayMatches;
+    return [];
   };
 
   return (

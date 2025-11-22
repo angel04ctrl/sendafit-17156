@@ -10,8 +10,8 @@
  */
 
 /**
- * Mapeo de códigos cortos a números de día JavaScript
- * Donde 0=Domingo, 1=Lunes, ..., 6=Sábado (estándar JS Date)
+ * Mapeo de códigos cortos a weekday (1-7 donde 1=Lunes, 7=Domingo)
+ * Este es el formato usado en la BD y en los planes
  */
 export const dayMap: Record<string, number> = {
   'L': 1,   // Lunes
@@ -20,7 +20,7 @@ export const dayMap: Record<string, number> = {
   'J': 4,   // Jueves
   'V': 5,   // Viernes
   'S': 6,   // Sábado
-  'D': 0,   // Domingo (0 en JS Date.getDay())
+  'D': 7,   // Domingo (7 en weekday format)
 };
 
 /**

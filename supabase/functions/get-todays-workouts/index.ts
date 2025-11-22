@@ -40,7 +40,7 @@ serve(async (req) => {
     // Get user profile to fetch assigned plan
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('assigned_routine_id')
+      .select('assigned_routine_id, available_weekdays')
       .eq('id', user.id)
       .single();
 
@@ -49,55 +49,71 @@ serve(async (req) => {
     }
 
     // Calculate today's weekday (1-7 where 1=Monday, 7=Sunday)
-    // IMPORTANTE: Usamos la fecha local del servidor, no UTC
     const now = new Date();
     const dayOfWeek = now.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
     const weekday = dayOfWeek === 0 ? 7 : dayOfWeek; // Convert to 1-7 where 1=Monday, 7=Sunday
+    
+    // Format today's date in local timezone
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const todayDate = `${year}-${month}-${day}`;
 
-    console.log(`Today's date: ${now.toISOString()}, JS day: ${dayOfWeek}, Weekday: ${weekday}, Assigned plan: ${profile?.assigned_routine_id || 'none'}`);
+    console.log(`Today: ${todayDate}, JS day: ${dayOfWeek}, Weekday: ${weekday}, Plan: ${profile?.assigned_routine_id || 'none'}, User days: ${profile?.available_weekdays?.join(', ') || 'none'}`);
 
-    // Fetch today's workouts by weekday and plan_id (more reliable than date)
-    let query = supabase
+    let finalWorkouts: any[] = [];
+
+    // Buscar entrenamientos de HOY por dos estrategias:
+    // 1. Por scheduled_date exacta (prioritario)
+    // 2. Por weekday + plan (para entrenamientos recurrentes de la semana actual)
+    
+    // Estrategia 1: Match exacto por fecha
+    const { data: dateWorkouts } = await supabase
       .from('workouts')
-      .select(`
-        *,
-        workout_exercises (*)
-      `)
+      .select(`*, workout_exercises (*)`)
       .eq('user_id', user.id)
-      .eq('weekday', weekday);
-
-    // Filter by plan_id if user has an assigned plan
-    if (profile?.assigned_routine_id) {
-      query = query.eq('plan_id', profile.assigned_routine_id);
-    }
-
-    const { data: workouts, error: workoutsError } = await query
+      .eq('scheduled_date', todayDate)
       .order('created_at', { ascending: true });
-
-    let finalWorkouts = workouts || [];
-
-    // Fallback: if no workouts found by weekday/plan, try by scheduled_date (legacy/manual)
-    if ((!finalWorkouts || finalWorkouts.length === 0)) {
-      const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-      const today = local.toISOString().split('T')[0];
-      const { data: fallback, error: fallbackError } = await supabase
+    
+    if (dateWorkouts && dateWorkouts.length > 0) {
+      console.log(`Found ${dateWorkouts.length} workouts by exact date match`);
+      finalWorkouts = dateWorkouts;
+    } else {
+      // Estrategia 2: Buscar por weekday + plan en la semana actual
+      // Calcular lunes de esta semana
+      const currentDay = now.getDay();
+      const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+      const mondayThisWeek = new Date(now);
+      mondayThisWeek.setDate(now.getDate() - daysToMonday);
+      mondayThisWeek.setHours(0, 0, 0, 0);
+      
+      const mondayStr = `${mondayThisWeek.getFullYear()}-${String(mondayThisWeek.getMonth() + 1).padStart(2, '0')}-${String(mondayThisWeek.getDate()).padStart(2, '0')}`;
+      
+      let query = supabase
         .from('workouts')
         .select(`*, workout_exercises (*)`)
         .eq('user_id', user.id)
-        .eq('scheduled_date', today)
-        .order('created_at', { ascending: true });
-      if (!fallbackError && fallback) {
-        finalWorkouts = fallback;
+        .eq('weekday', weekday)
+        .gte('scheduled_date', mondayStr); // Solo workouts de esta semana o futuros
+
+      // Filter by current plan if user has one
+      if (profile?.assigned_routine_id) {
+        query = query.eq('plan_id', profile.assigned_routine_id);
+      }
+
+      const { data: weekdayWorkouts, error: weekdayError } = await query
+        .order('scheduled_date', { ascending: false })
+        .limit(10);
+
+      if (!weekdayError && weekdayWorkouts && weekdayWorkouts.length > 0) {
+        console.log(`Found ${weekdayWorkouts.length} workouts by weekday=${weekday} for current week`);
+        finalWorkouts = weekdayWorkouts;
+      } else {
+        console.log('No workouts found for today');
+        finalWorkouts = [];
       }
     }
 
-    if (workoutsError) {
-      console.error('Error fetching workouts:', workoutsError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch workouts', details: workoutsError }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     console.log('Found', finalWorkouts?.length || 0, 'workouts for today');
 
