@@ -322,12 +322,7 @@ const Workouts = () => {
                     const baseName = workout.name.replace(/\s-\s(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo)$/i, '');
                     const displayName = `${baseName} - ${days[localDate.getDay()]}`;
                     return (
-                      <>
-                        <h3 className="font-semibold text-sm sm:text-base break-words">{displayName}</h3>
-                        <p className="text-xs sm:text-sm text-muted-foreground">
-                          {format(localDate, "d 'de' MMMM, yyyy")}
-                        </p>
-                      </>
+                      <h3 className="font-semibold text-sm sm:text-base break-words">{displayName}</h3>
                     );
                   })()}
                   {workout.description && (
