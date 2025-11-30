@@ -26,7 +26,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Plus, CheckCircle2, Circle, Trash2, ChevronDown, Scan, Library, Info } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
 import { AddExerciseDialog } from "@/components/AddExerciseDialog";
 import { useCompleteWorkout, useTodaysWorkouts } from "@/hooks/useBackendApi";
 import { ProButton } from "@/components/ProButton";
@@ -314,17 +313,7 @@ const Workouts = () => {
                   )}
                 </button>
                 <div className="flex-1 min-w-0">
-                  {(() => {
-                    const dateStr = isToday ? today : workout.scheduled_date;
-                    const [year, month, day] = dateStr.split('-').map(Number);
-                    const localDate = new Date(year, month - 1, day);
-                    const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-                    const baseName = workout.name.replace(/\s-\s(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo)$/i, '');
-                    const displayName = `${baseName} - ${days[localDate.getDay()]}`;
-                    return (
-                      <h3 className="font-semibold text-sm sm:text-base break-words">{displayName}</h3>
-                    );
-                  })()}
+                  <h3 className="font-semibold text-sm sm:text-base break-words">{workout.name}</h3>
                   {workout.description && (
                     <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
                       {workout.description}
@@ -624,19 +613,7 @@ const Workouts = () => {
                                 )}
                               </button>
                               <div>
-                                {(() => {
-                                  const [year, month, day] = workout.scheduled_date.split('-').map(Number);
-                                  const localDate = new Date(year, month - 1, day);
-                                  const days = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-                                  const baseName = workout.name.replace(/\s-\s(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo)$/i, '');
-                                  const displayName = `${baseName} - ${days[localDate.getDay()]}`;
-                                  return (
-                                    <>
-                                      <h4 className="font-medium text-sm">{displayName}</h4>
-                                      <p className="text-xs text-muted-foreground">{format(localDate, "d 'de' MMMM, yyyy")}</p>
-                                    </>
-                                  );
-                                })()}
+                                <h4 className="font-medium text-sm">{workout.name}</h4>
                               </div>
                             </div>
                             <div className="flex gap-3 ml-7 text-xs text-muted-foreground">
