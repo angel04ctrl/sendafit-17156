@@ -358,16 +358,40 @@ const Workouts = () => {
                           variant="ghost"
                           size="sm"
                           className="h-auto py-1 px-2 text-xs justify-start w-full hover:bg-muted"
-                          onClick={() => {
-                            setSelectedExercise({
-                              nombre: ex.name,
-                              descripcion: ex.notes || 'Sin descripción disponible',
-                              grupo_muscular: 'General',
-                              nivel: 'B',
-                              lugar: workout.location,
-                              series_sugeridas: ex.sets,
-                              repeticiones_sugeridas: ex.reps,
-                            });
+                          onClick={async () => {
+                            // Buscar el ejercicio completo en la tabla exercises por nombre
+                            const { data: exerciseData } = await sb
+                              .from('exercises')
+                              .select('*')
+                              .eq('nombre', ex.name)
+                              .maybeSingle();
+                            
+                            if (exerciseData) {
+                              // Usar los datos completos del ejercicio desde la BD
+                              setSelectedExercise({
+                                nombre: exerciseData.nombre,
+                                descripcion: exerciseData.descripcion,
+                                grupo_muscular: exerciseData.grupo_muscular,
+                                nivel: exerciseData.nivel,
+                                lugar: exerciseData.lugar,
+                                series_sugeridas: exerciseData.series_sugeridas || ex.sets,
+                                repeticiones_sugeridas: exerciseData.repeticiones_sugeridas || ex.reps,
+                                equipamiento: exerciseData.equipamiento,
+                                video: exerciseData.video,
+                                imagen: exerciseData.imagen,
+                              });
+                            } else {
+                              // Fallback si no se encuentra el ejercicio en la BD
+                              setSelectedExercise({
+                                nombre: ex.name,
+                                descripcion: ex.notes || 'Sin descripción disponible',
+                                grupo_muscular: 'General',
+                                nivel: 'B',
+                                lugar: workout.location,
+                                series_sugeridas: ex.sets,
+                                repeticiones_sugeridas: ex.reps,
+                              });
+                            }
                             setExerciseDetailOpen(true);
                           }}
                         >
