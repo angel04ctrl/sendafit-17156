@@ -261,8 +261,21 @@ const Workouts = () => {
   // Use backend data for today's workouts
   const todayWorkouts = todaysData?.workouts || [];
   
+  // Calculate today's weekday (1=Lunes, 7=Domingo)
+  const todayWeekday = (() => {
+    const jsDay = new Date().getDay();
+    return jsDay === 0 ? 7 : jsDay;
+  })();
+  
+  // Weekday names mapping
+  const weekdayNames: Record<number, string> = {
+    1: 'Lunes', 2: 'Martes', 3: 'Miércoles',
+    4: 'Jueves', 5: 'Viernes', 6: 'Sábado', 7: 'Domingo'
+  };
+  
   console.log('Workouts - Entrenamientos de hoy:', {
     count: todayWorkouts.length,
+    todayWeekday,
     workouts: todayWorkouts.map(w => ({ 
       name: w.name, 
       weekday: w.weekday, 
@@ -271,16 +284,22 @@ const Workouts = () => {
     })),
   });
   
-  // Filter "other days" workouts to only show current plan's workouts
+  // Filter "other days" workouts to show workouts from other days of the week
   const otherDaysWorkouts = workouts.filter((w) => {
-    // Exclude today's workouts
-    if (w.scheduled_date === today) return false;
+    // For automatic workouts: exclude by weekday of today
+    if (w.tipo === 'automatico') {
+      if (w.weekday === todayWeekday) return false;
+      // Only show workouts from the current plan
+      if (profile?.assigned_routine_id && w.plan_id !== profile.assigned_routine_id) {
+        return false;
+      }
+      return true;
+    }
     
-    // Only show workouts from the current plan (or manual workouts)
-    if (w.tipo === 'manual') return true;
-    if (!profile?.assigned_routine_id) return true;
+    // For manual workouts: exclude by scheduled_date of today
+    if (w.tipo === 'manual' && w.scheduled_date === today) return false;
     
-    return w.plan_id === profile.assigned_routine_id;
+    return true;
   });
   
   // Filtros por ubicación para el día actual
@@ -323,6 +342,11 @@ const Workouts = () => {
                     <span className="flex-shrink-0">{workout.duration_minutes} min</span>
                     <span className="flex-shrink-0">~{workout.estimated_calories} kcal</span>
                     <span className="capitalize flex-shrink-0">{workout.location}</span>
+                    {workout.tipo === 'automatico' && workout.weekday && (
+                      <span className="flex-shrink-0 text-primary font-medium">
+                        {weekdayNames[workout.weekday]}
+                      </span>
+                    )}
                   </div>
                   
                   {/* Show exercises */}
