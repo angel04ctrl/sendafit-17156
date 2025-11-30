@@ -41,6 +41,20 @@ const Calendar = () => {
   });
 
   const workouts = weekData?.workouts || [];
+  
+  // Debug: Ver qué workouts están llegando
+  useEffect(() => {
+    console.log('Calendar: Total workouts recibidos:', workouts.length);
+    if (workouts.length > 0) {
+      console.log('Calendar: Primeros 3 workouts:', workouts.slice(0, 3).map(w => ({
+        id: w.id,
+        name: w.name,
+        scheduled_date: w.scheduled_date,
+        weekday: w.weekday,
+        completed: w.completed
+      })));
+    }
+  }, [workouts]);
 
   // Obtener el perfil del usuario para saber los días disponibles
   const { data: profile } = useQuery({
