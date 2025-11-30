@@ -303,13 +303,14 @@ const Profile = () => {
       }
     }
 
-    // No hubo cambios en el plan, proceder con actualización normal
-    await updateProfile();
+    // Si solo cambiaron los días (sin cambio de objetivo), actualizar y redistribuir
+    // Si cambió el objetivo, el modal ya se mostró
+    await updateProfile(weekdaysChanged);
   };
 
   // Función para actualizar el perfil en la base de datos
   // Recalcula macros automáticamente si hay información completa
-  const updateProfile = async () => {
+  const updateProfile = async (weekdaysChanged = false) => {
     setLoading(true);
 
     // Recalcular macros nutricionales si hay información completa del usuario
@@ -353,6 +354,11 @@ const Profile = () => {
       console.error("Error updating profile:", error);
       toast.error("Error al actualizar perfil: " + error.message);
       return;
+    }
+
+    // Si cambiaron los días de entrenamiento, redistribuir automáticamente
+    if (weekdaysChanged) {
+      await redistributeWorkoutsIfNeeded(true);
     }
 
     setLoading(false);
@@ -400,6 +406,25 @@ const Profile = () => {
       toast.error('Error al aplicar cambios al plan');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // New function to handle redistribution when days change
+  const redistributeWorkoutsIfNeeded = async (weekdaysChanged: boolean) => {
+    if (!weekdaysChanged) return;
+
+    try {
+      toast.info('Actualizando entrenamientos...');
+      await redistributeMutation.mutateAsync({});
+      
+      // Invalidate all related queries
+      await queryClient.invalidateQueries({ queryKey: ['user-routine'] });
+      await queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
+      await queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
+      await queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
+      await queryClient.invalidateQueries({ queryKey: ['progress-stats'] });
+    } catch (error) {
+      console.error('Error redistributing workouts:', error);
     }
   };
 
