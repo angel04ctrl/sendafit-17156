@@ -121,18 +121,20 @@ serve(async (req) => {
     const planDays = Object.keys(exercisesByDay).map(Number).sort((a, b) => a - b);
     console.log('Plan has exercises for days:', planDays);
 
-    // Eliminar TODOS los workouts automáticos del plan actual (permanentes por weekday)
-    // Ya no usamos rango de fechas, eliminamos por plan_id
-    console.log('Deleting all automatic workouts for plan:', profile.assigned_routine_id);
-    const { error: deleteError } = await supabase
+    // Eliminar TODOS los workouts automáticos del usuario (sin importar plan_id)
+    // Esto asegura que los entrenamientos de días no seleccionados se eliminen
+    console.log('Deleting all automatic workouts for user:', user.id);
+    const { data: deletedWorkouts, error: deleteError } = await supabase
       .from('workouts')
       .delete()
       .eq('user_id', user.id)
       .eq('tipo', 'automatico')
-      .eq('plan_id', profile.assigned_routine_id);
+      .select('id');
 
     if (deleteError) {
       console.error('Error deleting old workouts:', deleteError);
+    } else {
+      console.log(`Successfully deleted ${deletedWorkouts?.length || 0} automatic workouts`);
     }
 
     // Obtener el plan para información adicional
