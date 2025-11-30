@@ -43,12 +43,20 @@ serve(async (req) => {
 
     console.log('Fetching workouts for user:', user.id, 'date:', date, 'range:', startDate, '-', endDate);
 
-    // Get user's assigned routine to filter automatic workouts
+    // Get user's assigned routine and available weekdays to filter automatic workouts
     const { data: profile } = await supabase
       .from('profiles')
-      .select('assigned_routine_id')
+      .select('assigned_routine_id, available_weekdays')
       .eq('id', user.id)
       .single();
+
+    // Map available weekdays to numbers (L=1, M=2, Mi=3, J=4, V=5, S=6, D=7)
+    const dayMap: { [key: string]: number } = {
+      'L': 1, 'M': 2, 'Mi': 3, 'J': 4, 'V': 5, 'S': 6, 'D': 7
+    };
+    const availableWeekdaysNumbers = (profile?.available_weekdays || [])
+      .map((d: string) => dayMap[d])
+      .filter(Boolean) as number[];
 
     let allWorkouts: any[] = [];
 
@@ -66,18 +74,26 @@ serve(async (req) => {
       }
 
       // Buscar entrenamientos automáticos por weekday
-      let automaticQuery = supabase
-        .from('workouts')
-        .select(`*, workout_exercises (*)`)
-        .eq('user_id', user.id)
-        .eq('tipo', 'automatico')
-        .in('weekday', Array.from(weekdays));
+      // Solo mostrar workouts de días que el usuario tiene seleccionados
+      const validWeekdays = Array.from(weekdays).filter(wd => availableWeekdaysNumbers.includes(wd));
+      
+      let automaticWorkouts: any[] = [];
+      
+      if (validWeekdays.length > 0) {
+        let automaticQuery = supabase
+          .from('workouts')
+          .select(`*, workout_exercises (*)`)
+          .eq('user_id', user.id)
+          .eq('tipo', 'automatico')
+          .in('weekday', validWeekdays);
 
-      if (profile?.assigned_routine_id) {
-        automaticQuery = automaticQuery.eq('plan_id', profile.assigned_routine_id);
+        if (profile?.assigned_routine_id) {
+          automaticQuery = automaticQuery.eq('plan_id', profile.assigned_routine_id);
+        }
+
+        const { data } = await automaticQuery;
+        automaticWorkouts = data || [];
       }
-
-      const { data: automaticWorkouts } = await automaticQuery;
 
       // Buscar entrenamientos manuales por fecha
       const { data: manualWorkouts } = await supabase
@@ -98,18 +114,24 @@ serve(async (req) => {
       const jsDay = d.getDay();
       const weekday = jsDay === 0 ? 7 : jsDay;
 
-      let automaticQuery = supabase
-        .from('workouts')
-        .select(`*, workout_exercises (*)`)
-        .eq('user_id', user.id)
-        .eq('tipo', 'automatico')
-        .eq('weekday', weekday);
+      // Solo mostrar workouts automáticos si hoy es un día de entrenamiento
+      let automaticWorkouts: any[] = [];
+      
+      if (availableWeekdaysNumbers.includes(weekday)) {
+        let automaticQuery = supabase
+          .from('workouts')
+          .select(`*, workout_exercises (*)`)
+          .eq('user_id', user.id)
+          .eq('tipo', 'automatico')
+          .eq('weekday', weekday);
 
-      if (profile?.assigned_routine_id) {
-        automaticQuery = automaticQuery.eq('plan_id', profile.assigned_routine_id);
+        if (profile?.assigned_routine_id) {
+          automaticQuery = automaticQuery.eq('plan_id', profile.assigned_routine_id);
+        }
+
+        const { data } = await automaticQuery;
+        automaticWorkouts = data || [];
       }
-
-      const { data: automaticWorkouts } = await automaticQuery;
 
       const { data: manualWorkouts } = await supabase
         .from('workouts')

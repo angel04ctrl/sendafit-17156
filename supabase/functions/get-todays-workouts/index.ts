@@ -61,30 +61,50 @@ serve(async (req) => {
 
     console.log(`Today: ${todayDate}, JS day: ${dayOfWeek}, Weekday: ${weekday}, Plan: ${profile?.assigned_routine_id || 'none'}, User days: ${profile?.available_weekdays?.join(', ') || 'none'}`);
 
+    // Map available weekdays to numbers for filtering
+    const dayMap: { [key: string]: number } = {
+      'L': 1, 'M': 2, 'Mi': 3, 'J': 4, 'V': 5, 'S': 6, 'D': 7
+    };
+    const availableWeekdaysNumbers = (profile?.available_weekdays || [])
+      .map((d: string) => dayMap[d])
+      .filter(Boolean) as number[];
+    
+    // Check if today is a training day
+    const isTodayTrainingDay = availableWeekdaysNumbers.includes(weekday);
+    console.log(`Is today a training day? ${isTodayTrainingDay}`);
+
     let finalWorkouts: any[] = [];
 
     // Buscar entrenamientos de HOY por dos estrategias:
-    // 1. Entrenamientos automáticos: por weekday + plan (permanentes)
+    // 1. Entrenamientos automáticos: por weekday + plan (permanentes) - SOLO si hoy es día de entrenamiento
     // 2. Entrenamientos manuales: por scheduled_date exacta
     
-    // Estrategia 1: Entrenamientos automáticos por weekday
-    let automaticQuery = supabase
-      .from('workouts')
-      .select(`*, workout_exercises (*)`)
-      .eq('user_id', user.id)
-      .eq('weekday', weekday)
-      .eq('tipo', 'automatico');
+    let automaticWorkouts: any[] = [];
+    
+    // Estrategia 1: Entrenamientos automáticos por weekday - solo si hoy es día de entrenamiento
+    if (isTodayTrainingDay) {
+      let automaticQuery = supabase
+        .from('workouts')
+        .select(`*, workout_exercises (*)`)
+        .eq('user_id', user.id)
+        .eq('weekday', weekday)
+        .eq('tipo', 'automatico');
 
-    // Filter by current plan if user has one
-    if (profile?.assigned_routine_id) {
-      automaticQuery = automaticQuery.eq('plan_id', profile.assigned_routine_id);
-    }
+      // Filter by current plan if user has one
+      if (profile?.assigned_routine_id) {
+        automaticQuery = automaticQuery.eq('plan_id', profile.assigned_routine_id);
+      }
 
-    const { data: automaticWorkouts, error: automaticError } = await automaticQuery
-      .order('created_at', { ascending: true });
+      const { data, error: automaticError } = await automaticQuery
+        .order('created_at', { ascending: true });
 
-    if (automaticError) {
-      console.error('Error fetching automatic workouts:', automaticError);
+      if (automaticError) {
+        console.error('Error fetching automatic workouts:', automaticError);
+      } else {
+        automaticWorkouts = data || [];
+      }
+    } else {
+      console.log('Today is a rest day - skipping automatic workouts');
     }
 
     // Estrategia 2: Entrenamientos manuales por fecha exacta
