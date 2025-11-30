@@ -41,20 +41,6 @@ const Calendar = () => {
   });
 
   const workouts = weekData?.workouts || [];
-  
-  // Debug: Ver qué workouts están llegando
-  useEffect(() => {
-    console.log('Calendar: Total workouts recibidos:', workouts.length);
-    if (workouts.length > 0) {
-      console.log('Calendar: Primeros 3 workouts:', workouts.slice(0, 3).map(w => ({
-        id: w.id,
-        name: w.name,
-        scheduled_date: w.scheduled_date,
-        weekday: w.weekday,
-        completed: w.completed
-      })));
-    }
-  }, [workouts]);
 
   // Obtener el perfil del usuario para saber los días disponibles
   const { data: profile } = useQuery({
@@ -100,16 +86,23 @@ const Calendar = () => {
     };
   }, []);
 
-  // Función para obtener entrenamientos de una fecha específica
+  // Función para obtener entrenamientos de una fecha específica (basado en weekday)
   const getWorkoutsForDate = (date: Date) => {
+    const jsDay = date.getDay(); // 0=Sunday, 1=Monday, etc.
+    const weekday = jsDay === 0 ? 7 : jsDay; // Convert to 1-7 where 1=Monday, 7=Sunday
     const compareDateStr = format(date, 'yyyy-MM-dd');
     
-    // Buscar por fecha exacta
+    // Para entrenamientos automáticos: buscar por weekday
+    // Para entrenamientos manuales: buscar por scheduled_date exacta
     const matches = workouts.filter((w) => {
-      return w.scheduled_date === compareDateStr;
+      if (w.tipo === 'automatico') {
+        return w.weekday === weekday;
+      } else {
+        return w.scheduled_date === compareDateStr;
+      }
     });
     
-    console.log(`Calendar: Workouts para ${compareDateStr}:`, matches.length);
+    console.log(`Calendar: Workouts para ${compareDateStr} (weekday ${weekday}):`, matches.length);
     return matches;
   };
 

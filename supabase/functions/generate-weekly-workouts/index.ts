@@ -199,9 +199,9 @@ serve(async (req) => {
     const planDays = Object.keys(exercisesByDay).map(Number).sort((a, b) => a - b);
     console.log(`Plan has ${planExercises.length} exercises across ${planDays.length} days`);
 
-    // Delete existing automatic workouts
-    // If reassigning plan, delete ALL automatic workouts (not completed)
-    // If only redistributing, delete only current week's workouts
+    // Delete existing automatic workouts for the user's current plan
+    // If reassigning plan, delete ALL automatic workouts from old plan
+    // Otherwise, just delete duplicates for the selected days
     let deletedCount = 0;
     if (needsReassign) {
       console.log('Deleting all previous automatic workouts due to plan reassignment');
@@ -209,8 +209,7 @@ serve(async (req) => {
         .from('workouts')
         .select('id')
         .eq('user_id', user.id)
-        .eq('tipo', 'automatico')
-        .eq('completed', false);
+        .eq('tipo', 'automatico');
       
       deletedCount = deletedWorkouts?.length || 0;
       
@@ -218,29 +217,30 @@ serve(async (req) => {
         .from('workouts')
         .delete()
         .eq('user_id', user.id)
-        .eq('tipo', 'automatico')
-        .eq('completed', false);
+        .eq('tipo', 'automatico');
     } else {
-      console.log('Deleting current week automatic workouts for redistribution');
-      const { data: deletedWorkouts } = await supabase
-        .from('workouts')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('tipo', 'automatico')
-        .eq('completed', false)
-        .gte('scheduled_date', monday.toISOString().split('T')[0])
-        .lte('scheduled_date', sunday.toISOString().split('T')[0]);
+      console.log('Deleting existing automatic workouts for selected weekdays');
+      const weekdaysToDelete = selectedDays.map(d => dayMap[d]).filter(Boolean);
       
-      deletedCount = deletedWorkouts?.length || 0;
-      
-      await supabase
-        .from('workouts')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('tipo', 'automatico')
-        .eq('completed', false)
-        .gte('scheduled_date', monday.toISOString().split('T')[0])
-        .lte('scheduled_date', sunday.toISOString().split('T')[0]);
+      for (const wd of weekdaysToDelete) {
+        const { data: deletedWorkouts } = await supabase
+          .from('workouts')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('tipo', 'automatico')
+          .eq('plan_id', planId)
+          .eq('weekday', wd);
+        
+        deletedCount += deletedWorkouts?.length || 0;
+        
+        await supabase
+          .from('workouts')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('tipo', 'automatico')
+          .eq('plan_id', planId)
+          .eq('weekday', wd);
+      }
     }
 
     // Get plan metadata
@@ -258,7 +258,7 @@ serve(async (req) => {
       return 'casa';
     };
 
-    // Generate workouts
+    // Generate permanent workouts based on weekday (not specific dates)
     const workoutsToCreate = [];
     selectedDays.forEach((dayCode, index) => {
       const weekday = dayMap[dayCode];
@@ -267,30 +267,15 @@ serve(async (req) => {
         return;
       }
 
-      // Calculate workout date based on weekday (1=Monday, 7=Sunday)
-      const workoutDate = new Date(monday);
-      workoutDate.setDate(monday.getDate() + (weekday - 1));
-
-      // If date has passed, schedule for next week
-      if (workoutDate < today) {
-        workoutDate.setDate(workoutDate.getDate() + 7);
-      }
-
-      // Format date as YYYY-MM-DD in local timezone (not UTC)
-      const year = workoutDate.getFullYear();
-      const month = String(workoutDate.getMonth() + 1).padStart(2, '0');
-      const day = String(workoutDate.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-      
-      // Verify the day name matches the weekday number
-      const calculatedDayOfWeek = workoutDate.getDay(); // 0=Sunday, 1=Monday, etc.
+      // Map weekday number to day name
       const dayNameMapping: Record<number, string> = {
         1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves',
-        5: 'Viernes', 6: 'Sábado', 0: 'Domingo'
+        5: 'Viernes', 6: 'Sábado', 7: 'Domingo'
       };
-      const actualDayName = dayNameMapping[calculatedDayOfWeek];
+      const dayName = dayNameMapping[weekday];
       
-      console.log(`Generando workout: dayCode=${dayCode}, weekday=${weekday}, fecha=${dateStr}, JS day=${calculatedDayOfWeek}, nombre=${actualDayName}`);
+      console.log(`Generando workout permanente: dayCode=${dayCode}, weekday=${weekday}, nombre=${dayName}`);
+      
       const planDayIndex = index % planDays.length;
       const planDay = planDays[planDayIndex];
       const dayExercises = exercisesByDay[planDay];
@@ -310,10 +295,10 @@ serve(async (req) => {
 
       workoutsToCreate.push({
         user_id: user.id,
-        name: `${planData?.nombre_plan || 'Entrenamiento'} - ${actualDayName}`,
+        name: `${planData?.nombre_plan || 'Entrenamiento'} - ${dayName}`,
         description: `${muscleGroup} - ${planData?.descripcion_plan || 'Plan personalizado'}`,
-        scheduled_date: dateStr,
-        weekday: weekday,
+        scheduled_date: today.toISOString().split('T')[0], // Fecha de creación como referencia
+        weekday: weekday, // Campo principal para identificar el día
         plan_id: planId,
         location: normalizeLocation(planData?.lugar),
         duration_minutes: dayExercises.length * 5,
@@ -372,13 +357,13 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: needsReassign ? 'Plan assigned and workouts generated' : 'Workouts redistributed',
+        message: needsReassign ? 'Plan asignado y entrenamientos permanentes creados' : 'Entrenamientos redistribuidos',
         plan_id: planId,
         plan_name: planData?.nombre_plan,
         workouts_created: createdWorkouts.length,
         workouts_deleted: deletedCount,
         training_days: selectedDays,
-        week_range: `${monday.toISOString().split('T')[0]} to ${sunday.toISOString().split('T')[0]}`,
+        note: 'Los entrenamientos son permanentes y se repiten cada semana',
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
