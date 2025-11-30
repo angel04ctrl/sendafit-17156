@@ -121,25 +121,15 @@ serve(async (req) => {
     const planDays = Object.keys(exercisesByDay).map(Number).sort((a, b) => a - b);
     console.log('Plan has exercises for days:', planDays);
 
-    // Calcular lunes de la semana actual (weekStartsOn: 1)
-    const today = new Date();
-    const currentDayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const daysToMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - daysToMonday);
-    monday.setHours(0, 0, 0, 0);
-
-    // Eliminar workouts automáticos solo de la semana actual (no completados)
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
+    // Eliminar TODOS los workouts automáticos del plan actual (permanentes por weekday)
+    // Ya no usamos rango de fechas, eliminamos por plan_id
+    console.log('Deleting all automatic workouts for plan:', profile.assigned_routine_id);
     const { error: deleteError } = await supabase
       .from('workouts')
       .delete()
       .eq('user_id', user.id)
       .eq('tipo', 'automatico')
-      .eq('completed', false)
-      .gte('scheduled_date', monday.toISOString().split('T')[0])
-      .lte('scheduled_date', sunday.toISOString().split('T')[0]);
+      .eq('plan_id', profile.assigned_routine_id);
 
     if (deleteError) {
       console.error('Error deleting old workouts:', deleteError);
@@ -160,8 +150,10 @@ serve(async (req) => {
       return 'casa';
     };
 
-    // Crear nuevos workouts redistribuidos
+    // Crear nuevos workouts redistribuidos (permanentes por weekday)
     const workoutsToCreate = [];
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0]; // Fecha de creación como referencia
     
     // Distribuir los días del plan entre los días seleccionados por el usuario
     selectedDays.forEach((dayCode, index) => {
@@ -170,17 +162,6 @@ serve(async (req) => {
         console.warn(`Unknown day code: ${dayCode}`);
         return;
       }
-      
-      // Calcular la fecha para este día (weekday 1=Lunes = monday + 0 días)
-      const workoutDate = new Date(monday);
-      workoutDate.setDate(monday.getDate() + (weekday - 1));
-      
-      // Si la fecha ya pasó esta semana, reprogramar para la próxima semana
-      if (workoutDate < today) {
-        workoutDate.setDate(workoutDate.getDate() + 7);
-      }
-
-      const dateStr = workoutDate.toISOString().split('T')[0];
 
       // Obtener el día del plan correspondiente (circular)
       const planDayIndex = index % planDays.length;
@@ -208,8 +189,8 @@ serve(async (req) => {
         user_id: user.id,
         name: `${planData?.nombre_plan || 'Entrenamiento'} - ${dayNames[dayCode]}`,
         description: `${muscleGroup} - ${planData?.descripcion_plan || 'Rutina personalizada'}`,
-        scheduled_date: dateStr,
-        weekday: weekday, // 1-7 donde 1=Lunes
+        scheduled_date: todayStr, // Solo fecha de creación como referencia
+        weekday: weekday, // Campo principal: 1-7 donde 1=Lunes
         plan_id: profile.assigned_routine_id,
         location: normalizeLocation(planData?.lugar),
         duration_minutes: dayExercises.length * 5,
