@@ -199,48 +199,21 @@ serve(async (req) => {
     const planDays = Object.keys(exercisesByDay).map(Number).sort((a, b) => a - b);
     console.log(`Plan has ${planExercises.length} exercises across ${planDays.length} days`);
 
-    // Delete existing automatic workouts for the user's current plan
-    // If reassigning plan, delete ALL automatic workouts from old plan
-    // Otherwise, just delete duplicates for the selected days
-    let deletedCount = 0;
-    if (needsReassign) {
-      console.log('Deleting all previous automatic workouts due to plan reassignment');
-      const { data: deletedWorkouts } = await supabase
-        .from('workouts')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('tipo', 'automatico');
-      
-      deletedCount = deletedWorkouts?.length || 0;
-      
-      await supabase
-        .from('workouts')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('tipo', 'automatico');
-    } else {
-      console.log('Deleting existing automatic workouts for selected weekdays');
-      const weekdaysToDelete = selectedDays.map(d => dayMap[d]).filter(Boolean);
-      
-      for (const wd of weekdaysToDelete) {
-        const { data: deletedWorkouts } = await supabase
-          .from('workouts')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('tipo', 'automatico')
-          .eq('plan_id', planId)
-          .eq('weekday', wd);
-        
-        deletedCount += deletedWorkouts?.length || 0;
-        
-        await supabase
-          .from('workouts')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('tipo', 'automatico')
-          .eq('plan_id', planId)
-          .eq('weekday', wd);
-      }
+    // Delete ALL existing automatic workouts to ensure clean state
+    // This prevents leftover workouts from days that are no longer selected
+    console.log('Deleting all automatic workouts for clean regeneration');
+    const { data: deletedWorkouts, error: deleteError } = await supabase
+      .from('workouts')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('tipo', 'automatico')
+      .select('id');
+    
+    const deletedCount = deletedWorkouts?.length || 0;
+    console.log(`Successfully deleted ${deletedCount} automatic workouts`);
+    
+    if (deleteError) {
+      console.error('Error deleting workouts:', deleteError);
     }
 
     // Get plan metadata
