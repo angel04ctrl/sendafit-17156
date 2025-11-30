@@ -20,6 +20,7 @@ import { DashboardMobileCarousel } from "@/components/DashboardMobileCarousel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkoutsByDate } from "@/hooks/useBackendApi";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 const Calendar = () => {
   // Hook para detectar si es móvil
@@ -40,6 +41,26 @@ const Calendar = () => {
   });
 
   const workouts = weekData?.workouts || [];
+
+  // Obtener el perfil del usuario para saber los días disponibles
+  const { data: profile } = useQuery({
+    queryKey: ["user-profile"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("available_weekdays")
+        .eq("id", user.id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const availableWeekdays = profile?.available_weekdays || [];
 
   // Bloque de suscripción en tiempo real - Escucha cambios en entrenamientos
   // Actualiza automáticamente cuando se marca un entrenamiento como completado
@@ -66,49 +87,23 @@ const Calendar = () => {
   }, []);
 
   // Función para obtener entrenamientos de una fecha específica
-  // Busca por fecha exacta prioritariamente
   const getWorkoutsForDate = (date: Date) => {
-    // Normalizar la fecha a medianoche hora local para comparación precisa
-    const compareDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const compareDateStr = format(compareDate, 'yyyy-MM-dd');
-
-    // Estrategia 1: Match exacto por scheduled_date (prioritario)
-    const directMatches = workouts.filter((w) => {
-      if (!w.scheduled_date) return false;
+    const compareDateStr = format(date, 'yyyy-MM-dd');
+    
+    // Buscar por fecha exacta
+    const matches = workouts.filter((w) => {
       return w.scheduled_date === compareDateStr;
     });
     
-    console.log(`Calendar: Buscando workouts para ${compareDateStr}, encontrados ${directMatches.length} por fecha exacta`);
-    
-    if (directMatches.length > 0) {
-      return directMatches;
-    }
+    console.log(`Calendar: Workouts para ${compareDateStr}:`, matches.length);
+    return matches;
+  };
 
-    // Estrategia 2: Match por weekday solo para fechas futuras o de esta semana
-    // (no mostrar workouts viejos solo porque coincide el día de la semana)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const weekStart = startOfWeek(today, { locale: es, weekStartsOn: 1 });
-    
-    // Solo usar weekday si la fecha es de esta semana o posterior
-    if (compareDate >= weekStart) {
-      const jsDay = compareDate.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-      const weekdayNumber = jsDay === 0 ? 7 : jsDay; // 1=Mon, 2=Tue, ..., 7=Sun
-      
-      const weekdayMatches = workouts.filter((w) => {
-        if (!w.weekday) return false;
-        // Solo workouts de esta semana o futuros
-        if (w.scheduled_date) {
-          return w.weekday === weekdayNumber && w.scheduled_date >= format(weekStart, 'yyyy-MM-dd');
-        }
-        return false;
-      });
-      
-      console.log(`Calendar: Búsqueda secundaria por weekday=${weekdayNumber}, encontrados ${weekdayMatches.length}`);
-      return weekdayMatches;
-    }
-    
-    return [];
+  // Función para verificar si un día tiene entrenamientos programados según available_weekdays
+  const isScheduledDay = (date: Date) => {
+    const jsDay = date.getDay(); // 0=Dom, 1=Lun, ..., 6=Sáb
+    const weekdayNumber = jsDay === 0 ? 7 : jsDay; // Convertir a 1=Lun, 2=Mar, ..., 7=Dom
+    return availableWeekdays.includes(weekdayNumber.toString());
   };
 
   return (
@@ -134,6 +129,7 @@ const Calendar = () => {
                       const isSelected = isSameDay(day, selectedDate);
                       const dayWorkouts = getWorkoutsForDate(day);
                       const hasWorkouts = dayWorkouts.length > 0;
+                      const isScheduled = isScheduledDay(day);
                       const dayInitial = format(day, "EEEEEE", { locale: es }).toUpperCase();
 
                       return (
@@ -146,13 +142,15 @@ const Calendar = () => {
                             {isToday ? "HOY" : dayInitial}
                           </p>
                           <div
-                            className={`w-11 h-11 rounded-full flex items-center justify-center cursor-pointer transition-all ${
+                            className={`w-11 h-11 rounded-full flex items-center justify-center cursor-pointer transition-all relative ${
                               isToday
                                 ? "border-primary border-2"
                                 : "border border-border"
                             } ${
                               isSelected
                                 ? "bg-primary text-primary-foreground"
+                                : isScheduled
+                                ? "bg-primary/10 border-primary/30"
                                 : hasWorkouts
                                 ? "bg-primary/20"
                                 : "bg-background"
@@ -161,6 +159,9 @@ const Calendar = () => {
                             <p className="text-base font-bold">
                               {format(day, "d", { locale: es })}
                             </p>
+                            {isScheduled && !isSelected && (
+                              <div className="absolute -bottom-1 w-1.5 h-1.5 bg-primary rounded-full" />
+                            )}
                           </div>
                         </div>
                       );
@@ -263,13 +264,16 @@ const Calendar = () => {
                   const dayWorkouts = getWorkoutsForDate(day);
                   const isToday = isSameDay(day, new Date());
                   const isSelected = isSameDay(day, selectedDate);
+                  const isScheduled = isScheduledDay(day);
 
                   return (
                     <Card
                       key={day.toISOString()}
-                      className={`p-3 cursor-pointer transition-all ${
+                      className={`p-3 cursor-pointer transition-all relative ${
                         isToday ? "border-primary border-2" : ""
-                      } ${isSelected ? "bg-primary/5" : ""}`}
+                      } ${isSelected ? "bg-primary/5" : ""} ${
+                        isScheduled ? "border-primary/30" : ""
+                      }`}
                       onClick={() => setSelectedDate(day)}
                     >
                       <div className="text-center mb-2">
@@ -281,6 +285,9 @@ const Calendar = () => {
                         </p>
                         {isToday && (
                           <span className="text-xs text-primary font-medium">Hoy</span>
+                        )}
+                        {isScheduled && (
+                          <div className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full" />
                         )}
                       </div>
                       <div className="space-y-2">
