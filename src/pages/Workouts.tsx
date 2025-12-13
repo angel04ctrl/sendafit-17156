@@ -503,7 +503,7 @@ const Workouts = () => {
                     ) : (
                       <div className="space-y-2">
                         {configuredExercises.map((ex, index) => (
-                          <div key={index} className="p-3 bg-muted rounded-lg flex items-start justify-between">
+                          <div key={`${ex.exercise.id}-${index}`} className="p-3 bg-muted rounded-lg flex items-start justify-between">
                             <div className="flex-1">
                               <p className="font-medium">{ex.exercise.nombre}</p>
                               <p className="text-sm text-muted-foreground">

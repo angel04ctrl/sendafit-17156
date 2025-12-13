@@ -84,6 +84,9 @@ const Profile = () => {
   // Bloque de carga inicial del perfil - Se ejecuta al montar el componente
   // Detecta si el usuario viene desde un pago exitoso o cancelado
   useEffect(() => {
+    let isMounted = true;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    
     const loadProfile = async () => {
       setLoading(true);
       await fetchProfile();
@@ -97,6 +100,8 @@ const Profile = () => {
         const maxAttempts = 10;
         
         const checkProStatus = async () => {
+          if (!isMounted) return;
+          
           attempts++;
           const { data: roleData } = await sb
             .from("user_roles")
@@ -110,6 +115,8 @@ const Profile = () => {
             .eq("user_id", user?.id)
             .maybeSingle();
           
+          if (!isMounted) return;
+          
           // Si ya es PRO, mostrar modal de éxito
           if (roleData?.role === "pro" || subscriptionData?.status === "active") {
             setUserRole("pro");
@@ -119,9 +126,9 @@ const Profile = () => {
           }
           
           // Si no es PRO aún y no hemos llegado al máximo de intentos, reintentar
-          if (attempts < maxAttempts) {
-            setTimeout(checkProStatus, 2000); // Reintentar cada 2 segundos
-          } else {
+          if (attempts < maxAttempts && isMounted) {
+            timeoutId = setTimeout(checkProStatus, 2000); // Reintentar cada 2 segundos
+          } else if (isMounted) {
             // Después de 20 segundos, mostrar el modal de todas formas
             // El usuario puede refrescar manualmente si es necesario
             setShowSuccessModal(true);
@@ -133,13 +140,20 @@ const Profile = () => {
         };
         
         // Iniciar verificación después de 1 segundo
-        setTimeout(checkProStatus, 1000);
+        timeoutId = setTimeout(checkProStatus, 1000);
       } else if (paymentStatus === "canceled") {
         toast.error("Pago cancelado. Puedes intentar de nuevo cuando quieras.");
       }
     };
 
     loadProfile();
+    
+    return () => {
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [user, searchParams]);
 
   // Bloque de suscripción en tiempo real - Escucha cambios en el perfil y roles

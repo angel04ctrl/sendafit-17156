@@ -97,7 +97,7 @@ export function DashboardMobileCarousel({ sections }: DashboardMobileCarouselPro
         <div className="flex flex-col" style={{ height: '100%' }}>
           {sections.map((section, index) => (
             <div
-              key={index}
+              key={`carousel-section-${index}`}
               className="flex-shrink-0 px-1 flex items-center justify-center"
               style={{ 
                 height: 'calc(100vh - 12rem)',
@@ -117,7 +117,7 @@ export function DashboardMobileCarousel({ sections }: DashboardMobileCarouselPro
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
         {sections.map((_, index) => (
           <button
-            key={index}
+            key={`carousel-dot-${index}`}
             onClick={() => emblaApi?.scrollTo(index)}
             className={`h-2 rounded-full transition-all ${
               index === selectedIndex

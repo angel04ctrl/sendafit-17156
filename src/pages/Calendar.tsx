@@ -62,9 +62,20 @@ const Calendar = () => {
 
   const availableWeekdays = profile?.available_weekdays || [];
 
+  // Obtener el usuario actual para el filtro de realtime
+  const { data: currentUser } = useQuery({
+    queryKey: ["current-user"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      return user;
+    },
+  });
+
   // Bloque de suscripción en tiempo real - Escucha cambios en entrenamientos
   // Actualiza automáticamente cuando se marca un entrenamiento como completado
   useEffect(() => {
+    if (!currentUser) return;
+
     const channel = supabase
       .channel('calendar-workouts')
       .on(
@@ -73,6 +84,7 @@ const Calendar = () => {
           event: '*',
           schema: 'public',
           table: 'workouts',
+          filter: `user_id=eq.${currentUser.id}`,
         },
         (payload) => {
           console.log('Workout updated in calendar:', payload);
@@ -84,7 +96,7 @@ const Calendar = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [currentUser]);
 
   // Función para obtener entrenamientos de una fecha específica (basado en weekday)
   const getWorkoutsForDate = (date: Date) => {
