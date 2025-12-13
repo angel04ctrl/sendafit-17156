@@ -22,19 +22,30 @@ const SplashScreen = ({ onComplete }: SplashScreenProps) => {
 
   // Bloque de efecto - Incrementa progreso automáticamente cada 30ms
   useEffect(() => {
+    let isMounted = true;
+    let completeTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
           // Al llegar a 100%, limpiar intervalo y llamar callback
           clearInterval(interval);
-          setTimeout(onComplete, 300);
+          if (isMounted) {
+            completeTimeoutId = setTimeout(onComplete, 300);
+          }
           return 100;
         }
         return prev + 2; // Incrementar 2% cada vez
       });
     }, 30);
 
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      if (completeTimeoutId) {
+        clearTimeout(completeTimeoutId);
+      }
+    };
   }, [onComplete]);
 
   return (
