@@ -119,9 +119,14 @@ export const TodaysWorkouts = () => {
             <Dumbbell className="h-5 w-5" />
           </div>
           <span className="flex-1">Entrenamientos de Hoy</span>
-          <Badge variant="secondary" className="ml-auto">
-            {workouts.length} {workouts.length === 1 ? 'workout' : 'workouts'}
-          </Badge>
+          <div className="text-right">
+            <Badge variant="secondary" className="ml-auto">
+              {workouts.length} {workouts.length === 1 ? 'workout' : 'workouts'}
+            </Badge>
+            <p className="text-xs text-muted-foreground mt-1">
+              {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'short' })}
+            </p>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -129,8 +134,8 @@ export const TodaysWorkouts = () => {
         {workouts.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Dumbbell className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p className="text-sm">No hay entrenamientos programados para hoy</p>
-            <p className="text-xs mt-1">¡Disfruta tu día de descanso!</p>
+            <p className="text-sm font-medium">Día de descanso</p>
+            <p className="text-xs mt-1">No hay entrenamientos programados para hoy</p>
           </div>
         ) : (
           /* Lista de entrenamientos */

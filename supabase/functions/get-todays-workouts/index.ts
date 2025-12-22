@@ -37,6 +37,17 @@ serve(async (req) => {
 
     console.log('Fetching todays workouts for user:', user.id);
 
+    // Get timezone from request body or default to America/Mexico_City
+    let timezone = 'America/Mexico_City';
+    try {
+      const body = await req.json();
+      if (body?.timezone) {
+        timezone = body.timezone;
+      }
+    } catch {
+      // No body or invalid JSON, use default timezone
+    }
+
     // Get user profile to fetch assigned plan
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
@@ -48,30 +59,41 @@ serve(async (req) => {
       console.error('Error fetching profile:', profileError);
     }
 
-    // Calculate today's weekday (1-7 where 1=Monday, 7=Sunday)
+    // Calculate today's date and weekday in user's timezone
     const now = new Date();
-    const dayOfWeek = now.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+    const userDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+    const dayOfWeek = userDate.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
     const weekday = dayOfWeek === 0 ? 7 : dayOfWeek; // Convert to 1-7 where 1=Monday, 7=Sunday
     
-    // Format today's date in local timezone
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
+    // Format today's date in user's timezone
+    const year = userDate.getFullYear();
+    const month = String(userDate.getMonth() + 1).padStart(2, '0');
+    const day = String(userDate.getDate()).padStart(2, '0');
     const todayDate = `${year}-${month}-${day}`;
 
-    console.log(`Today: ${todayDate}, JS day: ${dayOfWeek}, Weekday: ${weekday}, Plan: ${profile?.assigned_routine_id || 'none'}, User days: ${profile?.available_weekdays?.join(', ') || 'none'}`);
+    console.log(`Timezone: ${timezone}, Today: ${todayDate}, JS day: ${dayOfWeek}, Weekday: ${weekday}, Plan: ${profile?.assigned_routine_id || 'none'}, User days: ${profile?.available_weekdays?.join(', ') || 'none'}`);
 
     // Map available weekdays to numbers for filtering
+    // Support both formats: letter codes (L, M, Mi, etc.) and numbers (1, 2, 3, etc.)
     const dayMap: { [key: string]: number } = {
       'L': 1, 'M': 2, 'Mi': 3, 'J': 4, 'V': 5, 'S': 6, 'D': 7
     };
+    
     const availableWeekdaysNumbers = (profile?.available_weekdays || [])
-      .map((d: string) => dayMap[d])
-      .filter(Boolean) as number[];
+      .map((d: string | number) => {
+        // If it's already a number, use it directly
+        if (typeof d === 'number') return d;
+        // If it's a numeric string, parse it
+        const num = parseInt(d, 10);
+        if (!isNaN(num)) return num;
+        // Otherwise, use the dayMap for letter codes
+        return dayMap[d];
+      })
+      .filter((n: number | undefined): n is number => n !== undefined && n !== null) as number[];
     
     // Check if today is a training day
     const isTodayTrainingDay = availableWeekdaysNumbers.includes(weekday);
-    console.log(`Is today a training day? ${isTodayTrainingDay}`);
+    console.log(`Available weekdays as numbers: [${availableWeekdaysNumbers.join(', ')}], Is today (${weekday}) a training day? ${isTodayTrainingDay}`);
 
     let finalWorkouts: any[] = [];
 
@@ -127,8 +149,6 @@ serve(async (req) => {
     ];
 
     console.log(`Found ${automaticWorkouts?.length || 0} automatic workouts and ${manualWorkouts?.length || 0} manual workouts for today`);
-
-
     console.log('Found', finalWorkouts?.length || 0, 'workouts for today');
 
     return new Response(
@@ -136,6 +156,8 @@ serve(async (req) => {
         workouts: finalWorkouts || [],
         weekday: weekday,
         count: finalWorkouts?.length || 0,
+        todayDate: todayDate,
+        timezone: timezone,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
