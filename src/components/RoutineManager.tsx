@@ -17,7 +17,7 @@ import {
   useUserRoutine,
   useProgressStats
 } from "@/hooks/useBackendApi";
-import { planDayToShort } from "@/lib/dayMapping";
+import { planDayToName } from "@/lib/dayMapping";
 
 export function RoutineManager() {
   // Hook para obtener la rutina asignada al usuario
@@ -130,7 +130,7 @@ export function RoutineManager() {
                        <Collapsible key={day} className="space-y-1">
                         {/* Trigger para expandir/colapsar día */}
                         <CollapsibleTrigger className="w-full flex justify-between items-center p-2 bg-muted rounded-md text-left hover:bg-muted/80 transition-colors">
-                          <span className="font-medium text-sm">{planDayToShort(parseInt(day))}: {exercises[0]?.grupo_muscular || 'Variado'}</span>
+                          <span className="font-medium text-sm">{planDayToName(parseInt(day))}: {exercises[0]?.grupo_muscular || 'Variado'}</span>
                           <ChevronDown className="h-4 w-4 transition-transform duration-200 data-[state=open]:rotate-180" />
                         </CollapsibleTrigger>
                         {/* Contenido colapsable con lista de ejercicios */}

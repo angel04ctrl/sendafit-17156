@@ -110,8 +110,12 @@ export async function getUserRoutine(): Promise<RoutineResponse> {
  * Get today's workouts
  */
 export async function getTodaysWorkouts(): Promise<{ workouts: any[]; date: string; count: number }> {
+  // Send client timezone to get correct workouts for today
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  
   const { data, error } = await supabase.functions.invoke('get-todays-workouts', {
-    method: 'GET'
+    method: 'POST',
+    body: { timezone }
   });
 
   if (error) throw error;
