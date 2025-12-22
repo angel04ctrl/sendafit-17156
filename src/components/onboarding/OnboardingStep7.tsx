@@ -17,6 +17,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UpgradeModal } from "@/components/UpgradeModal";
+import { Badge } from "@/components/ui/badge";
+import { DEV_MODE_PRO_ENABLED } from "@/lib/devConfig";
+import { Sparkles, Lock } from "lucide-react";
 
 interface OnboardingStep7Props {
   formData: any;
@@ -25,6 +28,16 @@ interface OnboardingStep7Props {
 
 const OnboardingStep7 = ({ formData, updateFormData }: OnboardingStep7Props) => {
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+
+  const handleWearablesChange = (checked: boolean) => {
+    if (DEV_MODE_PRO_ENABLED) {
+      // En modo desarrollo, permitir cambiar el valor
+      updateFormData({ wearablesSync: checked });
+    } else {
+      // En producción, mostrar modal de upgrade
+      setUpgradeModalOpen(true);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -69,17 +82,26 @@ const OnboardingStep7 = ({ formData, updateFormData }: OnboardingStep7Props) => 
 
         <div className="flex items-center justify-between p-4 bg-secondary/50 rounded-lg">
           <div className="space-y-1">
-            <Label htmlFor="wearables" className="text-base">
-              Sincronizar con wearables
-            </Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="wearables" className="text-base">
+                Sincronizar con wearables
+              </Label>
+              <Badge variant={DEV_MODE_PRO_ENABLED ? "secondary" : "default"} className="text-xs gap-1">
+                {DEV_MODE_PRO_ENABLED ? (
+                  <><Sparkles className="w-3 h-3" /> DEV</>
+                ) : (
+                  <><Lock className="w-3 h-3" /> PRO</>
+                )}
+              </Badge>
+            </div>
             <p className="text-sm text-muted-foreground">
               Google Fit, Apple Health, Fitbit
             </p>
           </div>
           <Switch
             id="wearables"
-            checked={false}
-            onCheckedChange={() => setUpgradeModalOpen(true)}
+            checked={formData.wearablesSync || false}
+            onCheckedChange={handleWearablesChange}
           />
         </div>
 
@@ -119,19 +141,21 @@ const OnboardingStep7 = ({ formData, updateFormData }: OnboardingStep7Props) => 
         </div>
       </div>
 
-      <UpgradeModal
-        open={upgradeModalOpen}
-        onOpenChange={setUpgradeModalOpen}
-        featureTitle="Sincronización con Wearables"
-        featureDescription="Conecta tus dispositivos y obtén seguimiento automático de tu actividad física"
-        features={[
-          "Sincronización con Apple Health, Google Fit y Fitbit",
-          "Importación automática de pasos, calorías y ritmo cardíaco",
-          "Ajuste dinámico de objetivos según tu actividad diaria",
-          "Detección automática de entrenamientos realizados",
-          "Análisis de patrones de sueño y recuperación"
-        ]}
-      />
+      {!DEV_MODE_PRO_ENABLED && (
+        <UpgradeModal
+          open={upgradeModalOpen}
+          onOpenChange={setUpgradeModalOpen}
+          featureTitle="Sincronización con Wearables"
+          featureDescription="Conecta tus dispositivos y obtén seguimiento automático de tu actividad física"
+          features={[
+            "Sincronización con Apple Health, Google Fit y Fitbit",
+            "Importación automática de pasos, calorías y ritmo cardíaco",
+            "Ajuste dinámico de objetivos según tu actividad diaria",
+            "Detección automática de entrenamientos realizados",
+            "Análisis de patrones de sueño y recuperación"
+          ]}
+        />
+      )}
     </div>
   );
 };

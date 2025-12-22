@@ -14,7 +14,7 @@
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { StatCard } from "@/components/StatCard";
-import { Flame, Activity, Target, TrendingUp, BarChart3 } from "lucide-react";
+import { Flame, Activity, Target, TrendingUp, BarChart3, Sparkles, Lock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ProButton } from "@/components/ProButton";
@@ -28,6 +28,7 @@ import { RoutineManager } from "@/components/RoutineManager";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DashboardMobileCarousel } from "@/components/DashboardMobileCarousel";
 import { useTodaysWorkouts } from "@/hooks/useBackendApi";
+import { DEV_MODE_PRO_ENABLED } from "@/lib/devConfig";
 
 const Dashboard = () => {
   // Hook de autenticación
@@ -227,10 +228,12 @@ const Dashboard = () => {
           variant="outline"
           className="w-full"
         />
-        <Button variant="outline" className="gap-2 w-full" disabled>
+        <Button variant="outline" className="gap-2 w-full" disabled={!DEV_MODE_PRO_ENABLED}>
           <TrendingUp className="w-4 h-4" />
           Reportes Mensuales
-          <Badge variant="default" className="ml-auto text-xs">PRO</Badge>
+          <Badge variant={DEV_MODE_PRO_ENABLED ? "secondary" : "default"} className="ml-auto text-xs gap-1">
+            {DEV_MODE_PRO_ENABLED ? <><Sparkles className="w-3 h-3" /> DEV</> : <><Lock className="w-3 h-3" /> PRO</>}
+          </Badge>
         </Button>
       </div>
     </Card>,
@@ -442,10 +445,12 @@ const Dashboard = () => {
                   variant="outline"
                   className="w-full"
                 />
-                <Button variant="outline" className="gap-2 w-full" disabled>
+                <Button variant="outline" className="gap-2 w-full" disabled={!DEV_MODE_PRO_ENABLED}>
                   <TrendingUp className="w-4 h-4" />
                   Reportes Mensuales
-                  <Badge variant="default" className="ml-auto">PRO</Badge>
+                  <Badge variant={DEV_MODE_PRO_ENABLED ? "secondary" : "default"} className="ml-auto gap-1">
+                    {DEV_MODE_PRO_ENABLED ? <><Sparkles className="w-3 h-3" /> DEV</> : <><Lock className="w-3 h-3" /> PRO</>}
+                  </Badge>
                 </Button>
               </div>
             </Card>

@@ -22,7 +22,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Sparkles } from "lucide-react";
+import { Pencil, Sparkles, Lock } from "lucide-react";
+import { DEV_MODE_PRO_ENABLED } from "@/lib/devConfig";
 import { calculateMacros, validateProfileData } from "@/lib/macrosCalculator";
 import { PlanChangePreviewModal } from "@/components/PlanChangePreviewModal";
 import { PaymentModal } from "@/components/PaymentModal";
@@ -462,12 +463,30 @@ const Profile = () => {
                   {user?.email}
                 </p>
               </div>
-              <Badge variant={userRole === "pro" || subscriptionStatus === "active" ? "default" : "secondary"} className="text-lg px-4 py-2">
-                {userRole === "pro" || subscriptionStatus === "active" ? "PRO" : "Básico"}
+              <Badge 
+                variant={DEV_MODE_PRO_ENABLED || userRole === "pro" || subscriptionStatus === "active" ? "default" : "secondary"} 
+                className="text-lg px-4 py-2 gap-1"
+              >
+                {DEV_MODE_PRO_ENABLED ? (
+                  <><Sparkles className="w-4 h-4" /> DEV PRO</>
+                ) : userRole === "pro" || subscriptionStatus === "active" ? (
+                  "PRO"
+                ) : (
+                  "Básico"
+                )}
               </Badge>
             </div>
             
-            {(userRole !== "pro" && subscriptionStatus !== "active") ? (
+            {DEV_MODE_PRO_ENABLED ? (
+              <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                <p className="text-sm font-medium mb-1 text-yellow-600 dark:text-yellow-400">
+                  🔧 Modo Desarrollo Activo
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Todas las funciones PRO están desbloqueadas temporalmente para pruebas
+                </p>
+              </div>
+            ) : (userRole !== "pro" && subscriptionStatus !== "active") ? (
               <div className="mt-4 space-y-3">
                 <div className="p-4 bg-primary/10 rounded-lg">
                   <p className="text-sm font-medium mb-2">
