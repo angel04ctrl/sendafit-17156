@@ -31,6 +31,7 @@ import { PaymentSuccessModal } from "@/components/PaymentSuccessModal";
 import { useSearchParams } from "react-router-dom";
 import { useValidatePlanChange, useAssignRoutine, useRedistributeWorkouts } from "@/hooks/useBackendApi";
 import { useQueryClient } from "@tanstack/react-query";
+import { MenstrualTrackingCard } from "@/components/MenstrualTrackingCard";
 
 const Profile = () => {
   // Hook de autenticación para obtener usuario actual
@@ -528,6 +529,12 @@ const Profile = () => {
               </div>
             )}
           </Card>
+
+          {/* Menstrual Tracking - Solo visible para mujeres PRO */}
+          {(DEV_MODE_PRO_ENABLED || userRole === "pro" || subscriptionStatus === "active") && 
+           formData.gender === "femenino" && (
+            <MenstrualTrackingCard />
+          )}
 
           <Card className="p-3 sm:p-4 shadow-card">
             <div className="flex items-center justify-between mb-3 sm:mb-4">
