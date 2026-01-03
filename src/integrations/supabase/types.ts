@@ -192,6 +192,45 @@ export type Database = {
           },
         ]
       }
+      menstrual_logs: {
+        Row: {
+          created_at: string
+          cycle_length: number | null
+          id: string
+          notes: string | null
+          period_end_date: string | null
+          period_length: number | null
+          period_start_date: string
+          symptoms: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          cycle_length?: number | null
+          id?: string
+          notes?: string | null
+          period_end_date?: string | null
+          period_length?: number | null
+          period_start_date: string
+          symptoms?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          cycle_length?: number | null
+          id?: string
+          notes?: string | null
+          period_end_date?: string | null
+          period_length?: number | null
+          period_start_date?: string
+          symptoms?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       plan_ejercicios: {
         Row: {
           created_at: string
@@ -288,6 +327,7 @@ export type Database = {
           daily_fat_goal: number | null
           daily_protein_goal: number | null
           dietary_preferences: string[] | null
+          fase_menstrual_actual: string | null
           fitness_goal: Database["public"]["Enums"]["fitness_goal"]
           fitness_level: Database["public"]["Enums"]["fitness_level"]
           full_name: string
@@ -300,10 +340,12 @@ export type Database = {
           initial_photo_url: string | null
           injuries_limitations: string | null
           injuries_limitations_encrypted: string | null
+          lesiones_activas: string[] | null
           menstrual_auto_sync: boolean | null
           menstrual_tracking_app: string | null
           menstrual_tracking_enabled: boolean | null
           motivation_phrase: string | null
+          nivel_fatiga: number | null
           notifications_enabled: boolean | null
           onboarding_completed: boolean | null
           primary_goal: string | null
@@ -333,6 +375,7 @@ export type Database = {
           daily_fat_goal?: number | null
           daily_protein_goal?: number | null
           dietary_preferences?: string[] | null
+          fase_menstrual_actual?: string | null
           fitness_goal?: Database["public"]["Enums"]["fitness_goal"]
           fitness_level?: Database["public"]["Enums"]["fitness_level"]
           full_name: string
@@ -345,10 +388,12 @@ export type Database = {
           initial_photo_url?: string | null
           injuries_limitations?: string | null
           injuries_limitations_encrypted?: string | null
+          lesiones_activas?: string[] | null
           menstrual_auto_sync?: boolean | null
           menstrual_tracking_app?: string | null
           menstrual_tracking_enabled?: boolean | null
           motivation_phrase?: string | null
+          nivel_fatiga?: number | null
           notifications_enabled?: boolean | null
           onboarding_completed?: boolean | null
           primary_goal?: string | null
@@ -378,6 +423,7 @@ export type Database = {
           daily_fat_goal?: number | null
           daily_protein_goal?: number | null
           dietary_preferences?: string[] | null
+          fase_menstrual_actual?: string | null
           fitness_goal?: Database["public"]["Enums"]["fitness_goal"]
           fitness_level?: Database["public"]["Enums"]["fitness_level"]
           full_name?: string
@@ -390,10 +436,12 @@ export type Database = {
           initial_photo_url?: string | null
           injuries_limitations?: string | null
           injuries_limitations_encrypted?: string | null
+          lesiones_activas?: string[] | null
           menstrual_auto_sync?: boolean | null
           menstrual_tracking_app?: string | null
           menstrual_tracking_enabled?: boolean | null
           motivation_phrase?: string | null
+          nivel_fatiga?: number | null
           notifications_enabled?: boolean | null
           onboarding_completed?: boolean | null
           primary_goal?: string | null
@@ -690,6 +738,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_menstrual_phase: { Args: { _user_id: string }; Returns: string }
       calculate_weekday_from_date: {
         Args: { date_val: string }
         Returns: number
@@ -704,6 +753,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_user_pro: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "user" | "pro"
