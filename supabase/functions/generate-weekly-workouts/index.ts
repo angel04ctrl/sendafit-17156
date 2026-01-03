@@ -25,6 +25,59 @@ interface PlanScore {
   score: number;
 }
 
+interface UserHealthContext {
+  isPro: boolean;
+  menstrualPhase: string | null;
+  activeInjuries: string[] | null;
+  fatigueLevel: number | null;
+  fitnessLevel: string;
+  fitnessGoal: string;
+}
+
+// =============================================
+// PLACEHOLDER PARA LÓGICA DE IA (USUARIOS PRO)
+// =============================================
+async function generateProWorkoutsWithAI(
+  supabase: any,
+  userId: string,
+  profile: any,
+  healthContext: UserHealthContext,
+  selectedDays: string[]
+): Promise<{ workouts: any[]; aiGenerated: boolean; aiMessage: string }> {
+  /**
+   * TODO: Implementar lógica de IA para usuarios PRO
+   * 
+   * Este placeholder será reemplazado con:
+   * 1. Llamada a Lovable AI para generar entrenamientos personalizados
+   * 2. Consideración de fase menstrual para ajustar intensidad
+   * 3. Exclusión de ejercicios que afecten lesiones activas
+   * 4. Ajuste de volumen según nivel de fatiga
+   * 5. Variación inteligente de ejercicios basada en historial
+   * 
+   * Contexto disponible para IA:
+   * - healthContext.menstrualPhase: 'menstrual' | 'folicular' | 'ovulacion' | 'lutea' | null
+   * - healthContext.activeInjuries: ['rodilla', 'espalda baja', etc.]
+   * - healthContext.fatigueLevel: 1-10
+   * - healthContext.fitnessLevel: 'principiante' | 'intermedio' | 'avanzado'
+   * - healthContext.fitnessGoal: objetivo del usuario
+   * - profile: perfil completo del usuario
+   */
+  
+  console.log('🤖 [PRO] AI Workout Generation - PLACEHOLDER');
+  console.log('📊 Health Context for AI:', JSON.stringify(healthContext, null, 2));
+  
+  // Por ahora, retornamos null para que use la lógica estándar
+  // Cuando se implemente la IA, este return cambiará
+  return {
+    workouts: [],
+    aiGenerated: false,
+    aiMessage: 'AI generation placeholder - using standard logic for now'
+  };
+}
+
+// =============================================
+// FUNCIÓN PRINCIPAL
+// =============================================
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -55,7 +108,16 @@ serve(async (req) => {
 
     console.log(`Generating weekly workouts for user ${user.id}`);
 
-    // Get user profile
+    // =============================================
+    // PASO 1: Verificar si el usuario es PRO
+    // =============================================
+    const { data: proCheck } = await supabase.rpc('is_user_pro', { _user_id: user.id });
+    const isPro = proCheck === true;
+    console.log(`👤 User type: ${isPro ? 'PRO' : 'FREE'}`);
+
+    // =============================================
+    // PASO 2: Obtener perfil del usuario
+    // =============================================
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
@@ -77,17 +139,75 @@ serve(async (req) => {
       );
     }
 
+    // =============================================
+    // PASO 3: Obtener contexto de salud (solo PRO)
+    // =============================================
+    let menstrualPhase: string | null = null;
+    
+    if (isPro && profile.menstrual_tracking_enabled) {
+      // Calcular fase menstrual usando la función de BD
+      const { data: phaseData } = await supabase.rpc('calculate_menstrual_phase', { _user_id: user.id });
+      menstrualPhase = phaseData;
+      
+      // Actualizar fase en el perfil para acceso rápido
+      if (menstrualPhase) {
+        await supabase
+          .from('profiles')
+          .update({ fase_menstrual_actual: menstrualPhase })
+          .eq('id', user.id);
+      }
+    }
+
+    const healthContext: UserHealthContext = {
+      isPro,
+      menstrualPhase,
+      activeInjuries: profile.lesiones_activas || null,
+      fatigueLevel: profile.nivel_fatiga || null,
+      fitnessLevel: profile.fitness_level,
+      fitnessGoal: profile.fitness_goal
+    };
+
+    console.log('📊 Health context:', JSON.stringify(healthContext, null, 2));
     console.log('User profile:', {
       goal: profile.fitness_goal,
       level: profile.fitness_level,
       days: selectedDays,
-      current_plan: profile.assigned_routine_id
+      current_plan: profile.assigned_routine_id,
+      isPro,
+      menstrualPhase
     });
+
+    // =============================================
+    // PASO 4: Generar entrenamientos según tipo de usuario
+    // =============================================
+    let aiResult = { workouts: [], aiGenerated: false, aiMessage: '' };
+    
+    if (isPro) {
+      // Intentar generar con IA para usuarios PRO
+      aiResult = await generateProWorkoutsWithAI(
+        supabase,
+        user.id,
+        profile,
+        healthContext,
+        selectedDays
+      );
+      
+      if (aiResult.aiGenerated && aiResult.workouts.length > 0) {
+        console.log('✅ Using AI-generated workouts for PRO user');
+        // TODO: Insertar entrenamientos generados por IA
+        // Por ahora, continuamos con la lógica estándar
+      }
+    }
+
+    // =============================================
+    // PASO 5: Lógica estándar (FREE y fallback PRO)
+    // =============================================
+    console.log(`📋 Using standard plan logic (${isPro ? 'PRO fallback' : 'FREE user'})`);
 
     // Calculate week boundaries in local timezone
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset to start of day
-    const currentDayOfWeek = today.getDay(); // 0=Sunday, 1=Monday, etc.
+    today.setHours(0, 0, 0, 0);
+    const currentDayOfWeek = today.getDay();
     const daysToMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
     const monday = new Date(today);
     monday.setDate(today.getDate() - daysToMonday);
@@ -200,7 +320,6 @@ serve(async (req) => {
     console.log(`Plan has ${planExercises.length} exercises across ${planDays.length} days`);
 
     // Delete ALL existing automatic workouts to ensure clean state
-    // This prevents leftover workouts from days that are no longer selected
     console.log('Deleting all automatic workouts for clean regeneration');
     const { data: deletedWorkouts, error: deleteError } = await supabase
       .from('workouts')
@@ -240,7 +359,6 @@ serve(async (req) => {
         return;
       }
 
-      // Map weekday number to day name
       const dayNameMapping: Record<number, string> = {
         1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves',
         5: 'Viernes', 6: 'Sábado', 7: 'Domingo'
@@ -270,8 +388,8 @@ serve(async (req) => {
         user_id: user.id,
         name: `${planData?.nombre_plan || 'Entrenamiento'} - ${dayName}`,
         description: `${muscleGroup} - ${planData?.descripcion_plan || 'Plan personalizado'}`,
-        scheduled_date: today.toISOString().split('T')[0], // Fecha de creación como referencia
-        weekday: weekday, // Campo principal para identificar el día
+        scheduled_date: today.toISOString().split('T')[0],
+        weekday: weekday,
         plan_id: planId,
         location: normalizeLocation(planData?.lugar),
         duration_minutes: dayExercises.length * 5,
@@ -336,6 +454,9 @@ serve(async (req) => {
         workouts_created: createdWorkouts.length,
         workouts_deleted: deletedCount,
         training_days: selectedDays,
+        user_type: isPro ? 'PRO' : 'FREE',
+        health_context: isPro ? healthContext : null,
+        ai_generated: aiResult.aiGenerated,
         note: 'Los entrenamientos son permanentes y se repiten cada semana',
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
