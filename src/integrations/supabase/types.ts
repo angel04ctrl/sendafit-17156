@@ -326,6 +326,7 @@ export type Database = {
           daily_carbs_goal: number | null
           daily_fat_goal: number | null
           daily_protein_goal: number | null
+          dev_override: boolean | null
           dietary_preferences: string[] | null
           fase_menstrual_actual: string | null
           fitness_goal: Database["public"]["Enums"]["fitness_goal"]
@@ -374,6 +375,7 @@ export type Database = {
           daily_carbs_goal?: number | null
           daily_fat_goal?: number | null
           daily_protein_goal?: number | null
+          dev_override?: boolean | null
           dietary_preferences?: string[] | null
           fase_menstrual_actual?: string | null
           fitness_goal?: Database["public"]["Enums"]["fitness_goal"]
@@ -422,6 +424,7 @@ export type Database = {
           daily_carbs_goal?: number | null
           daily_fat_goal?: number | null
           daily_protein_goal?: number | null
+          dev_override?: boolean | null
           dietary_preferences?: string[] | null
           fase_menstrual_actual?: string | null
           fitness_goal?: Database["public"]["Enums"]["fitness_goal"]
@@ -746,6 +749,7 @@ export type Database = {
       decrypt_health_data: { Args: { encrypted_data: string }; Returns: string }
       encrypt_health_data: { Args: { data: string }; Returns: string }
       get_encryption_key: { Args: never; Returns: string }
+      has_dev_pro_override: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
