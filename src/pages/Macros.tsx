@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Trash2, Search, Camera } from "lucide-react";
+import { Plus, Trash2, Search, Camera, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ProButton } from "@/components/ProButton";
@@ -34,6 +34,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { DashboardMobileCarousel } from "@/components/DashboardMobileCarousel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { FoodAnalysisModal } from "@/components/ai/FoodAnalysisModal";
+import { DEV_MODE_PRO_ENABLED } from "@/lib/devConfig";
 
 const mealTypes = [
   { value: "desayuno", label: "Desayuno" },
@@ -54,6 +56,8 @@ const Macros = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFood, setSelectedFood] = useState<any>(null);
   const [portion, setPortion] = useState("1");
+  const [foodAnalysisOpen, setFoodAnalysisOpen] = useState(false);
+
   const [formData, setFormData] = useState({
     meal_type: "desayuno",
     name: "",
@@ -418,9 +422,19 @@ const Macros = () => {
               </DialogContent>
               </Dialog>
               
+              {DEV_MODE_PRO_ENABLED ? (
+                <Button 
+                  variant="outline" 
+                  className="gap-2 w-full sm:w-auto"
+                  onClick={() => setFoodAnalysisOpen(true)}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span className="text-sm sm:text-base">Análisis IA</span>
+                </Button>
+              ) : (
               <ProButton
                 icon={Camera}
-                label="Identificar Comida IA"
+                label="Análisis IA"
                 featureTitle="Identificación de Comida con IA"
                 featureDescription="Analiza fotos de tus comidas y obtén información nutricional instantánea"
                 features={[
@@ -430,7 +444,15 @@ const Macros = () => {
                   "Sugerencias de porciones",
                   "Historial de análisis con fotos"
                 ]}
+                onClick={() => setFoodAnalysisOpen(true)}
                 className="w-full sm:w-auto"
+              />
+              )}
+              
+              <FoodAnalysisModal
+                open={foodAnalysisOpen}
+                onOpenChange={setFoodAnalysisOpen}
+                onSaved={fetchData}
               />
             </div>
           </div>
