@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_trainer_conversations: {
+        Row: {
+          conversation_type: string
+          created_at: string
+          generated_content: Json | null
+          id: string
+          messages: Json | null
+          saved_to_app: boolean | null
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_type: string
+          created_at?: string
+          generated_content?: Json | null
+          id?: string
+          messages?: Json | null
+          saved_to_app?: boolean | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_type?: string
+          created_at?: string
+          generated_content?: Json | null
+          id?: string
+          messages?: Json | null
+          saved_to_app?: boolean | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_trainer_conversations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exercises: {
         Row: {
           calorias_por_repeticion: number | null
@@ -73,6 +117,53 @@ export type Database = {
           video?: string | null
         }
         Relationships: []
+      }
+      food_analysis_logs: {
+        Row: {
+          adjusted_macros: Json | null
+          analysis_date: string
+          created_at: string
+          detected_foods: Json | null
+          estimated_macros: Json | null
+          id: string
+          image_url: string
+          saved_to_daily: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          adjusted_macros?: Json | null
+          analysis_date?: string
+          created_at?: string
+          detected_foods?: Json | null
+          estimated_macros?: Json | null
+          id?: string
+          image_url: string
+          saved_to_daily?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          adjusted_macros?: Json | null
+          analysis_date?: string
+          created_at?: string
+          detected_foods?: Json | null
+          estimated_macros?: Json | null
+          id?: string
+          image_url?: string
+          saved_to_daily?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "food_analysis_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       foods: {
         Row: {
@@ -138,6 +229,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "health_data_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      machine_scan_history: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          machine_name: string | null
+          machine_type: string | null
+          posture_tips: string | null
+          primary_muscles: string[] | null
+          related_exercises: Json | null
+          secondary_muscles: string[] | null
+          usage_instructions: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          machine_name?: string | null
+          machine_type?: string | null
+          posture_tips?: string | null
+          primary_muscles?: string[] | null
+          related_exercises?: Json | null
+          secondary_muscles?: string[] | null
+          usage_instructions?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          machine_name?: string | null
+          machine_type?: string | null
+          posture_tips?: string | null
+          primary_muscles?: string[] | null
+          related_exercises?: Json | null
+          secondary_muscles?: string[] | null
+          usage_instructions?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_scan_history_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"

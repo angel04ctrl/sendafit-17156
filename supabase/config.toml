@@ -38,3 +38,12 @@ verify_jwt = true
 
 [functions.validate-plan-change]
 verify_jwt = true
+
+[functions.analyze-food]
+verify_jwt = false
+
+[functions.analyze-gym-machine]
+verify_jwt = false
+
+[functions.ai-trainer-chat]
+verify_jwt = false
