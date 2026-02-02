@@ -1,24 +1,25 @@
-import { render, screen } from '@testing-library/react';
+import { describe, test, expect } from 'vitest';
+import { render } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import Auth from './Auth';
 
 describe('Auth Component', () => {
   test('renders SendaFit title', () => {
-    render(
+    const { getByText } = render(
       <BrowserRouter>
         <Auth />
       </BrowserRouter>
     );
-    expect(screen.getByText(/SendaFit/i)).toBeInTheDocument();
+    expect(getByText(/SendaFit/i)).toBeInTheDocument();
   });
 
   test('renders sign in and sign up tabs', () => {
-    render(
+    const { getByRole } = render(
       <BrowserRouter>
         <Auth />
       </BrowserRouter>
     );
-    expect(screen.getByRole('tab', { name: /Iniciar Sesión/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /Registrarse/i })).toBeInTheDocument();
+    expect(getByRole('tab', { name: /Iniciar Sesión/i })).toBeInTheDocument();
+    expect(getByRole('tab', { name: /Registrarse/i })).toBeInTheDocument();
   });
 });

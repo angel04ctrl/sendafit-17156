@@ -36,7 +36,14 @@ import {
 export const useUserRoutine = () => {
   return useQuery({
     queryKey: ['user-routine'],
-    queryFn: getUserRoutine,
+    queryFn: async () => {
+      try {
+        return await getUserRoutine();
+      } catch (error) {
+        console.error('Error fetching user routine:', error);
+        return { routine: null, profile: null, message: 'Error loading routine' };
+      }
+    },
     staleTime: 5 * 60 * 1000, // 5 minutos de cache
     retry: 1
   });
@@ -49,7 +56,14 @@ export const useUserRoutine = () => {
 export const useTodaysWorkouts = () => {
   return useQuery({
     queryKey: ['todays-workouts'],
-    queryFn: getTodaysWorkouts,
+    queryFn: async () => {
+      try {
+        return await getTodaysWorkouts();
+      } catch (error) {
+        console.error('Error fetching todays workouts:', error);
+        return { workouts: [], date: new Date().toISOString().split('T')[0], count: 0 };
+      }
+    },
     staleTime: 2 * 60 * 1000, // 2 minutos de cache
     retry: 1
   });
@@ -66,7 +80,14 @@ export const useWorkoutsByDate = (params?: {
 }) => {
   return useQuery({
     queryKey: ['workouts-by-date', params],
-    queryFn: () => getWorkoutsByDate(params),
+    queryFn: async () => {
+      try {
+        return await getWorkoutsByDate(params);
+      } catch (error) {
+        console.error('Error fetching workouts by date:', error);
+        return { workouts: [], count: 0 };
+      }
+    },
     staleTime: 2 * 60 * 1000, // 2 minutos de cache
     enabled: !!params?.date || !!params?.start_date || !!params?.end_date,
   });
@@ -159,7 +180,25 @@ export const useProgress = (options?: {
 export const useProgressStats = (days: number = 30) => {
   return useQuery({
     queryKey: ['progress-stats', days],
-    queryFn: () => getProgressStats(days),
+    queryFn: async () => {
+      try {
+        return await getProgressStats(days);
+      } catch (error) {
+        console.error('Error fetching progress stats:', error);
+        return {
+          stats: {
+            total_workouts: 0,
+            weight_change: 0,
+            average_energy_level: 0,
+            workout_streak: 0,
+            weight_trend: [],
+            energy_trend: [],
+          },
+          period_days: days,
+          calculated_at: new Date().toISOString(),
+        };
+      }
+    },
     staleTime: 5 * 60 * 1000, // 5 minutos de cache
   });
 };

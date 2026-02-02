@@ -42,7 +42,7 @@ export function RoutineManager() {
       </div>
 
       {/* Bloque de tarjetas de estadísticas - Entrenamientos, racha y peso */}
-      {statsData && (
+      {statsData?.stats && (
         <div className="grid gap-2 grid-cols-3 shrink-0 px-3 sm:px-4">
           {/* Card de total de entrenamientos */}
           <Card className="shadow-sm">
@@ -52,7 +52,7 @@ export function RoutineManager() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 sm:p-4 pt-0">
-              <div className="text-lg sm:text-2xl font-bold">{statsData.stats.total_workouts}</div>
+              <div className="text-lg sm:text-2xl font-bold">{statsData.stats.total_workouts ?? 0}</div>
               <p className="text-[10px] sm:text-xs text-muted-foreground">30 días</p>
             </CardContent>
           </Card>
@@ -65,7 +65,7 @@ export function RoutineManager() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 sm:p-4 pt-0">
-              <div className="text-lg sm:text-2xl font-bold">{statsData.stats.workout_streak}</div>
+              <div className="text-lg sm:text-2xl font-bold">{statsData.stats.workout_streak ?? 0}</div>
               <p className="text-[10px] sm:text-xs text-muted-foreground">días</p>
             </CardContent>
           </Card>
@@ -80,10 +80,10 @@ export function RoutineManager() {
             <CardContent className="p-3 sm:p-4 pt-0">
               <div className="flex items-center gap-1">
                 <div className="text-lg sm:text-2xl font-bold">
-                  {statsData.stats.weight_change > 0 ? '+' : ''}
-                  {statsData.stats.weight_change.toFixed(1)}
+                  {(statsData.stats.weight_change ?? 0) > 0 ? '+' : ''}
+                  {(statsData.stats.weight_change ?? 0).toFixed(1)}
                 </div>
-                <TrendingUp className={`h-3 w-3 sm:h-4 sm:w-4 ${statsData.stats.weight_change > 0 ? 'text-green-500' : 'text-red-500'}`} />
+                <TrendingUp className={`h-3 w-3 sm:h-4 sm:w-4 ${(statsData.stats.weight_change ?? 0) > 0 ? 'text-green-500' : 'text-red-500'}`} />
               </div>
               <p className="text-[10px] sm:text-xs text-muted-foreground">kg</p>
             </CardContent>

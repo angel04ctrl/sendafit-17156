@@ -41,18 +41,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       async (event, session) => {
         if (!mounted) return;
         
-        // Manejar evento de cierre de sesión
-        if (event === 'SIGNED_OUT') {
-          setSession(null);
-          setUser(null);
-          setLoading(false);
-          return;
-        }
+        try {
+          // Manejar evento de cierre de sesión
+          if (event === 'SIGNED_OUT') {
+            setSession(null);
+            setUser(null);
+            setLoading(false);
+            return;
+          }
 
-        // Actualizar estado de sesión y usuario
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+          // Actualizar estado de sesión y usuario
+          setSession(session);
+          setUser(session?.user ?? null);
+          setLoading(false);
+        } catch (error) {
+          console.error('Error in auth state change handler:', error);
+          setLoading(false);
+        }
       }
     );
 
