@@ -58,6 +58,27 @@ export type Database = {
           },
         ]
       }
+      app_config: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string
+          value: boolean
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string
+          value?: boolean
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string
+          value?: boolean
+        }
+        Relationships: []
+      }
       exercises: {
         Row: {
           calorias_por_repeticion: number | null
@@ -724,6 +745,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_settings: {
+        Row: {
+          created_at: string
+          dev_mode: boolean
+          is_pro: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dev_mode?: boolean
+          is_pro?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dev_mode?: boolean
+          is_pro?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_subscriptions: {
         Row: {

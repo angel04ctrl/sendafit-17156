@@ -18,6 +18,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import OnboardingForm from "./components/onboarding/OnboardingForm";
 import Auth from "./pages/Auth";
@@ -72,6 +73,7 @@ const App = () => {
           <ThemeProvider>
             {/* Provider de autenticación para gestión de usuarios */}
             <AuthProvider>
+              <FeatureFlagsProvider>
               {/* Provider de tooltips para componentes UI */}
               <TooltipProvider>
                 {/* Componentes de notificaciones */}
@@ -102,6 +104,7 @@ const App = () => {
                   </Routes>
                 </Suspense>
               </TooltipProvider>
+              </FeatureFlagsProvider>
             </AuthProvider>
           </ThemeProvider>
         </QueryClientProvider>

@@ -23,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Pencil, Sparkles, Lock } from "lucide-react";
-import { DEV_MODE_PRO_ENABLED } from "@/lib/devConfig";
+import { useFeatureFlags } from "@/contexts/FeatureFlagsContext";
 import { calculateMacros, validateProfileData } from "@/lib/macrosCalculator";
 import { PlanChangePreviewModal } from "@/components/PlanChangePreviewModal";
 import { PaymentModal } from "@/components/PaymentModal";
@@ -36,6 +36,7 @@ import { MenstrualTrackingCard } from "@/components/MenstrualTrackingCard";
 const Profile = () => {
   // Hook de autenticación para obtener usuario actual
   const { user } = useAuth();
+  const { hasProAccess, user: userFlagsData } = useFeatureFlags();
   const sb = supabase as any;
   
   // Estado del perfil y datos del formulario
@@ -465,12 +466,12 @@ const Profile = () => {
                 </p>
               </div>
               <Badge 
-                variant={DEV_MODE_PRO_ENABLED || userRole === "pro" || subscriptionStatus === "active" ? "default" : "secondary"} 
+                variant={hasProAccess || userRole === "pro" || subscriptionStatus === "active" ? "default" : "secondary"} 
                 className="text-lg px-4 py-2 gap-1"
               >
-                {DEV_MODE_PRO_ENABLED ? (
+                {userFlagsData.devMode ? (
                   <><Sparkles className="w-4 h-4" /> DEV PRO</>
-                ) : userRole === "pro" || subscriptionStatus === "active" ? (
+                ) : hasProAccess || userRole === "pro" || subscriptionStatus === "active" ? (
                   "PRO"
                 ) : (
                   "Básico"
@@ -478,7 +479,7 @@ const Profile = () => {
               </Badge>
             </div>
             
-            {DEV_MODE_PRO_ENABLED ? (
+            {userFlagsData.devMode ? (
               <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                 <p className="text-sm font-medium mb-1 text-yellow-600 dark:text-yellow-400">
                   🔧 Modo Desarrollo Activo
@@ -487,7 +488,7 @@ const Profile = () => {
                   Todas las funciones PRO están desbloqueadas temporalmente para pruebas
                 </p>
               </div>
-            ) : (userRole !== "pro" && subscriptionStatus !== "active") ? (
+            ) : (userRole !== "pro" && subscriptionStatus !== "active" && !hasProAccess) ? (
               <div className="mt-4 space-y-3">
                 <div className="p-4 bg-primary/10 rounded-lg">
                   <p className="text-sm font-medium mb-2">
@@ -531,7 +532,7 @@ const Profile = () => {
           </Card>
 
           {/* Menstrual Tracking - Solo visible para mujeres PRO */}
-          {(DEV_MODE_PRO_ENABLED || userRole === "pro" || subscriptionStatus === "active") && 
+          {(hasProAccess || userRole === "pro" || subscriptionStatus === "active") && 
            formData.gender === "femenino" && (
             <MenstrualTrackingCard />
           )}

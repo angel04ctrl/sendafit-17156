@@ -1,8 +1,7 @@
 /**
  * OnboardingStep4.tsx - Paso 4 del onboarding: Seguimiento Menstrual
  * 
- * Este componente configura el seguimiento menstrual para usuarias.
- * Solo se muestra para usuarios con género femenino.
+ * Usa feature flags para controlar acceso PRO.
  */
 
 import { useState } from "react";
@@ -10,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { Badge } from "@/components/ui/badge";
-import { DEV_MODE_PRO_ENABLED } from "@/lib/devConfig";
+import { useFeatureFlags } from "@/contexts/FeatureFlagsContext";
 import { Sparkles, Lock } from "lucide-react";
 
 interface OnboardingStep4Props {
@@ -20,8 +19,8 @@ interface OnboardingStep4Props {
 
 const OnboardingStep4 = ({ formData, updateFormData }: OnboardingStep4Props) => {
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const { hasProAccess } = useFeatureFlags();
 
-  // Solo mostrar esta pantalla si el género es femenino
   if (formData.gender !== "femenino") {
     return (
       <div className="space-y-6 animate-fade-in flex items-center justify-center min-h-[400px]">
@@ -38,11 +37,9 @@ const OnboardingStep4 = ({ formData, updateFormData }: OnboardingStep4Props) => 
   }
 
   const handleMenstrualTrackingChange = (checked: boolean) => {
-    if (DEV_MODE_PRO_ENABLED) {
-      // En modo desarrollo, permitir cambiar el valor
+    if (hasProAccess) {
       updateFormData({ menstrualTracking: checked });
     } else {
-      // En producción, mostrar modal de upgrade
       setUpgradeModalOpen(true);
     }
   };
@@ -61,9 +58,9 @@ const OnboardingStep4 = ({ formData, updateFormData }: OnboardingStep4Props) => 
               <Label htmlFor="menstrualTracking" className="text-base">
                 ¿Deseas conectar tu seguimiento menstrual?
               </Label>
-              <Badge variant={DEV_MODE_PRO_ENABLED ? "secondary" : "default"} className="text-xs gap-1">
-                {DEV_MODE_PRO_ENABLED ? (
-                  <><Sparkles className="w-3 h-3" /> DEV</>
+              <Badge variant={hasProAccess ? "secondary" : "default"} className="text-xs gap-1">
+                {hasProAccess ? (
+                  <><Sparkles className="w-3 h-3" /> Activo</>
                 ) : (
                   <><Lock className="w-3 h-3" /> PRO</>
                 )}
@@ -81,7 +78,7 @@ const OnboardingStep4 = ({ formData, updateFormData }: OnboardingStep4Props) => 
         </div>
       </div>
 
-      {!DEV_MODE_PRO_ENABLED && (
+      {!hasProAccess && (
         <UpgradeModal
           open={upgradeModalOpen}
           onOpenChange={setUpgradeModalOpen}
