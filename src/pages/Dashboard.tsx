@@ -28,11 +28,12 @@ import { RoutineManager } from "@/components/RoutineManager";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DashboardMobileCarousel } from "@/components/DashboardMobileCarousel";
 import { useTodaysWorkouts } from "@/hooks/useBackendApi";
-import { DEV_MODE_PRO_ENABLED } from "@/lib/devConfig";
+import { useFeatureFlags } from "@/contexts/FeatureFlagsContext";
 
 const Dashboard = () => {
   // Hook de autenticación
   const { user } = useAuth();
+  const { hasProAccess } = useFeatureFlags();
   const sb = supabase as any;
   // Estados de datos del usuario
   const [profile, setProfile] = useState<any>(null);
@@ -228,11 +229,11 @@ const Dashboard = () => {
           variant="outline"
           className="w-full"
         />
-        <Button variant="outline" className="gap-2 w-full" disabled={!DEV_MODE_PRO_ENABLED}>
+        <Button variant="outline" className="gap-2 w-full" disabled={!hasProAccess}>
           <TrendingUp className="w-4 h-4" />
           Reportes Mensuales
-          <Badge variant={DEV_MODE_PRO_ENABLED ? "secondary" : "default"} className="ml-auto text-xs gap-1">
-            {DEV_MODE_PRO_ENABLED ? <><Sparkles className="w-3 h-3" /> DEV</> : <><Lock className="w-3 h-3" /> PRO</>}
+          <Badge variant={hasProAccess ? "secondary" : "default"} className="ml-auto text-xs gap-1">
+            {hasProAccess ? <><Sparkles className="w-3 h-3" /> Activo</> : <><Lock className="w-3 h-3" /> PRO</>}
           </Badge>
         </Button>
       </div>
@@ -445,11 +446,11 @@ const Dashboard = () => {
                   variant="outline"
                   className="w-full"
                 />
-                <Button variant="outline" className="gap-2 w-full" disabled={!DEV_MODE_PRO_ENABLED}>
+                <Button variant="outline" className="gap-2 w-full" disabled={!hasProAccess}>
                   <TrendingUp className="w-4 h-4" />
                   Reportes Mensuales
-                  <Badge variant={DEV_MODE_PRO_ENABLED ? "secondary" : "default"} className="ml-auto gap-1">
-                    {DEV_MODE_PRO_ENABLED ? <><Sparkles className="w-3 h-3" /> DEV</> : <><Lock className="w-3 h-3" /> PRO</>}
+                  <Badge variant={hasProAccess ? "secondary" : "default"} className="ml-auto gap-1">
+                    {hasProAccess ? <><Sparkles className="w-3 h-3" /> Activo</> : <><Lock className="w-3 h-3" /> PRO</>}
                   </Badge>
                 </Button>
               </div>

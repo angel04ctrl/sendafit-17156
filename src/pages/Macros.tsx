@@ -35,7 +35,7 @@ import { DashboardMobileCarousel } from "@/components/DashboardMobileCarousel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { FoodAnalysisModal } from "@/components/ai/FoodAnalysisModal";
-import { DEV_MODE_PRO_ENABLED } from "@/lib/devConfig";
+import { useFeatureFlags } from "@/contexts/FeatureFlagsContext";
 
 const mealTypes = [
   { value: "desayuno", label: "Desayuno" },
@@ -47,6 +47,7 @@ const mealTypes = [
 
 const Macros = () => {
   const { user } = useAuth();
+  const { canAccess } = useFeatureFlags();
   const isMobile = useIsMobile();
   const sb = supabase as any;
   const [meals, setMeals] = useState<any[]>([]);
@@ -422,7 +423,7 @@ const Macros = () => {
               </DialogContent>
               </Dialog>
               
-              {DEV_MODE_PRO_ENABLED ? (
+              {canAccess("foodAIEnabled") ? (
                 <Button 
                   variant="outline" 
                   className="gap-2 w-full sm:w-auto"
