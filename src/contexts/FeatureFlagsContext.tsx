@@ -76,7 +76,7 @@ export const FeatureFlagsProvider = ({ children }: { children: React.ReactNode }
   // Load global flags from app_config
   const loadGlobalFlags = useCallback(async () => {
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("app_config")
         .select("key, value");
 
@@ -110,7 +110,7 @@ export const FeatureFlagsProvider = ({ children }: { children: React.ReactNode }
     }
 
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("user_settings")
         .select("is_pro, dev_mode")
         .eq("user_id", user.id)
@@ -128,7 +128,7 @@ export const FeatureFlagsProvider = ({ children }: { children: React.ReactNode }
         });
       } else {
         // No record yet — create one
-        await (supabase as any)
+        await supabase
           .from("user_settings")
           .insert({ user_id: user.id })
           .single();
@@ -160,7 +160,7 @@ export const FeatureFlagsProvider = ({ children }: { children: React.ReactNode }
 
     const checkSubscription = async () => {
       try {
-        const { data } = await (supabase as any)
+        const { data } = await supabase
           .from("user_subscriptions")
           .select("status, plan")
           .eq("user_id", user.id)

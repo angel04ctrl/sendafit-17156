@@ -96,9 +96,10 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
       } else {
         throw new Error("No URL returned from payment service");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating checkout session:", error);
-      toast.error(error.message || "Error al procesar el pago. Intenta de nuevo.");
+      const err = error as Error;
+      toast.error(err.message || "Error al procesar el pago. Intenta de nuevo.");
       setIsProcessing(false);
     }
   };
@@ -144,6 +145,7 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
       return;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).paypal
       .Buttons({
         style: {
@@ -152,11 +154,13 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
           layout: "vertical",
           label: "subscribe",
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         createSubscription: function (data: any, actions: any) {
           return actions.subscription.create({
             plan_id: planId,
           });
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onApprove: async function (data: any) {
           setIsProcessing(true);
           try {
@@ -183,6 +187,7 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
             setIsProcessing(false);
           }
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onError: function (err: any) {
           console.error("PayPal error:", err);
           toast.error("Error al procesar el pago con PayPal");

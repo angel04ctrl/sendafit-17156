@@ -58,7 +58,7 @@ const Auth = () => {
       
       // Verificar si el usuario completó el onboarding
       if (data.user) {
-        const { data: profile } = await (supabase as any)
+        const { data: profile } = await supabase
           .from("profiles")
           .select("onboarding_completed")
           .eq("id", data.user.id)
@@ -73,12 +73,13 @@ const Auth = () => {
           navigate("/onboarding");
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Manejar errores de validación o autenticación
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
       } else {
-        toast.error(error.message || "Error al iniciar sesión");
+        const err = error as Error;
+        toast.error(err.message || "Error al iniciar sesión");
       }
     } finally {
       setLoading(false);
@@ -104,12 +105,13 @@ const Auth = () => {
       
       toast.success("¡Perfecto! Ahora completa tu perfil");
       navigate("/onboarding");
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Manejar errores de validación
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
       } else {
-        toast.error(error.message || "Error al validar datos");
+        const err = error as Error;
+        toast.error(err.message || "Error al validar datos");
       }
     } finally {
       setLoading(false);

@@ -141,7 +141,7 @@ export function GymMachineScanner({ open, onOpenChange }: GymMachineScannerProps
       }
 
       // Save to machine_scan_history
-      const sb = supabase as any;
+      const sb = supabase;
       await sb.from("machine_scan_history").insert({
         user_id: user.id,
         image_url: imageUrl,

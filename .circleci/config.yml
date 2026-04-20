@@ -32,10 +32,10 @@ jobs:
           name: Run Tests
           command: npm test
 
-      # Ejecutar linter
+      # Ejecutar linter (Falla el build si hay errores para evitar nueva deuda técnica)
       - run:
           name: Run Linter
-          command: npm run lint || true
+          command: npm run lint
 
       # Build del proyecto
       - run:

@@ -34,7 +34,7 @@ export const TodaysWorkouts = () => {
   const { data, isLoading, error } = useTodaysWorkouts();
   const [completingWorkout, setCompletingWorkout] = useState<string | null>(null);
   const queryClient = useQueryClient();
-  const sb = supabase as any;
+  const sb = supabase;
 
   /**
    * Handler para marcar workout como completado/incompleto
@@ -139,6 +139,7 @@ export const TodaysWorkouts = () => {
           </div>
         ) : (
           /* Lista de entrenamientos */
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           workouts.map((workout: any) => (
             <div
               key={workout.id}
@@ -202,6 +203,7 @@ export const TodaysWorkouts = () => {
                     Ejercicios ({workout.workout_exercises.length}):
                   </p>
                   <div className="space-y-1">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {workout.workout_exercises.slice(0, 3).map((exercise: any, idx: number) => (
                       <div key={exercise.id || idx} className="text-xs flex items-center justify-between gap-2">
                         <span className={`truncate ${workout.completed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>

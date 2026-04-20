@@ -29,7 +29,7 @@ export const useMenstrualLogs = (limit = 12) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('menstrual_logs')
         .select('*')
         .eq('user_id', user.id)
@@ -52,7 +52,7 @@ export const useMenstrualPhase = () => {
       if (!user) throw new Error('No authenticated user');
 
       // Obtener el último log
-      const { data: logs, error } = await (supabase as any)
+      const { data: logs, error } = await supabase
         .from('menstrual_logs')
         .select('*')
         .eq('user_id', user.id)
@@ -120,7 +120,7 @@ export const useLogPeriod = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No authenticated user');
 
-      const { data: result, error } = await (supabase as any)
+      const { data: result, error } = await supabase
         .from('menstrual_logs')
         .insert({
           user_id: user.id,
@@ -150,7 +150,7 @@ export const useDeleteMenstrualLog = () => {
 
   return useMutation({
     mutationFn: async (logId: string) => {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('menstrual_logs')
         .delete()
         .eq('id', logId);

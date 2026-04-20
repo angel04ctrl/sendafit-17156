@@ -174,7 +174,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
     if (!user || adjustedFoods.length === 0) return;
 
     setIsSaving(true);
-    const sb = supabase as any;
+    const sb = supabase;
 
     try {
       // Upload image to storage

@@ -103,7 +103,7 @@ serve(async (req) => {
     }
 
     // Group exercises by plan day (1, 2, 3, ...)
-    const exercisesByPlanDay: { [key: number]: any[] } = {};
+    const exercisesByPlanDay: { [key: number]: Record<string, unknown>[] } = {};
     planExercises?.forEach((pe) => {
       if (!exercisesByPlanDay[pe.dia]) {
         exercisesByPlanDay[pe.dia] = [];
@@ -116,7 +116,7 @@ serve(async (req) => {
     const planDays = Object.keys(exercisesByPlanDay).map(Number).sort((a, b) => a - b);
     
     // Create mapping: actual weekday number -> exercises
-    const mappedDays: { [key: number]: any[] } = {};
+    const mappedDays: { [key: number]: Record<string, unknown>[] } = {};
     selectedDays.forEach((dayCode, index) => {
       const weekday = dayMap[dayCode];
       if (weekday && planDays.length > 0) {

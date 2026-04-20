@@ -58,7 +58,7 @@ serve(async (req) => {
       .map((d: string) => dayMap[d])
       .filter(Boolean) as number[];
 
-    let allWorkouts: any[] = [];
+    let allWorkouts: Record<string, unknown>[] = [];
 
     // Para entrenamientos automáticos: buscar por weekday
     if (startDate && endDate) {
@@ -77,7 +77,7 @@ serve(async (req) => {
       // Solo mostrar workouts de días que el usuario tiene seleccionados
       const validWeekdays = Array.from(weekdays).filter(wd => availableWeekdaysNumbers.includes(wd));
       
-      let automaticWorkouts: any[] = [];
+      let automaticWorkouts: Record<string, unknown>[] = [];
       
       if (validWeekdays.length > 0) {
         let automaticQuery = supabase
@@ -115,7 +115,7 @@ serve(async (req) => {
       const weekday = jsDay === 0 ? 7 : jsDay;
 
       // Solo mostrar workouts automáticos si hoy es un día de entrenamiento
-      let automaticWorkouts: any[] = [];
+      let automaticWorkouts: Record<string, unknown>[] = [];
       
       if (availableWeekdaysNumbers.includes(weekday)) {
         let automaticQuery = supabase

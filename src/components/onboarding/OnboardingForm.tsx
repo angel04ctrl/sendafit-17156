@@ -38,8 +38,9 @@ const OnboardingForm = () => {
   // Estado de verificación inicial del perfil
   const [checkingProfile, setCheckingProfile] = useState(true);
   // Datos acumulados del formulario de onboarding
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [formData, setFormData] = useState<any>({});
-  const sb = supabase as any;
+  const sb = supabase;
 
   const totalSteps = 7; // Total de pasos en el proceso
   const progress = (currentStep / totalSteps) * 100; // Porcentaje de progreso
@@ -81,7 +82,7 @@ const OnboardingForm = () => {
         
         // Hay registro pendiente, permitir continuar (flujo normal de registro)
         setCheckingProfile(false);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error checking onboarding status:", error);
         toast.error("Error al verificar tu registro. Por favor vuelve a intentarlo.");
         navigate("/auth", { replace: true });
@@ -90,7 +91,7 @@ const OnboardingForm = () => {
     };
 
     checkOnboardingStatus();
-  }, [navigate]);
+  }, [navigate, sb]);
 
   // Bloque de prevención de cierre - Evita que el usuario pierda su progreso
   // Muestra advertencias si intenta cerrar la ventana durante el registro
@@ -126,7 +127,9 @@ const OnboardingForm = () => {
   }
 
   // Función helper para actualizar datos del formulario de forma incremental
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateFormData = (data: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setFormData((prev: any) => ({ ...prev, ...data }));
   };
 
@@ -386,31 +389,30 @@ const OnboardingForm = () => {
       }
 
       navigate("/dashboard");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error en handleSubmit:", error);
       
+      const err = error as Error & { code?: string };
       // Determinar el mensaje de error específico
       let errorMessage = "Hubo un error al completar tu registro";
       
-      if (error?.message?.includes("already registered") || error?.message?.includes("User already registered")) {
+      if (err?.message?.includes("already registered") || err?.message?.includes("User already registered")) {
         errorMessage = "Este correo ya está registrado. Serás redirigida a la página de inicio de sesión";
-      } else if (error?.message?.includes("Invalid email")) {
+      } else if (err?.message?.includes("Invalid email")) {
         errorMessage = "El formato del correo electrónico no es válido";
-      } else if (error?.message?.includes("Password")) {
+      } else if (err?.message?.includes("Password")) {
         errorMessage = "La contraseña no cumple con los requisitos mínimos";
-      } else if (error?.code === "23505") {
+      } else if (err?.code === "23505") {
         errorMessage = "Este usuario ya existe en el sistema";
-      } else if (error?.message?.includes("profiles")) {
+      } else if (err?.message?.includes("profiles")) {
         errorMessage = "Error al crear tu perfil. Verifica que todos los datos sean correctos";
-      } else if (error?.message?.includes("permission denied") || error?.message?.includes("RLS")) {
+      } else if (err?.message?.includes("permission denied") || err?.message?.includes("RLS")) {
         errorMessage = "Error de permisos al crear tu cuenta. Por favor, intenta nuevamente";
-      } else if (error?.message) {
-        errorMessage = error.message;
+      } else if (err?.message) {
+        errorMessage = err.message;
       }
       
-      toast.error(`❌ ${errorMessage}. Redirigiendo a la página de registro...`, {
-        duration: 4000,
-      });
+      toast.error(errorMessage);
       
       // Limpiar datos temporales
       sessionStorage.removeItem('pendingRegistration');

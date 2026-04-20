@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import type { Tables } from "@/integrations/supabase/types";
 
 interface Exercise {
   id: string;
@@ -18,7 +19,7 @@ interface Exercise {
   calorias_por_repeticion?: number;
 }
 
-interface ConfiguredExercise {
+export interface ConfiguredExercise {
   exercise: Exercise;
   series: number;
   repeticiones: number;
@@ -35,25 +36,20 @@ interface AddExerciseDialogProps {
 
 export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location }: AddExerciseDialogProps) => {
   const { user } = useAuth();
-  const sb = supabase as any;
+  const sb = supabase;
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [series, setSeries] = useState("3");
   const [repeticiones, setRepeticiones] = useState("10");
   const [peso, setPeso] = useState("0");
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<{weight: number | null, fitness_level: string | null} | null>(null);
   const [estimatedCalories, setEstimatedCalories] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [muscleGroupFilter, setMuscleGroupFilter] = useState<string>("all");
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
-  useEffect(() => {
-    fetchExercises();
-    fetchUserProfile();
-  }, []);
-
-  const fetchExercises = async () => {
+  const fetchExercises = useCallback(async () => {
     // Traer TODOS los ejercicios sin filtrar por ubicación
     const { data } = await sb
       .from("exercises")
@@ -61,9 +57,9 @@ export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location 
       .order("nombre");
     
     setExercises(data || []);
-  };
+  }, [sb]);
 
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = useCallback(async () => {
     if (!user) return;
     const { data } = await sb
       .from("profiles")
@@ -71,10 +67,20 @@ export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location 
       .eq("id", user.id)
       .single();
     
-    setUserProfile(data);
-  };
+    if (data) {
+      setUserProfile({
+        weight: data.weight,
+        fitness_level: data.fitness_level
+      });
+    }
+  }, [user, sb]);
 
-  const calculateCalories = () => {
+  useEffect(() => {
+    fetchExercises();
+    fetchUserProfile();
+  }, [fetchExercises, fetchUserProfile]);
+
+  const calculateCalories = useCallback(() => {
     if (!selectedExercise || !userProfile?.weight) return 0;
 
     // Datos base
@@ -89,7 +95,7 @@ export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location 
       'principiante': 1.0,
       'intermedio': 1.2,
       'avanzado': 1.5
-    }[userProfile.fitness_level] || 1.0;
+    }[userProfile.fitness_level as 'principiante' | 'intermedio' | 'avanzado' || 'principiante'] || 1.0;
 
     // Factor de carga (porcentaje del peso corporal que se está levantando)
     const loadPercentage = loadWeight / userWeight;
@@ -102,13 +108,13 @@ export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location 
     const totalCalories = adjustedCaloriesPerRep * reps * sets;
 
     return Math.round(totalCalories);
-  };
+  }, [selectedExercise, series, repeticiones, peso, userProfile]);
 
   useEffect(() => {
     if (selectedExercise) {
       setEstimatedCalories(calculateCalories());
     }
-  }, [selectedExercise, series, repeticiones, peso, userProfile]);
+  }, [selectedExercise, calculateCalories]);
 
   // Filtrar ejercicios basado en búsqueda y filtros
   const filteredExercises = exercises.filter((exercise) => {

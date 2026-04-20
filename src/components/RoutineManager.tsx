@@ -126,6 +126,7 @@ export function RoutineManager() {
                   <h4 className="font-semibold text-sm sm:text-base shrink-0">Distribución Semanal:</h4>
                   <div className="space-y-2">
                     {/* Mapear cada día de la semana con sus ejercicios */}
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     {Object.entries(routineData.routine.days).map(([day, exercises]: [string, any[]]) => (
                        <Collapsible key={day} className="space-y-1">
                         {/* Trigger para expandir/colapsar día */}
@@ -136,6 +137,7 @@ export function RoutineManager() {
                         {/* Contenido colapsable con lista de ejercicios */}
                         <CollapsibleContent className="overflow-hidden">
                           <ul className="space-y-1.5 p-2 border rounded-md bg-card/50 max-h-60 overflow-y-auto">
+                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                             {exercises.map((exercise: any, idx: number) => (
                               <li key={`${day}-${exercise.id}-${idx}`} className="flex items-center gap-2 text-xs sm:text-sm py-1">
                                 <Dumbbell className="h-3 w-3 sm:h-4 sm:w-4 text-primary shrink-0" />

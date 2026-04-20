@@ -11,8 +11,11 @@
  * - Detectar pagos exitosos desde el parámetro URL
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useValidatePlanChange, useGenerateWeeklyWorkouts } from "@/hooks/useBackendApi";
 import { Navbar } from "@/components/Navbar";
+import { MenstrualTrackingCard } from "@/components/MenstrualTrackingCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -28,28 +31,26 @@ import { calculateMacros, validateProfileData } from "@/lib/macrosCalculator";
 import { PlanChangePreviewModal } from "@/components/PlanChangePreviewModal";
 import { PaymentModal } from "@/components/PaymentModal";
 import { PaymentSuccessModal } from "@/components/PaymentSuccessModal";
-import { useSearchParams } from "react-router-dom";
-import { useValidatePlanChange, useAssignRoutine, useRedistributeWorkouts } from "@/hooks/useBackendApi";
-import { useQueryClient } from "@tanstack/react-query";
-import { MenstrualTrackingCard } from "@/components/MenstrualTrackingCard";
+import type { Tables } from "@/integrations/supabase/types";
 
 const Profile = () => {
   // Hook de autenticación para obtener usuario actual
   const { user } = useAuth();
   const { hasProAccess, user: userFlagsData } = useFeatureFlags();
-  const sb = supabase as any;
+  const sb = supabase;
   
   // Estado del perfil y datos del formulario
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<Tables<"profiles"> | null>(null);
   // Estados de UI y control
   const [userRole, setUserRole] = useState<string>("user"); // Rol del usuario (user/pro)
-  const [loading, setLoading] = useState(false); // Estado de carga
+  const [loading, setLoading] = useState(true); // Estado de carga
   const [isEditing, setIsEditing] = useState(false); // Modo edición activado
   const [resetOnFirstDayClick, setResetOnFirstDayClick] = useState(false); // Reset de días al primer click
   const [showPreviewModal, setShowPreviewModal] = useState(false); // Modal de vista previa de cambios
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false); // Modal de pago abierto
+  const [showPaymentModal, setShowPaymentModal] = useState(false); // Modal de pago abierto
   const [showSuccessModal, setShowSuccessModal] = useState(false); // Modal de éxito en pago
-  const [validationData, setValidationData] = useState<any>(null); // Datos de validación de cambios
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [validationData, setValidationData] = useState<any>(null); // Datos de validaciÃ³n de cambios
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null); // Estado de suscripción
   const [searchParams] = useSearchParams(); // Parámetros de URL para detectar pagos
   const [formData, setFormData] = useState({
@@ -69,9 +70,78 @@ const Profile = () => {
   });
 
   const validateMutation = useValidatePlanChange();
-  const assignMutation = useAssignRoutine();
-  const redistributeMutation = useRedistributeWorkouts();
-  const queryClient = useQueryClient();
+  const generateWorkoutsMutation = useGenerateWeeklyWorkouts();
+
+  // Función para obtener los datos del perfil del usuario desde la base de datos
+  // También obtiene el rol del usuario y el estado de su suscripción
+  const fetchProfile = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      // Obtener datos del perfil
+      const { data: profileData, error: profileError } = await sb
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error("Error loading profile:", profileError);
+        toast.error("Error al cargar el perfil");
+        return;
+      }
+
+      // Actualizar estado del perfil y formulario con datos obtenidos
+      if (profileData) {
+        setProfile(profileData);
+        setFormData({
+          full_name: profileData.full_name || "",
+          gender: profileData.gender || "femenino",
+          fitness_level: profileData.fitness_level || "principiante",
+          fitness_goal: profileData.fitness_goal || "mantener_peso",
+          weight: profileData.weight?.toString() || "",
+          height: profileData.height?.toString() || "",
+          age: profileData.age?.toString() || "",
+          available_days_per_week: profileData.available_days_per_week?.toString() || "",
+          available_weekdays: Array.isArray(profileData.available_weekdays)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ? ([...new Set((profileData.available_weekdays as any[]).map(String))] as string[])
+            : [],
+          daily_calorie_goal: profileData.daily_calorie_goal?.toString() || "",
+          daily_protein_goal: profileData.daily_protein_goal?.toString() || "",
+          daily_carbs_goal: profileData.daily_carbs_goal?.toString() || "",
+          daily_fat_goal: profileData.daily_fat_goal?.toString() || "",
+        });
+      }
+
+      // Obtener rol del usuario (user/pro)
+      const { data: roleData } = await sb
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (roleData) {
+        setUserRole(roleData.role);
+      }
+
+      // Verificar estado de suscripción PRO del usuario
+      const { data: subscriptionData } = await sb
+        .from("user_subscriptions")
+        .select("status, plan")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (subscriptionData?.status === "active") {
+        setSubscriptionStatus("active");
+        setUserRole("pro");
+      }
+    } catch (error) {
+      console.error("Error in fetchProfile:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, sb]);
 
   // Bloque de debug logging - Registra el estado del perfil y suscripción
   useEffect(() => {
@@ -87,9 +157,11 @@ const Profile = () => {
   // Bloque de carga inicial del perfil - Se ejecuta al montar el componente
   // Detecta si el usuario viene desde un pago exitoso o cancelado
   useEffect(() => {
-    let isMounted = true;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    if (!user) return;
     
+    let isMounted = true;
+    let timeoutId: number | ReturnType<typeof setTimeout>;
+
     const loadProfile = async () => {
       setLoading(true);
       await fetchProfile();
@@ -157,7 +229,7 @@ const Profile = () => {
         clearTimeout(timeoutId);
       }
     };
-  }, [user, searchParams]);
+  }, [user, searchParams, fetchProfile]);
 
   // Bloque de suscripción en tiempo real - Escucha cambios en el perfil y roles
   // Se activa cuando el webhook de Stripe actualiza la suscripción y el rol
@@ -212,236 +284,105 @@ const Profile = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, fetchProfile, sb]);
 
-  // Función para obtener los datos del perfil del usuario desde la base de datos
-  // También obtiene el rol del usuario y el estado de su suscripción
-  const fetchProfile = async () => {
-    if (!user) return;
+  const handleDayToggle = (day: string) => {
+    const currentDays = formData.available_weekdays as string[];
+    const newDays = currentDays.includes(day)
+      ? currentDays.filter(d => d !== day)
+      : [...currentDays, day];
+    const uniqueDays = [...new Set(newDays)];
+    // Auto-update available_days_per_week based on selected days
+    setFormData({ 
+      ...formData, 
+      available_weekdays: uniqueDays,
+      available_days_per_week: uniqueDays.length.toString()
+    });
+  };
 
+  const saveProfileChanges = async () => {
     try {
-      // Obtener datos del perfil
-      const { data: profileData, error: profileError } = await sb
+      if (!user) return;
+      const macros = calculateMacros({
+        gender: formData.gender as string,
+        age: Number(formData.age),
+        weight: Number(formData.weight),
+        height: Number(formData.height),
+        availableDays: formData.available_weekdays.length,
+        fitnessLevel: formData.fitness_level as string,
+        fitnessGoal: formData.fitness_goal as string
+      });
+      
+      const { error } = await supabase
         .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error("Error loading profile:", profileError);
-        toast.error("Error al cargar el perfil");
-        return;
-      }
-
-      // Actualizar estado del perfil y formulario con datos obtenidos
-      if (profileData) {
-        setProfile(profileData);
-        setFormData({
-          full_name: profileData.full_name || "",
-          gender: profileData.gender || "femenino",
-          fitness_level: profileData.fitness_level || "principiante",
-          fitness_goal: profileData.fitness_goal || "mantener_peso",
-          weight: profileData.weight?.toString() || "",
-          height: profileData.height?.toString() || "",
-          age: profileData.age?.toString() || "",
-          available_days_per_week: profileData.available_days_per_week?.toString() || "",
-          available_weekdays: Array.isArray(profileData.available_weekdays)
-            ? ([...new Set((profileData.available_weekdays as any[]).map(String))] as string[])
-            : [],
-          daily_calorie_goal: profileData.daily_calorie_goal?.toString() || "",
-          daily_protein_goal: profileData.daily_protein_goal?.toString() || "",
-          daily_carbs_goal: profileData.daily_carbs_goal?.toString() || "",
-          daily_fat_goal: profileData.daily_fat_goal?.toString() || "",
-        });
-      }
-
-      // Obtener rol del usuario (user/pro)
-      const { data: roleData } = await sb
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (roleData) {
-        setUserRole(roleData.role);
-      }
-
-      // Verificar estado de suscripción PRO del usuario
-      const { data: subscriptionData } = await sb
-        .from("user_subscriptions")
-        .select("status, plan")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (subscriptionData?.status === "active") {
-        setSubscriptionStatus("active");
-        setUserRole("pro");
-      }
+        .update({
+          full_name: formData.full_name,
+          // @ts-expect-error: validation typing
+          gender: formData.gender,
+          // @ts-expect-error: validation typing
+          fitness_level: formData.fitness_level,
+          // @ts-expect-error: validation typing
+          fitness_goal: formData.fitness_goal,
+          weight: formData.weight ? parseFloat(formData.weight as string) : null,
+          height: formData.height ? parseFloat(formData.height as string) : null,
+          age: formData.age ? parseInt(formData.age as string) : null,
+          available_days_per_week: formData.available_weekdays.length,
+          available_weekdays: formData.available_weekdays,
+          daily_calorie_goal: macros.dailyCalories,
+          daily_protein_goal: macros.protein,
+          daily_carbs_goal: macros.carbs,
+          daily_fat_goal: macros.fat,
+        })
+        .eq("id", user.id);
+        
+      if (error) throw error;
+      toast.success("Perfil actualizado");
+      setIsEditing(false);
+      fetchProfile();
     } catch (error) {
-      console.error("Error in fetchProfile:", error);
-    } finally {
-      setLoading(false);
+      console.error(error);
+      toast.error("Error al actualizar");
     }
   };
 
-  // Función para manejar el envío del formulario de perfil
-  // Valida si hubo cambios en el objetivo o días de entrenamiento
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     
-    // Verificar si cambiaron campos relacionados con el plan de entrenamiento
-    const oldGoal = profile?.fitness_goal;
-    const newGoal = formData.fitness_goal;
-    const oldWeekdays = profile?.available_weekdays || [];
-    const newWeekdays = formData.available_weekdays;
-
-    const goalChanged = oldGoal !== newGoal;
-    const weekdaysChanged = oldWeekdays.length !== newWeekdays.length || 
-      !oldWeekdays.every((day: string) => newWeekdays.includes(day));
-
-    // Si cambió el objetivo o días, validar primero los cambios
-    // Esto previene perder entrenamientos programados sin confirmación
-    if (goalChanged || weekdaysChanged) {
+    // Si hubo cambios en los días disponibles o el objetivo, validamos el cambio
+    const oldGoal = profile?.fitness_goal || "";
+    const newGoal = formData.fitness_goal as string;
+    const oldDaysCount = profile?.available_days_per_week || 0;
+    const newDaysCount = parseInt(formData.available_days_per_week as string) || 0;
+    
+    if (oldGoal !== newGoal || oldDaysCount !== newDaysCount) {
       try {
         const validation = await validateMutation.mutateAsync({
-          new_weekdays: newWeekdays,
-          new_goal: newGoal,
+           new_goal: newGoal,
+           new_weekdays: formData.available_weekdays as string[],
         });
-
-        if (validation.action !== 'none') {
-          setValidationData(validation);
-          setShowPreviewModal(true);
-          return; // Esperar confirmación del usuario
+        
+        if (validation && validation.action !== "none") {
+           setValidationData(validation);
+           setShowPreviewModal(true);
+           return;
         }
-      } catch (error) {
-        console.error('Error validating changes:', error);
-        toast.error('Error al validar cambios');
-        return;
+      } catch (err) {
+        console.error(err);
       }
     }
-
-    // Si solo cambiaron los días (sin cambio de objetivo), actualizar y redistribuir
-    // Si cambió el objetivo, el modal ya se mostró
-    await updateProfile(weekdaysChanged);
-  };
-
-  // Función para actualizar el perfil en la base de datos
-  // Recalcula macros automáticamente si hay información completa
-  const updateProfile = async (weekdaysChanged = false) => {
-    setLoading(true);
-
-    // Recalcular macros nutricionales si hay información completa del usuario
-    let calculatedMacros = null;
-    const profileData = {
-      gender: formData.gender,
-      age: parseInt(formData.age) || 0,
-      weight: parseFloat(formData.weight) || 0,
-      height: parseFloat(formData.height) || 0,
-      availableDays: parseInt(formData.available_days_per_week) || 0,
-      fitnessLevel: formData.fitness_level,
-      fitnessGoal: formData.fitness_goal,
-    };
-
-    if (validateProfileData(profileData)) {
-      calculatedMacros = calculateMacros(profileData);
-      console.log("Macros recalculados:", calculatedMacros);
-    }
-
-    const { error } = await sb
-      .from("profiles")
-      .update({
-        full_name: formData.full_name,
-        gender: formData.gender,
-        fitness_level: formData.fitness_level as "principiante" | "intermedio" | "avanzado",
-        fitness_goal: formData.fitness_goal as "bajar_peso" | "aumentar_masa" | "mantener_peso" | "tonificar" | "mejorar_resistencia" | "ganar_masa" | "bajar_grasa" | "rendimiento",
-        weight: parseFloat(formData.weight) || null,
-        height: parseFloat(formData.height) || null,
-        age: parseInt(formData.age) || null,
-        available_days_per_week: formData.available_weekdays.length || null,
-        available_weekdays: (formData.available_weekdays.length > 0 ? [...new Set(formData.available_weekdays)] : null) as any,
-        daily_calorie_goal: calculatedMacros?.dailyCalories || parseInt(formData.daily_calorie_goal) || 2000,
-        daily_protein_goal: calculatedMacros?.protein || parseInt(formData.daily_protein_goal) || 150,
-        daily_carbs_goal: calculatedMacros?.carbs || parseInt(formData.daily_carbs_goal) || 200,
-        daily_fat_goal: calculatedMacros?.fat || parseInt(formData.daily_fat_goal) || 50,
-      })
-      .eq("id", user?.id);
-
-    if (error) {
-      setLoading(false);
-      console.error("Error updating profile:", error);
-      toast.error("Error al actualizar perfil: " + error.message);
-      return;
-    }
-
-    // Si cambiaron los días de entrenamiento, redistribuir automáticamente
-    if (weekdaysChanged) {
-      await redistributeWorkoutsIfNeeded(true);
-    }
-
-    setLoading(false);
-    if (calculatedMacros) {
-      toast.success("Perfil y macros actualizados correctamente");
-    } else {
-      toast.success("Perfil actualizado correctamente");
-    }
-    setIsEditing(false);
-    fetchProfile();
+    
+    saveProfileChanges();
   };
 
   const handleConfirmPlanChange = async () => {
-    if (!validationData) return;
-
-    setLoading(true);
+    setShowPreviewModal(false);
+    await saveProfileChanges();
     try {
-      // First update the profile
-      await updateProfile();
-
-      // Then execute the plan changes
-      if (validationData.needsReassign) {
-        toast.info('Reasignando plan de entrenamiento...');
-        await assignMutation.mutateAsync();
-      } else if (validationData.needsRedistribute) {
-        toast.info('Redistribuyendo entrenamientos...');
-        await redistributeMutation.mutateAsync({});
-      }
-
-      // Invalidate all related queries to refresh data across the app
-      await queryClient.invalidateQueries({ queryKey: ['user-routine'] });
-      await queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
-      await queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
-      await queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
-      await queryClient.invalidateQueries({ queryKey: ['progress-stats'] });
-
-      toast.success('Plan actualizado exitosamente');
-      setShowPreviewModal(false);
-      setValidationData(null);
-      
-      // Refetch profile
-      fetchProfile();
-    } catch (error) {
-      console.error('Error applying plan changes:', error);
-      toast.error('Error al aplicar cambios al plan');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // New function to handle redistribution when days change
-  const redistributeWorkoutsIfNeeded = async (weekdaysChanged: boolean) => {
-    if (!weekdaysChanged) return;
-
-    try {
-      toast.info('Actualizando entrenamientos...');
-      await redistributeMutation.mutateAsync({});
-      
-      // Invalidate all related queries
-      await queryClient.invalidateQueries({ queryKey: ['user-routine'] });
-      await queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
-      await queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
-      await queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
-      await queryClient.invalidateQueries({ queryKey: ['progress-stats'] });
-    } catch (error) {
-      console.error('Error redistributing workouts:', error);
+       await generateWorkoutsMutation.mutateAsync({});
+       toast.success("Plan redistribuido con éxito");
+    } catch (e) {
+       toast.error("Error al redistribuir plan");
     }
   };
 
@@ -508,7 +449,7 @@ const Profile = () => {
                   size="lg"
                   onClick={() => {
                     console.log('Opening payment modal');
-                    setPaymentModalOpen(true);
+                    setShowPaymentModal(true);
                   }}
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
@@ -777,13 +718,14 @@ const Profile = () => {
         open={showPreviewModal}
         onOpenChange={setShowPreviewModal}
         onConfirm={handleConfirmPlanChange}
+        // @ts-expect-error: validation typing from API
         validationData={validationData}
         isLoading={loading}
       />
 
       <PaymentModal
-        open={paymentModalOpen}
-        onOpenChange={setPaymentModalOpen}
+        open={showPaymentModal}
+        onOpenChange={setShowPaymentModal}
       />
 
       <PaymentSuccessModal

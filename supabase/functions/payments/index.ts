@@ -163,7 +163,7 @@ serve(async (req) => {
         console.log("Webhook event ID:", event.id);
 
         if (event.type === "checkout.session.completed") {
-          const session = event.data.object as any;
+          const session = event.data.object as unknown;
           const { userId, plan } = session.metadata;
 
           console.log("=== CHECKOUT COMPLETED ===");
@@ -226,7 +226,7 @@ serve(async (req) => {
 
         // Webhook: Pago de renovación exitoso (mensual o anual)
         if (event.type === "invoice.payment_succeeded") {
-          const invoice = event.data.object as any;
+          const invoice = event.data.object as unknown;
           const subscriptionId = invoice.subscription;
 
           console.log("Payment succeeded for subscription:", subscriptionId);
@@ -247,7 +247,7 @@ serve(async (req) => {
 
         // Webhook: Suscripción cancelada (por el usuario o por fallo de pago)
         if (event.type === "customer.subscription.deleted") {
-          const subscription = event.data.object as any;
+          const subscription = event.data.object as unknown;
 
           console.log("Subscription deleted:", subscription.id);
 

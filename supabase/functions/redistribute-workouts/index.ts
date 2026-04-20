@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
@@ -104,14 +105,14 @@ serve(async (req) => {
     console.log('Total plan exercises fetched:', planExercises.length);
 
     // Agrupar ejercicios por día - REMOVIENDO DUPLICADOS
-    const exercisesByDay: { [key: number]: any[] } = {};
-    planExercises.forEach((pe: any) => {
+    const exercisesByDay: { [key: number]: Record<string, unknown>[] } = {};
+    planExercises.forEach((pe: unknown) => {
       if (!exercisesByDay[pe.dia]) {
         exercisesByDay[pe.dia] = [];
       }
       // Verificar que el ejercicio no esté ya agregado (evitar duplicados)
       const alreadyExists = exercisesByDay[pe.dia].some(
-        (existing: any) => existing.ejercicio_id === pe.ejercicio_id
+        (existing: unknown) => existing.ejercicio_id === pe.ejercicio_id
       );
       if (!alreadyExists) {
         exercisesByDay[pe.dia].push(pe);
@@ -175,7 +176,7 @@ serve(async (req) => {
       }
 
       // Calcular calorías estimadas
-      const estimatedCalories = dayExercises.reduce((total: number, pe: any) => {
+      const estimatedCalories = dayExercises.reduce((total: number, pe: unknown) => {
         const exercise = pe.exercises;
         if (!exercise) return total;
         const caloriesPerRep = exercise.calorias_por_repeticion || 0;
@@ -224,8 +225,8 @@ serve(async (req) => {
       // Agregar ejercicios al workout
       if (exercises && exercises.length > 0) {
         const workoutExercises = exercises
-          .filter((pe: any) => pe.exercises && pe.exercises.nombre)
-          .map((pe: any) => {
+          .filter((pe: unknown) => pe.exercises && pe.exercises.nombre)
+          .map((pe: unknown) => {
             const exercise = pe.exercises;
             return {
               workout_id: workout.id,

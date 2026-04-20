@@ -12,6 +12,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import {
   assignRoutine,
   getUserRoutine,
@@ -119,7 +120,6 @@ export const useGenerateWeeklyWorkouts = () => {
       
       // Mostrar mensaje de confirmación si se eliminaron entrenamientos
       if (data?.workouts_deleted && data.workouts_deleted > 0) {
-        const { toast } = await import('sonner');
         toast.success(`Se eliminaron ${data.workouts_deleted} entrenamientos anteriores y se crearon ${data.workouts_created} nuevos entrenamientos`);
       }
     },

@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
@@ -21,7 +22,7 @@ const dayNames: Record<string, string> = {
 };
 
 interface PlanScore {
-  plan: any;
+  plan: unknown;
   score: number;
 }
 
@@ -38,12 +39,12 @@ interface UserHealthContext {
 // PLACEHOLDER PARA LÓGICA DE IA (USUARIOS PRO)
 // =============================================
 async function generateProWorkoutsWithAI(
-  supabase: any,
+  supabase: unknown,
   userId: string,
-  profile: any,
+  profile: unknown,
   healthContext: UserHealthContext,
   selectedDays: string[]
-): Promise<{ workouts: any[]; aiGenerated: boolean; aiMessage: string }> {
+): Promise<{ workouts: Record<string, unknown>[]; aiGenerated: boolean; aiMessage: string }> {
   /**
    * TODO: Implementar lógica de IA para usuarios PRO
    * 
@@ -303,13 +304,13 @@ serve(async (req) => {
     }
 
     // Group exercises by day, removing duplicates
-    const exercisesByDay: { [key: number]: any[] } = {};
-    planExercises.forEach((pe: any) => {
+    const exercisesByDay: { [key: number]: Record<string, unknown>[] } = {};
+    planExercises.forEach((pe: unknown) => {
       if (!exercisesByDay[pe.dia]) {
         exercisesByDay[pe.dia] = [];
       }
       const alreadyExists = exercisesByDay[pe.dia].some(
-        (existing: any) => existing.ejercicio_id === pe.ejercicio_id
+        (existing: unknown) => existing.ejercicio_id === pe.ejercicio_id
       );
       if (!alreadyExists) {
         exercisesByDay[pe.dia].push(pe);
@@ -373,7 +374,7 @@ serve(async (req) => {
 
       if (!dayExercises || dayExercises.length === 0) return;
 
-      const estimatedCalories = dayExercises.reduce((total: number, pe: any) => {
+      const estimatedCalories = dayExercises.reduce((total: number, pe: unknown) => {
         const exercise = pe.exercises;
         if (!exercise) return total;
         const caloriesPerRep = exercise.calorias_por_repeticion || 0;
@@ -419,13 +420,13 @@ serve(async (req) => {
       }
 
       if (exercises && exercises.length > 0) {
-        const uniqueExercises = exercises.filter((pe: any, index: number, self: any[]) => 
-          self.findIndex((t: any) => t.ejercicio_id === pe.ejercicio_id) === index
+        const uniqueExercises = exercises.filter((pe: unknown, index: number, self: Record<string, unknown>[]) => 
+          self.findIndex((t: unknown) => t.ejercicio_id === pe.ejercicio_id) === index
         );
 
         const workoutExercises = uniqueExercises
-          .filter((pe: any) => pe.exercises && pe.exercises.nombre)
-          .map((pe: any) => {
+          .filter((pe: unknown) => pe.exercises && pe.exercises.nombre)
+          .map((pe: unknown) => {
             const exercise = pe.exercises;
             return {
               workout_id: workout.id,

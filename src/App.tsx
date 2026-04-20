@@ -20,14 +20,15 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import OnboardingForm from "./components/onboarding/OnboardingForm";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import Macros from "./pages/Macros";
-import Workouts from "./pages/Workouts";
-import Calendar from "./pages/Calendar";
-import Profile from "./pages/Profile";
-import NotFound from "./pages/NotFound";
+
+const OnboardingForm = lazy(() => import("./components/onboarding/OnboardingForm"));
+const Auth = lazy(() => import("./pages/Auth"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Macros = lazy(() => import("./pages/Macros"));
+const Workouts = lazy(() => import("./pages/Workouts"));
+const Calendar = lazy(() => import("./pages/Calendar"));
+const Profile = lazy(() => import("./pages/Profile"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 /**
  * Componente de loading para Suspense

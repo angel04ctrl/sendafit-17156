@@ -95,13 +95,13 @@ serve(async (req) => {
     const isTodayTrainingDay = availableWeekdaysNumbers.includes(weekday);
     console.log(`Available weekdays as numbers: [${availableWeekdaysNumbers.join(', ')}], Is today (${weekday}) a training day? ${isTodayTrainingDay}`);
 
-    let finalWorkouts: any[] = [];
+    let finalWorkouts: Record<string, unknown>[] = [];
 
     // Buscar entrenamientos de HOY por dos estrategias:
     // 1. Entrenamientos automáticos: por weekday + plan (permanentes) - SOLO si hoy es día de entrenamiento
     // 2. Entrenamientos manuales: por scheduled_date exacta
     
-    let automaticWorkouts: any[] = [];
+    let automaticWorkouts: Record<string, unknown>[] = [];
     
     // Estrategia 1: Entrenamientos automáticos por weekday - solo si hoy es día de entrenamiento
     if (isTodayTrainingDay) {

@@ -79,7 +79,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (session?.user && mounted) {
           // Verificar que el usuario existe en la tabla profiles
           // Esto previene errores 403 cuando el usuario fue eliminado de la BD
-          const { error: userError } = await (supabase as any)
+          const { error: userError } = await supabase
             .from('profiles')
             .select('id')
             .eq('id', session.user.id)

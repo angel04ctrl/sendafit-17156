@@ -13,7 +13,7 @@
  * - Adaptar vista móvil con carousel y vista desktop con grid
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,12 +49,16 @@ const Macros = () => {
   const { user } = useAuth();
   const { canAccess } = useFeatureFlags();
   const isMobile = useIsMobile();
-  const sb = supabase as any;
+  const sb = supabase;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [meals, setMeals] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [profile, setProfile] = useState<any>(null);
   const [open, setOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [foods, setFoods] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedFood, setSelectedFood] = useState<any>(null);
   const [portion, setPortion] = useState("1");
   const [foodAnalysisOpen, setFoodAnalysisOpen] = useState(false);
@@ -68,21 +72,16 @@ const Macros = () => {
     fat: "",
   });
 
-  useEffect(() => {
-    fetchData();
-    fetchFoods();
-  }, [user]);
-
-  const fetchFoods = async () => {
+  const fetchFoods = useCallback(async () => {
     const { data } = await sb
       .from("foods")
       .select("*")
       .order("nombre", { ascending: true });
     
     setFoods(data || []);
-  };
+  }, [sb]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!user) return;
 
     const { data: profileData } = await sb
@@ -102,13 +101,18 @@ const Macros = () => {
       .order("created_at", { ascending: false });
 
     setMeals(mealsData || []);
-  };
+  }, [user, sb]);
+
+  useEffect(() => {
+    fetchData();
+    fetchFoods();
+  }, [fetchData, fetchFoods]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const { error } = await sb.from("meals").insert([{
-      user_id: user?.id!,
+      user_id: user?.id || "",
       meal_type: formData.meal_type as any,
       name: formData.name,
       calories: parseInt(formData.calories),
@@ -139,7 +143,7 @@ const Macros = () => {
     const portionMultiplier = parseFloat(portion);
     
     const { error } = await sb.from("meals").insert([{
-      user_id: user?.id!,
+      user_id: user?.id || "",
       meal_type: formData.meal_type as any,
       name: `${selectedFood.nombre} (${portion} × ${selectedFood.racion}${selectedFood.unidad})`,
       calories: Math.round(selectedFood.calorias * portionMultiplier),

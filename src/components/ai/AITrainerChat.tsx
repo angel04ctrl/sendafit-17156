@@ -76,7 +76,7 @@ export function AITrainerChat({ open, onOpenChange }: AITrainerChatProps) {
         timestamp: new Date(),
       }]);
     }
-  }, [open]);
+  }, [open, messages.length]);
 
   const sendMessage = async () => {
     if (!inputValue.trim() || !user || isLoading) return;

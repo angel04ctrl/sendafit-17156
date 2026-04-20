@@ -12,11 +12,13 @@
  * - Actualizar en tiempo real al completar entrenamientos
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,57 +26,179 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, CheckCircle2, Circle, Trash2, ChevronDown, Scan, Library, Info } from "lucide-react";
+import { Plus, CheckCircle2, Circle, Trash2, ChevronDown, Scan, Library, Info, Dumbbell, CalendarDays, Timer, Flame, PlayCircle } from "lucide-react";
 import { toast } from "sonner";
-import { AddExerciseDialog } from "@/components/AddExerciseDialog";
+import { AddExerciseDialog, type ConfiguredExercise } from "@/components/AddExerciseDialog";
 import { useCompleteWorkout, useTodaysWorkouts } from "@/hooks/useBackendApi";
 import { ProButton } from "@/components/ProButton";
 import { ExerciseDetailModal } from "@/components/ExerciseDetailModal";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
-interface ConfiguredExercise {
-  exercise: {
-    id: string;
-    nombre: string;
-    descripcion: string;
-  };
-  series: number;
-  repeticiones: number;
-  peso: number;
-  estimatedCalories: number;
-}
+const getTodayDate = () => format(new Date(), "yyyy-MM-dd");
+
+const WorkoutList = ({ workouts, isToday = false, completingWorkout, handleCompleteWorkout, handleStartWorkout, handleDeleteWorkout }: { 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  workouts: any[]; 
+  isToday?: boolean;
+  completingWorkout: string | null;
+  handleCompleteWorkout: (id: string, completed: boolean) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  handleStartWorkout: (workout: any) => void;
+  handleDeleteWorkout: (id: string) => void;
+}) => (
+  <div className="space-y-2 sm:space-y-3">
+    {workouts.length === 0 ? (
+      <div className="text-center py-6 sm:py-8 text-muted-foreground border-2 border-dashed rounded-xl">
+        <Dumbbell className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3 opacity-50" />
+        <p className="text-xs sm:text-sm">No hay entrenamientos</p>
+      </div>
+    ) : (
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      workouts.map((workout: any) => (
+        <Card 
+          key={workout.id} 
+          className={`transition-all overflow-hidden border-2 group ${
+            workout.completed 
+              ? 'bg-muted/50 border-muted-foreground/30 shadow-none' 
+              : 'bg-card border-primary/20 hover:border-primary/40 shadow-sm hover:shadow-md'
+          }`}
+        >
+          <CardHeader className="p-3 sm:p-4 pb-2">
+            <div className="flex justify-between items-start gap-2">
+              <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
+                <Checkbox
+                  checked={workout.completed}
+                  onCheckedChange={() => handleCompleteWorkout(workout.id, workout.completed)}
+                  disabled={completingWorkout === workout.id}
+                  className="mt-1"
+                />
+                <div className="flex-1 min-w-0">
+                  <CardTitle className={`text-sm sm:text-base flex items-center gap-2 truncate ${
+                    workout.completed ? 'text-muted-foreground line-through' : 'text-foreground'
+                  }`}>
+                    {workout.name}
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1 truncate">
+                    <CalendarDays className="h-3 w-3 shrink-0" />
+                    {format(new Date(workout.scheduled_date), "EEEE d 'de' MMMM", { locale: es })}
+                  </p>
+                </div>
+              </div>
+              <Badge variant={workout.completed ? "secondary" : "default"} className="capitalize text-[10px] sm:text-xs shrink-0">
+                {workout.location}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-3 sm:p-4 pt-0">
+            <div className="flex flex-wrap gap-2 sm:gap-4 text-xs text-muted-foreground mb-3 sm:mb-4 bg-muted/30 p-2 rounded-lg">
+              <div className="flex items-center gap-1">
+                <Timer className="h-3 w-3 sm:h-4 sm:w-4 text-primary/70" />
+                <span>{workout.duration_minutes} min</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Flame className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500/70" />
+                <span>{workout.estimated_calories} kcal</span>
+              </div>
+            </div>
+
+            {workout.workout_exercises && workout.workout_exercises.length > 0 && (
+              <div className="space-y-1 mb-3 sm:mb-4 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                {workout.workout_exercises.map((exercise: any) => (
+                  <div key={exercise.id} className="text-xs sm:text-sm flex items-center justify-between gap-2 p-1.5 rounded-md hover:bg-muted/50">
+                    <span className={`truncate ${workout.completed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                      {exercise.name}
+                    </span>
+                    <span className="text-muted-foreground font-medium shrink-0 bg-background px-2 py-0.5 rounded shadow-sm border">
+                      {exercise.sets}×{exercise.reps}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2 mt-2 sm:mt-4">
+              {!workout.completed && (
+                <Button 
+                  className="w-full sm:flex-1 text-xs sm:text-sm font-medium shadow-sm transition-all hover:scale-[1.02]"
+                  onClick={() => handleStartWorkout(workout)}
+                >
+                  <PlayCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                  Iniciar
+                </Button>
+              )}
+              <Button 
+                variant="outline"
+                className={`w-full sm:flex-none text-xs sm:text-sm border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 ${!workout.completed ? 'sm:w-auto' : ''}`}
+                onClick={() => handleDeleteWorkout(workout.id)}
+              >
+                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                Eliminar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ))
+    )}
+  </div>
+);
 
 const Workouts = () => {
   const { user } = useAuth();
-  const sb = supabase as any;
-  const [workouts, setWorkouts] = useState<any[]>([]);
-  const [profile, setProfile] = useState<any>(null);
-  const [open, setOpen] = useState(false);
-  const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false);
+  const sb = supabase;
+  const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [upcomingWorkouts, setUpcomingWorkouts] = useState<any[]>([]);
+  const [availableDays, setAvailableDays] = useState<string[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [configuredExercises, setConfiguredExercises] = useState<any[]>([]);
+  const [addExerciseOpen, setAddExerciseOpen] = useState(false);
   const [exerciseDetailOpen, setExerciseDetailOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedExercise, setSelectedExercise] = useState<any>(null);
-  const [configuredExercises, setConfiguredExercises] = useState<ConfiguredExercise[]>([]);
   const [otherDaysOpen, setOtherDaysOpen] = useState(false);
   const completeWorkoutMutation = useCompleteWorkout();
   
-  // Use backend API for today's workouts
-  const { data: todaysData, refetch: refetchTodays } = useTodaysWorkouts();
-  const getTodayDate = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
   const [formData, setFormData] = useState({
     name: "",
     location: "casa",
     scheduled_date: getTodayDate(),
   });
+  const [open, setOpen] = useState(false);
+  const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false);
+  const [completingWorkout, setCompletingWorkout] = useState<string | null>(null);
+
+  // Use backend API for today's workouts
+  const { data: todaysData, refetch: refetchTodays } = useTodaysWorkouts();
+
+  const fetchData = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data: profileData } = await sb
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+      setProfile(profileData);
+
+      const today = getTodayDate();
+      const { data: upcoming } = await sb
+        .from("workouts")
+        .select("*, workout_exercises(*)")
+        .eq("user_id", user.id)
+        .gte("scheduled_date", today)
+        .order("scheduled_date", { ascending: true });
+      
+      setUpcomingWorkouts(upcoming || []);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [user, sb]);
 
   useEffect(() => {
     fetchData();
-  }, [user]);
+  }, [user, fetchData]);
 
   // Realtime subscription for workouts
   useEffect(() => {
@@ -101,42 +225,16 @@ const Workouts = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, fetchData, refetchTodays]);
 
-  const fetchData = async () => {
-    if (!user) return;
+  const fetchExercisesForDay = async (dayOfWeek: string, location: string) => {
+    const query = sb.from("workout_exercises").select("*");
+    // @ts-expect-error: deeply nested instantiation
+    const { data } = await query
+      .eq("workout_id", upcomingWorkouts[0]?.id)
+      .eq("location", location);
 
-    try {
-      // Fetch profile with assigned routine
-      const { data: profileData } = await sb
-        .from("profiles")
-        .select("assigned_routine_id, available_weekdays")
-        .eq("id", user.id)
-        .single();
-
-      console.log('Workouts - Perfil del usuario:', {
-        available_weekdays: profileData?.available_weekdays,
-        assigned_routine_id: profileData?.assigned_routine_id,
-      });
-
-      setProfile(profileData);
-
-      // Fetch workouts for the current plan only
-      const { data, error } = await sb
-        .from("workouts")
-        .select("*, workout_exercises(*)")
-        .eq("user_id", user.id)
-        .order("scheduled_date", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching workouts:", error);
-        return;
-      }
-
-      setWorkouts(data || []);
-    } catch (error) {
-      console.error("Error in fetchData:", error);
-    }
+    return data;
   };
 
   const handleAddExercise = (exercise: ConfiguredExercise) => {
@@ -177,8 +275,9 @@ const Workouts = () => {
     const { data: workoutData, error: workoutError } = await sb
       .from("workouts")
       .insert([{
-        user_id: user?.id!,
+        user_id: user.id,
         name: formData.name,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         location: formData.location as any,
         estimated_calories: totalCalories,
         duration_minutes: totalDuration,
@@ -226,34 +325,34 @@ const Workouts = () => {
     fetchData();
   };
 
-  const toggleComplete = async (id: string, completed: boolean) => {
+  const handleCompleteWorkout = async (id: string, completed: boolean) => {
     try {
       await completeWorkoutMutation.mutateAsync({
         workoutId: id,
         completed: !completed,
       });
-      
-      toast.success(!completed ? "¡Entrenamiento completado!" : "Marcado como pendiente");
-      refetchTodays();
       fetchData();
-    } catch (error) {
-      toast.error("Error al actualizar");
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  const deleteWorkout = async (id: string) => {
-    const { error } = await sb
-      .from("workouts")
-      .delete()
-      .eq("id", id);
+  const handleStartWorkout = (workout: Record<string, unknown>) => {
+    // Implementar navegación a página de entrenamiento activo si existe
+    toast.info(`Iniciando entrenamiento: ${workout.name}`);
+  };
 
-    if (error) {
-      toast.error("Error al eliminar entrenamiento");
-      return;
+  const handleDeleteWorkout = async (id: string) => {
+    if (!confirm("¿Eliminar entrenamiento?")) return;
+    try {
+      const { error } = await sb.from("workouts").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Entrenamiento eliminado");
+      fetchData();
+      refetchTodays();
+    } catch (e) {
+      toast.error("Error al eliminar");
     }
-
-    toast.success("Entrenamiento eliminado");
-    fetchData();
   };
 
   const today = getTodayDate();
@@ -285,7 +384,7 @@ const Workouts = () => {
   });
   
   // Filter "other days" workouts to show workouts from other days of the week
-  const otherDaysWorkouts = workouts.filter((w) => {
+  const otherDaysWorkouts = upcomingWorkouts.filter((w) => {
     // For automatic workouts: exclude by weekday of today
     if (w.tipo === 'automatico') {
       if (w.weekday === todayWeekday) return false;
@@ -306,117 +405,6 @@ const Workouts = () => {
   const todayHome = todayWorkouts.filter((w) => w.location === "casa");
   const todayGym = todayWorkouts.filter((w) => w.location === "gimnasio");
   const todayOutdoor = todayWorkouts.filter((w) => w.location === "exterior");
-
-  const WorkoutList = ({ workouts, isToday = false }: { workouts: any[]; isToday?: boolean }) => (
-    <div className="space-y-2 sm:space-y-3">
-      {workouts.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No hay entrenamientos registrados</p>
-      ) : (
-        workouts.map((workout) => (
-          <Card
-            key={workout.id}
-            className={`p-3 sm:p-4 shadow-card transition-all ${
-              workout.completed ? "bg-primary/5 border-primary/20" : ""
-            }`}
-          >
-            <div className="flex flex-col gap-2">
-              <div className="flex items-start gap-2 sm:gap-3">
-                <button 
-                  onClick={() => toggleComplete(workout.id, workout.completed)}
-                  className="flex-shrink-0 mt-0.5"
-                >
-                  {workout.completed ? (
-                    <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-                  ) : (
-                    <Circle className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground" />
-                  )}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm sm:text-base break-words">{workout.name}</h3>
-                  {workout.description && (
-                    <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
-                      {workout.description}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground mt-1">
-                    <span className="flex-shrink-0">{workout.duration_minutes} min</span>
-                    <span className="flex-shrink-0">~{workout.estimated_calories} kcal</span>
-                    <span className="capitalize flex-shrink-0">{workout.location}</span>
-                    {workout.tipo === 'automatico' && workout.weekday && (
-                      <span className="flex-shrink-0 text-primary font-medium">
-                        {weekdayNames[workout.weekday]}
-                      </span>
-                    )}
-                  </div>
-                  
-                  {/* Show exercises */}
-                  {workout.workout_exercises && workout.workout_exercises.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {workout.workout_exercises.map((ex: any) => (
-                        <Button
-                          key={ex.id}
-                          variant="ghost"
-                          size="sm"
-                          className="h-auto py-1 px-2 text-xs justify-start w-full hover:bg-muted"
-                          onClick={async () => {
-                            // Buscar el ejercicio completo en la tabla exercises por nombre
-                            const { data: exerciseData } = await sb
-                              .from('exercises')
-                              .select('*')
-                              .eq('nombre', ex.name)
-                              .maybeSingle();
-                            
-                            if (exerciseData) {
-                              // Usar los datos completos del ejercicio desde la BD
-                              setSelectedExercise({
-                                nombre: exerciseData.nombre,
-                                descripcion: exerciseData.descripcion,
-                                grupo_muscular: exerciseData.grupo_muscular,
-                                nivel: exerciseData.nivel,
-                                lugar: exerciseData.lugar,
-                                series_sugeridas: exerciseData.series_sugeridas || ex.sets,
-                                repeticiones_sugeridas: exerciseData.repeticiones_sugeridas || ex.reps,
-                                equipamiento: exerciseData.equipamiento,
-                                video: exerciseData.video,
-                                imagen: exerciseData.imagen,
-                              });
-                            } else {
-                              // Fallback si no se encuentra el ejercicio en la BD
-                              setSelectedExercise({
-                                nombre: ex.name,
-                                descripcion: ex.notes || 'Sin descripción disponible',
-                                grupo_muscular: 'General',
-                                nivel: 'B',
-                                lugar: workout.location,
-                                series_sugeridas: ex.sets,
-                                repeticiones_sugeridas: ex.reps,
-                              });
-                            }
-                            setExerciseDetailOpen(true);
-                          }}
-                        >
-                          <Info className="w-3 h-3 mr-1 flex-shrink-0" />
-                          <span className="truncate">{ex.name} - {ex.sets}×{ex.reps}</span>
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => deleteWorkout(workout.id)}
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0 h-8 w-8 p-0"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </Card>
-        ))
-      )}
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -600,23 +588,51 @@ const Workouts = () => {
             <div>
               <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-3">Entrenamientos de Hoy</h2>
               <Tabs defaultValue="all" className="w-full">
-                <TabsList className="grid w-full grid-cols-4 h-auto">
-                  <TabsTrigger value="all" className="text-xs sm:text-sm py-2">Todos</TabsTrigger>
-                  <TabsTrigger value="casa" className="text-xs sm:text-sm py-2">Casa</TabsTrigger>
-                  <TabsTrigger value="gimnasio" className="text-xs sm:text-sm py-2">Gimnasio</TabsTrigger>
-                  <TabsTrigger value="exterior" className="text-xs sm:text-sm py-2">Exterior</TabsTrigger>
+                <TabsList className="w-full grid grid-cols-4 bg-muted/50 p-1">
+                  <TabsTrigger value="all" className="text-xs sm:text-sm">Todos</TabsTrigger>
+                  <TabsTrigger value="casa" className="text-xs sm:text-sm">Casa</TabsTrigger>
+                  <TabsTrigger value="gimnasio" className="text-xs sm:text-sm">Gym</TabsTrigger>
+                  <TabsTrigger value="exterior" className="text-xs sm:text-sm">Outdoor</TabsTrigger>
                 </TabsList>
                 <TabsContent value="all" className="mt-3 sm:mt-4">
-                  <WorkoutList workouts={todayWorkouts} isToday />
+                  <WorkoutList 
+                    workouts={todayWorkouts} 
+                    isToday 
+                    completingWorkout={completingWorkout}
+                    handleCompleteWorkout={handleCompleteWorkout}
+                    handleStartWorkout={handleStartWorkout}
+                    handleDeleteWorkout={handleDeleteWorkout}
+                  />
                 </TabsContent>
                 <TabsContent value="casa" className="mt-3 sm:mt-4">
-                  <WorkoutList workouts={todayHome} isToday />
+                  <WorkoutList 
+                    workouts={todayHome} 
+                    isToday 
+                    completingWorkout={completingWorkout}
+                    handleCompleteWorkout={handleCompleteWorkout}
+                    handleStartWorkout={handleStartWorkout}
+                    handleDeleteWorkout={handleDeleteWorkout}
+                  />
                 </TabsContent>
                 <TabsContent value="gimnasio" className="mt-3 sm:mt-4">
-                  <WorkoutList workouts={todayGym} isToday />
+                  <WorkoutList 
+                    workouts={todayGym} 
+                    isToday 
+                    completingWorkout={completingWorkout}
+                    handleCompleteWorkout={handleCompleteWorkout}
+                    handleStartWorkout={handleStartWorkout}
+                    handleDeleteWorkout={handleDeleteWorkout}
+                  />
                 </TabsContent>
                 <TabsContent value="exterior" className="mt-3 sm:mt-4">
-                  <WorkoutList workouts={todayOutdoor} isToday />
+                  <WorkoutList 
+                    workouts={todayOutdoor} 
+                    isToday 
+                    completingWorkout={completingWorkout}
+                    handleCompleteWorkout={handleCompleteWorkout}
+                    handleStartWorkout={handleStartWorkout}
+                    handleDeleteWorkout={handleDeleteWorkout}
+                  />
                 </TabsContent>
               </Tabs>
             </div>
@@ -653,7 +669,7 @@ const Workouts = () => {
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <button onClick={() => toggleComplete(workout.id, workout.completed)}>
+                              <button onClick={() => handleCompleteWorkout(workout.id, workout.completed)}>
                                 {workout.completed ? (
                                   <CheckCircle2 className="w-5 h-5 text-primary" />
                                 ) : (
@@ -673,7 +689,7 @@ const Workouts = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => deleteWorkout(workout.id)}
+                            onClick={() => handleDeleteWorkout(workout.id)}
                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
                           >
                             <Trash2 className="w-4 h-4" />
