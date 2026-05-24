@@ -11,7 +11,7 @@
  */
 
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Calendar, Dumbbell, Apple, UserCircle, Moon, Sun, LogOut, Sparkles } from "lucide-react";
+import { Home, Calendar, Dumbbell, Apple, UserCircle, Moon, Sun, LogOut, MessageSquare } from "lucide-react";
 import { Button } from "./ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -49,6 +49,7 @@ export const Navbar = () => {
     { path: "/dashboard", icon: Home, label: "Inicio" },
     { path: "/macros", icon: Apple, label: "Macros" },
     { path: "/workouts", icon: Dumbbell, label: "Entrenar" },
+    { path: "/coach-chat", icon: MessageSquare, label: "Coach" },
     { path: "/calendar", icon: Calendar, label: "Agenda" },
     { path: "/profile", icon: UserCircle, label: "Perfil" },
   ];

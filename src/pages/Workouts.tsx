@@ -26,18 +26,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, CheckCircle2, Circle, Trash2, ChevronDown, Scan, Library, Info, Dumbbell, CalendarDays, Timer, Flame, PlayCircle } from "lucide-react";
+import { Plus, CheckCircle2, Circle, Trash2, ChevronDown, Scan, Library, HelpCircle, Dumbbell, CalendarDays, Timer, Flame, PlayCircle } from "lucide-react";
 import { toast } from "sonner";
 import { AddExerciseDialog, type ConfiguredExercise } from "@/components/AddExerciseDialog";
-import { useCompleteWorkout, useTodaysWorkouts } from "@/hooks/useBackendApi";
+import { 
+  useCompleteWorkout, 
+  useTodaysWorkouts, 
+  useWeeklyWorkouts, 
+  useUserProfile, 
+  useDeleteWorkout, 
+  useCreateWorkout 
+} from "@/hooks/useBackendApi";
 import { ProButton } from "@/components/ProButton";
 import { ExerciseDetailModal } from "@/components/ExerciseDetailModal";
+import { GymMachineScanner } from "@/components/ai/GymMachineScanner";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
 const getTodayDate = () => format(new Date(), "yyyy-MM-dd");
 
-const WorkoutList = ({ workouts, isToday = false, completingWorkout, handleCompleteWorkout, handleStartWorkout, handleDeleteWorkout }: { 
+const WorkoutList = ({ workouts, isToday = false, completingWorkout, handleCompleteWorkout, handleStartWorkout, handleDeleteWorkout, handleShowExerciseDetails }: { 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   workouts: any[]; 
   isToday?: boolean;
@@ -46,6 +54,7 @@ const WorkoutList = ({ workouts, isToday = false, completingWorkout, handleCompl
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   handleStartWorkout: (workout: any) => void;
   handleDeleteWorkout: (id: string) => void;
+  handleShowExerciseDetails: (exerciseName: string) => void;
 }) => (
   <div className="space-y-2 sm:space-y-3">
     {workouts.length === 0 ? (
@@ -107,8 +116,18 @@ const WorkoutList = ({ workouts, isToday = false, completingWorkout, handleCompl
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {workout.workout_exercises.map((exercise: any) => (
                   <div key={exercise.id} className="text-xs sm:text-sm flex items-center justify-between gap-2 p-1.5 rounded-md hover:bg-muted/50">
-                    <span className={`truncate ${workout.completed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
-                      {exercise.name}
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className={`truncate ${workout.completed ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                        {exercise.name}
+                      </span>
+                      <button
+                        type="button"
+                        className="shrink-0 rounded-full p-0.5 text-blue-500 transition-colors hover:bg-blue-500/10 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        aria-label={`Ver informacion de ${exercise.name}`}
+                        onClick={() => handleShowExerciseDetails(exercise.name)}
+                      >
+                        <HelpCircle className="h-4 w-4 text-blue-500" />
+                      </button>
                     </span>
                     <span className="text-muted-foreground font-medium shrink-0 bg-background px-2 py-0.5 rounded shadow-sm border">
                       {exercise.sets}×{exercise.reps}
@@ -147,85 +166,34 @@ const WorkoutList = ({ workouts, isToday = false, completingWorkout, handleCompl
 const Workouts = () => {
   const { user } = useAuth();
   const sb = supabase;
-  const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [upcomingWorkouts, setUpcomingWorkouts] = useState<any[]>([]);
+  
+  const todayDateString = getTodayDate();
+  const { data: profile } = useUserProfile(user?.id);
+  const { data: upcomingWorkouts = [] } = useWeeklyWorkouts(user?.id, todayDateString);
+  const { data: todaysData } = useTodaysWorkouts();
+  
+  const deleteMutation = useDeleteWorkout();
+  const createMutation = useCreateWorkout();
+  const completeWorkoutMutation = useCompleteWorkout();
+
   const [availableDays, setAvailableDays] = useState<string[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [configuredExercises, setConfiguredExercises] = useState<any[]>([]);
   const [addExerciseOpen, setAddExerciseOpen] = useState(false);
   const [exerciseDetailOpen, setExerciseDetailOpen] = useState(false);
+  const [machineScannerOpen, setMachineScannerOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedExercise, setSelectedExercise] = useState<any>(null);
   const [otherDaysOpen, setOtherDaysOpen] = useState(false);
-  const completeWorkoutMutation = useCompleteWorkout();
   
   const [formData, setFormData] = useState({
     name: "",
     location: "casa",
-    scheduled_date: getTodayDate(),
+    scheduled_date: todayDateString,
   });
   const [open, setOpen] = useState(false);
   const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false);
   const [completingWorkout, setCompletingWorkout] = useState<string | null>(null);
-
-  // Use backend API for today's workouts
-  const { data: todaysData, refetch: refetchTodays } = useTodaysWorkouts();
-
-  const fetchData = useCallback(async () => {
-    if (!user) return;
-    try {
-      const { data: profileData } = await sb
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-      setProfile(profileData);
-
-      const today = getTodayDate();
-      const { data: upcoming } = await sb
-        .from("workouts")
-        .select("*, workout_exercises(*)")
-        .eq("user_id", user.id)
-        .gte("scheduled_date", today)
-        .order("scheduled_date", { ascending: true });
-      
-      setUpcomingWorkouts(upcoming || []);
-    } catch (err) {
-      console.error(err);
-    }
-  }, [user, sb]);
-
-  useEffect(() => {
-    fetchData();
-  }, [user, fetchData]);
-
-  // Realtime subscription for workouts
-  useEffect(() => {
-    if (!user) return;
-
-    const channel = supabase
-      .channel('workouts-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'workouts',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          console.log('Workout changed:', payload);
-          refetchTodays();
-          fetchData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, fetchData, refetchTodays]);
 
   const fetchExercisesForDay = async (dayOfWeek: string, location: string) => {
     const query = sb.from("workout_exercises").select("*");
@@ -245,6 +213,27 @@ const Workouts = () => {
     setConfiguredExercises(configuredExercises.filter((_, i) => i !== index));
   };
 
+  const handleShowExerciseDetails = async (exerciseName: string) => {
+    const normalizedName = exerciseName.trim();
+    if (!normalizedName) return;
+
+    const { data, error } = await sb
+      .from("exercises")
+      .select("*")
+      .ilike("nombre", normalizedName)
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) {
+      console.error("Error fetching exercise details:", error);
+      toast.error("No se encontro informacion de este ejercicio");
+      return;
+    }
+
+    setSelectedExercise(data);
+    setExerciseDetailOpen(true);
+  };
+
   const getTotalCalories = () => {
     return configuredExercises.reduce((total, ex) => total + ex.estimatedCalories, 0);
   };
@@ -262,6 +251,7 @@ const Workouts = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!user?.id) return;
     if (configuredExercises.length === 0) {
       toast.error("Agrega al menos un ejercicio");
       return;
@@ -270,70 +260,50 @@ const Workouts = () => {
     const totalCalories = getTotalCalories();
     const totalDuration = getTotalDuration();
 
-    console.log('Fecha seleccionada en el formulario:', formData.scheduled_date);
+    const workoutObj = {
+      user_id: user.id,
+      name: formData.name,
+      location: formData.location,
+      estimated_calories: totalCalories,
+      duration_minutes: totalDuration,
+      scheduled_date: formData.scheduled_date,
+      completed: false,
+    };
 
-    const { data: workoutData, error: workoutError } = await sb
-      .from("workouts")
-      .insert([{
-        user_id: user.id,
-        name: formData.name,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        location: formData.location as any,
-        estimated_calories: totalCalories,
-        duration_minutes: totalDuration,
-        scheduled_date: formData.scheduled_date,
-        completed: false,
-      }])
-      .select()
-      .single();
-
-    console.log('Workout guardado:', workoutData);
-    console.log('Fecha guardada en DB:', workoutData?.scheduled_date);
-
-    if (workoutError) {
-      toast.error("Error al crear entrenamiento");
-      return;
-    }
-
-    // Insertar ejercicios
     const exercisesToInsert = configuredExercises.map(ex => ({
-      workout_id: workoutData.id,
       name: ex.exercise.nombre,
       sets: ex.series,
       reps: ex.repeticiones,
       notes: ex.peso > 0 ? `Peso: ${ex.peso}kg` : undefined
     }));
 
-    const { error: exercisesError } = await sb
-      .from("workout_exercises")
-      .insert(exercisesToInsert);
-
-    if (exercisesError) {
-      toast.error("Error al agregar ejercicios");
-      return;
+    try {
+      await createMutation.mutateAsync({ workout: workoutObj, exercises: exercisesToInsert });
+      toast.success("Entrenamiento creado");
+      setOpen(false);
+      setFormData({
+        name: "",
+        location: "casa",
+        scheduled_date: todayDateString,
+      });
+      setConfiguredExercises([]);
+    } catch (err) {
+      toast.error("Error al crear entrenamiento");
     }
-
-    toast.success("Entrenamiento creado");
-    setOpen(false);
-    setFormData({
-      name: "",
-      location: "casa",
-      scheduled_date: getTodayDate(),
-    });
-    setConfiguredExercises([]);
-    refetchTodays(); // Refetch today's workouts
-    fetchData();
   };
 
   const handleCompleteWorkout = async (id: string, completed: boolean) => {
     try {
+      setCompletingWorkout(id);
       await completeWorkoutMutation.mutateAsync({
         workoutId: id,
         completed: !completed,
       });
-      fetchData();
     } catch (e) {
       console.error(e);
+      toast.error("Error al completar entrenamiento");
+    } finally {
+      setCompletingWorkout(null);
     }
   };
 
@@ -345,17 +315,14 @@ const Workouts = () => {
   const handleDeleteWorkout = async (id: string) => {
     if (!confirm("¿Eliminar entrenamiento?")) return;
     try {
-      const { error } = await sb.from("workouts").delete().eq("id", id);
-      if (error) throw error;
+      await deleteMutation.mutateAsync(id);
       toast.success("Entrenamiento eliminado");
-      fetchData();
-      refetchTodays();
     } catch (e) {
       toast.error("Error al eliminar");
     }
   };
 
-  const today = getTodayDate();
+  const today = todayDateString;
   
   // Use backend data for today's workouts
   const todayWorkouts = todaysData?.workouts || [];
@@ -372,16 +339,7 @@ const Workouts = () => {
     4: 'Jueves', 5: 'Viernes', 6: 'Sábado', 7: 'Domingo'
   };
   
-  console.log('Workouts - Entrenamientos de hoy:', {
-    count: todayWorkouts.length,
-    todayWeekday,
-    workouts: todayWorkouts.map(w => ({ 
-      name: w.name, 
-      weekday: w.weekday, 
-      scheduled_date: w.scheduled_date,
-      plan_id: w.plan_id,
-    })),
-  });
+
   
   // Filter "other days" workouts to show workouts from other days of the week
   const otherDaysWorkouts = upcomingWorkouts.filter((w) => {
@@ -492,8 +450,21 @@ const Workouts = () => {
                       <div className="space-y-2">
                         {configuredExercises.map((ex, index) => (
                           <div key={`${ex.exercise.id}-${index}`} className="p-3 bg-muted rounded-lg flex items-start justify-between">
-                            <div className="flex-1">
-                              <p className="font-medium">{ex.exercise.nombre}</p>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex min-w-0 items-center gap-1.5">
+                                <p className="truncate font-medium">{ex.exercise.nombre}</p>
+                                <button
+                                  type="button"
+                                  className="shrink-0 rounded-full p-0.5 text-blue-500 transition-colors hover:bg-blue-500/10 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                  aria-label={`Ver informacion de ${ex.exercise.nombre}`}
+                                  onClick={() => {
+                                    setSelectedExercise(ex.exercise);
+                                    setExerciseDetailOpen(true);
+                                  }}
+                                >
+                                  <HelpCircle className="h-4 w-4 text-blue-500" />
+                                </button>
+                              </div>
                               <p className="text-sm text-muted-foreground">
                                 {ex.series} series × {ex.repeticiones} reps
                                 {ex.peso > 0 && ` • ${ex.peso}kg`}
@@ -552,6 +523,7 @@ const Workouts = () => {
                   "Historial de máquinas escaneadas"
                 ]}
                 className="w-full sm:w-auto"
+                onClick={() => setMachineScannerOpen(true)}
               />
               
               <ProButton
@@ -584,6 +556,12 @@ const Workouts = () => {
             exercise={selectedExercise}
           />
 
+          <GymMachineScanner
+            open={machineScannerOpen}
+            onOpenChange={setMachineScannerOpen}
+            fitnessLevel={profile?.fitness_level}
+          />
+
           <div className="space-y-4 sm:space-y-6">
             <div>
               <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-3">Entrenamientos de Hoy</h2>
@@ -602,6 +580,7 @@ const Workouts = () => {
                     handleCompleteWorkout={handleCompleteWorkout}
                     handleStartWorkout={handleStartWorkout}
                     handleDeleteWorkout={handleDeleteWorkout}
+                    handleShowExerciseDetails={handleShowExerciseDetails}
                   />
                 </TabsContent>
                 <TabsContent value="casa" className="mt-3 sm:mt-4">
@@ -612,6 +591,7 @@ const Workouts = () => {
                     handleCompleteWorkout={handleCompleteWorkout}
                     handleStartWorkout={handleStartWorkout}
                     handleDeleteWorkout={handleDeleteWorkout}
+                    handleShowExerciseDetails={handleShowExerciseDetails}
                   />
                 </TabsContent>
                 <TabsContent value="gimnasio" className="mt-3 sm:mt-4">
@@ -622,6 +602,7 @@ const Workouts = () => {
                     handleCompleteWorkout={handleCompleteWorkout}
                     handleStartWorkout={handleStartWorkout}
                     handleDeleteWorkout={handleDeleteWorkout}
+                    handleShowExerciseDetails={handleShowExerciseDetails}
                   />
                 </TabsContent>
                 <TabsContent value="exterior" className="mt-3 sm:mt-4">
@@ -632,6 +613,7 @@ const Workouts = () => {
                     handleCompleteWorkout={handleCompleteWorkout}
                     handleStartWorkout={handleStartWorkout}
                     handleDeleteWorkout={handleDeleteWorkout}
+                    handleShowExerciseDetails={handleShowExerciseDetails}
                   />
                 </TabsContent>
               </Tabs>
@@ -646,9 +628,9 @@ const Workouts = () => {
                       className="w-full justify-between hover:bg-transparent p-0 h-auto mb-2"
                     >
                       <div>
-                        <h3 className="text-lg font-medium">Ver otros días...</h3>
+                        <h3 className="text-lg font-medium">Próximos Entrenamientos</h3>
                         <p className="text-sm text-muted-foreground text-left">
-                          {otherDaysWorkouts.length} entrenamientos guardados recientemente
+                          {otherDaysWorkouts.length} entrenamientos programados esta semana
                         </p>
                       </div>
                       <ChevronDown
@@ -658,8 +640,8 @@ const Workouts = () => {
                       />
                     </Button>
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-3 mt-4">
-                    {otherDaysWorkouts.slice(0, 5).map((workout) => (
+                  <CollapsibleContent className="space-y-3 mt-4 max-h-[600px] overflow-y-auto">
+                    {otherDaysWorkouts.map((workout) => (
                       <Card
                         key={workout.id}
                         className={`p-4 ${
@@ -678,6 +660,15 @@ const Workouts = () => {
                               </button>
                               <div>
                                 <h4 className="font-medium text-sm">{workout.name}</h4>
+                                {workout.scheduled_date && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {new Date(workout.scheduled_date).toLocaleDateString('es-ES', {
+                                      weekday: 'short',
+                                      month: 'short',
+                                      day: 'numeric'
+                                    })}
+                                  </p>
+                                )}
                               </div>
                             </div>
                             <div className="flex gap-3 ml-7 text-xs text-muted-foreground">

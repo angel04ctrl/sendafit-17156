@@ -11,7 +11,7 @@
  */
 
 /** @deprecated Use useFeatureFlags().hasProAccess instead */
-export const DEV_MODE_PRO_ENABLED = false;
+export const DEV_MODE_PRO_ENABLED = import.meta.env.DEV;
 
 /** @deprecated Use useFeatureFlags().hasProAccess instead */
 export function hasProAccess(isProUser: boolean = false, hasDevOverride: boolean = false): boolean {

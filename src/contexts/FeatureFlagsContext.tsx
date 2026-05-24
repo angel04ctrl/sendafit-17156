@@ -62,6 +62,13 @@ const DEFAULT_RUNTIME: RuntimeFlags = {
   showDevTools: false,
 };
 
+const LOCAL_DEV_MODE_KEY = "sendafit_dev_mode";
+
+function getLocalDevMode(): boolean {
+  if (!import.meta.env.DEV || typeof window === "undefined") return false;
+  return window.localStorage.getItem(LOCAL_DEV_MODE_KEY) !== "false";
+}
+
 // ── Context ───────────────────────────────────────────
 
 const FeatureFlagsContext = createContext<FeatureFlagsState | undefined>(undefined);
@@ -71,6 +78,7 @@ export const FeatureFlagsProvider = ({ children }: { children: React.ReactNode }
   const [global, setGlobal] = useState<GlobalFlags>(DEFAULT_GLOBAL);
   const [userFlags, setUserFlags] = useState<UserFlags>(DEFAULT_USER);
   const [runtime, setRuntime] = useState<RuntimeFlags>(DEFAULT_RUNTIME);
+  const [localDevMode] = useState(getLocalDevMode);
   const [loading, setLoading] = useState(true);
 
   // Load global flags from app_config
@@ -179,14 +187,28 @@ export const FeatureFlagsProvider = ({ children }: { children: React.ReactNode }
     checkSubscription();
   }, [user?.id]);
 
-  const hasProAccess = userFlags.isPro || userFlags.devMode;
+  const effectiveUserFlags = {
+    ...userFlags,
+    devMode: userFlags.devMode || localDevMode,
+  };
+
+  const effectiveGlobalFlags = localDevMode
+    ? {
+        aiEnabled: true,
+        foodAIEnabled: true,
+        gymAIEnabled: true,
+        coachAIEnabled: true,
+      }
+    : global;
+
+  const hasProAccess = effectiveUserFlags.isPro || effectiveUserFlags.devMode;
 
   const canAccess = useCallback(
     (globalFlag: keyof GlobalFlags): boolean => {
       // Global flag must be on AND user must have pro access
-      return global[globalFlag] && hasProAccess;
+      return effectiveGlobalFlags[globalFlag] && hasProAccess;
     },
-    [global, hasProAccess]
+    [effectiveGlobalFlags, hasProAccess]
   );
 
   const setRuntimeFlag = useCallback((key: keyof RuntimeFlags, value: boolean) => {
@@ -196,8 +218,8 @@ export const FeatureFlagsProvider = ({ children }: { children: React.ReactNode }
   return (
     <FeatureFlagsContext.Provider
       value={{
-        global,
-        user: userFlags,
+        global: effectiveGlobalFlags,
+        user: effectiveUserFlags,
         runtime,
         loading,
         canAccess,

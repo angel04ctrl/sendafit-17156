@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -631,7 +631,9 @@ export type Database = {
       }
       progress_logs: {
         Row: {
+          body_fat_percentage: number | null
           created_at: string
+          energy_level: number | null
           id: string
           log_date: string
           notes: string | null
@@ -639,7 +641,9 @@ export type Database = {
           weight: number | null
         }
         Insert: {
+          body_fat_percentage?: number | null
           created_at?: string
+          energy_level?: number | null
           id?: string
           log_date?: string
           notes?: string | null
@@ -647,7 +651,9 @@ export type Database = {
           weight?: number | null
         }
         Update: {
+          body_fat_percentage?: number | null
           created_at?: string
+          energy_level?: number | null
           id?: string
           log_date?: string
           notes?: string | null

@@ -36,6 +36,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { FoodAnalysisModal } from "@/components/ai/FoodAnalysisModal";
 import { useFeatureFlags } from "@/contexts/FeatureFlagsContext";
+import { useMealsHistory } from "@/hooks/useBackendApi";
+import { MealHistorySection } from "@/components/MealHistorySection";
 
 const mealTypes = [
   { value: "desayuno", label: "Desayuno" },
@@ -50,6 +52,10 @@ const Macros = () => {
   const { canAccess } = useFeatureFlags();
   const isMobile = useIsMobile();
   const sb = supabase;
+  
+  // Obtener todas las comidas para el historial
+  const { data: allMeals = [] } = useMealsHistory(undefined, undefined, user?.id);
+  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [meals, setMeals] = useState<any[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -617,6 +623,15 @@ const Macros = () => {
                     )}
                   </Card>
                 ))}
+
+                {/* Historial de comidas */}
+                <div className="mt-8 pt-8 border-t">
+                  <MealHistorySection 
+                    meals={allMeals}
+                    onDeleteMeal={handleDelete}
+                    isLoading={false}
+                  />
+                </div>
               </div>
             </>
           )}

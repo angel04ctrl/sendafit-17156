@@ -229,8 +229,6 @@ const OnboardingForm = () => {
         // Usuario ya existe, solo crear/actualizar perfil
         userId = existingUser.id;
         userFullName = formData.fullName || existingUser.user_metadata?.full_name || existingUser.email?.split('@')[0] || 'Usuario';
-        
-        console.log("Usuario autenticado encontrado, actualizando perfil:", userId);
       } else {
         // No hay usuario autenticado, verificar registro pendiente
         const pendingRegString = sessionStorage.getItem('pendingRegistration');
@@ -264,8 +262,6 @@ const OnboardingForm = () => {
         
         userId = authData.user.id;
         userFullName = formData.fullName || pendingReg.fullName;
-        
-        console.log("Nuevo usuario creado:", userId);
       }
 
       // PASO 2: Calcular macros automáticamente basados en el perfil
@@ -290,7 +286,6 @@ const OnboardingForm = () => {
           fitnessGoal: formData.primaryGoal
         });
         
-        console.log("Macros calculados automáticamente:", calculatedMacros);
       }
 
       // PASO 3: Crear o actualizar el perfil completo en la base de datos
@@ -380,7 +375,6 @@ const OnboardingForm = () => {
           console.error("Error al asignar rutina:", routineError);
           toast.warning("Cuenta creada, pero hubo un error al asignar tu rutina. Puedes asignarla después desde el dashboard.");
         } else {
-          console.log("Rutina asignada:", routineData);
           toast.success(`¡Cuenta creada! Se te asignó el plan: ${routineData.plan?.nombre_plan || 'personalizado'} 🎉`);
         }
       } catch (error) {

@@ -111,18 +111,24 @@ serve(async (req) => {
       exercisesByPlanDay[pe.dia].push(pe.exercises);
     });
 
-    // Map plan days to actual user selected weekdays
+    // Map ordered plan slots to ordered user selected weekdays without modulo rotation.
     const selectedDays = profile.available_weekdays as string[] || [];
     const planDays = Object.keys(exercisesByPlanDay).map(Number).sort((a, b) => a - b);
+    const selectedWeekdays = selectedDays
+      .map((dayCode) => dayMap[dayCode])
+      .filter((weekday) => Number.isInteger(weekday))
+      .sort((a, b) => a - b);
     
     // Create mapping: actual weekday number -> exercises
     const mappedDays: { [key: number]: Record<string, unknown>[] } = {};
-    selectedDays.forEach((dayCode, index) => {
-      const weekday = dayMap[dayCode];
-      if (weekday && planDays.length > 0) {
-        const planDayIndex = index % planDays.length;
-        const planDay = planDays[planDayIndex];
+    const missingPlanDays: number[] = [];
+    selectedWeekdays.forEach((weekday, index) => {
+      const planDay = planDays[index];
+
+      if (planDay && exercisesByPlanDay[planDay]?.length) {
         mappedDays[weekday] = exercisesByPlanDay[planDay];
+      } else {
+        missingPlanDays.push(weekday);
       }
     });
 
@@ -130,6 +136,8 @@ serve(async (req) => {
     const routine = {
       ...plan,
       days: mappedDays,
+      missing_plan_days: missingPlanDays,
+      available_plan_days: planDays,
     };
 
     console.log(`Retrieved routine '${plan.nombre_plan}' for user ${user.id}`);

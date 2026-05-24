@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Tables } from "@/integrations/supabase/types";
+import { HelpCircle } from "lucide-react";
+import { ExerciseDetailModal } from "@/components/ExerciseDetailModal";
 
 interface Exercise {
   id: string;
@@ -17,6 +19,11 @@ interface Exercise {
   nivel: string;
   tipo_entrenamiento: string;
   calorias_por_repeticion?: number;
+  video?: string | null;
+  imagen?: string | null;
+  series_sugeridas?: number | null;
+  repeticiones_sugeridas?: number | null;
+  equipamiento?: string | null;
 }
 
 export interface ConfiguredExercise {
@@ -48,6 +55,7 @@ export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location 
   const [muscleGroupFilter, setMuscleGroupFilter] = useState<string>("all");
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [exerciseDetailOpen, setExerciseDetailOpen] = useState(false);
 
   const fetchExercises = useCallback(async () => {
     // Traer TODOS los ejercicios sin filtrar por ubicación
@@ -268,7 +276,17 @@ export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location 
           {selectedExercise && (
             <>
               <div className="p-3 bg-muted rounded-lg text-sm">
-                <p className="font-medium mb-1">{selectedExercise.nombre}</p>
+                <div className="mb-1 flex min-w-0 items-center gap-1.5">
+                  <p className="truncate font-medium">{selectedExercise.nombre}</p>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-full p-0.5 text-blue-500 transition-colors hover:bg-blue-500/10 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    aria-label={`Ver informacion de ${selectedExercise.nombre}`}
+                    onClick={() => setExerciseDetailOpen(true)}
+                  >
+                    <HelpCircle className="h-4 w-4 text-blue-500" />
+                  </button>
+                </div>
                 <p className="text-muted-foreground text-xs">{selectedExercise.descripcion}</p>
                 <p className="text-xs mt-2">
                   <span className="font-medium">Grupo muscular:</span> {selectedExercise.grupo_muscular}
@@ -321,6 +339,11 @@ export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location 
           )}
         </div>
       </DialogContent>
+      <ExerciseDetailModal
+        open={exerciseDetailOpen}
+        onOpenChange={setExerciseDetailOpen}
+        exercise={selectedExercise}
+      />
     </Dialog>
   );
 };

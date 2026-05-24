@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Lock } from "lucide-react";
 
 interface FeatureGateProps {
+  /** Named feature shortcuts */
+  feature?: "advanced_stats";
   /** Global flag that must be enabled */
   flag?: "aiEnabled" | "foodAIEnabled" | "gymAIEnabled" | "coachAIEnabled";
   /** Only require pro access (no global flag check) */
@@ -33,6 +35,7 @@ const DefaultFallback = ({ label }: { label?: string }) => (
 );
 
 export const FeatureGate = ({
+  feature,
   flag,
   requirePro = false,
   fallback,
@@ -43,7 +46,9 @@ export const FeatureGate = ({
 
   let allowed = true;
 
-  if (flag) {
+  if (feature === "advanced_stats") {
+    allowed = hasProAccess;
+  } else if (flag) {
     allowed = canAccess(flag);
   } else if (requirePro) {
     allowed = hasProAccess;

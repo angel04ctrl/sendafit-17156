@@ -12,6 +12,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import {
   assignRoutine,
@@ -25,8 +26,10 @@ import {
   getAllWorkouts,
   completeWorkout,
   getPredesignedPlans,
+  fetchMonthlyReport,
   redistributeWorkouts,
   validatePlanChange,
+  type MonthlyReportParams,
   type ProgressData
 } from '@/lib/api/backend';
 
@@ -94,37 +97,7 @@ export const useWorkoutsByDate = (params?: {
   });
 };
 
-/**
- * Hook para generar entrenamientos semanales
- * Este hook unifica la asignación y redistribución de entrenamientos
- * Invalida todas las queries relacionadas al completarse
- */
-export const useGenerateWeeklyWorkouts = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (options?: { reassign?: boolean }) => {
-      const { data, error } = await supabase.functions.invoke('generate-weekly-workouts', {
-        body: options || {}
-      });
-      
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: async (data) => {
-      // Invalidar todas las queries relacionadas con entrenamientos
-      queryClient.invalidateQueries({ queryKey: ['user-routine'] });
-      queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
-      queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
-      queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
-      
-      // Mostrar mensaje de confirmación si se eliminaron entrenamientos
-      if (data?.workouts_deleted && data.workouts_deleted > 0) {
-        toast.success(`Se eliminaron ${data.workouts_deleted} entrenamientos anteriores y se crearon ${data.workouts_created} nuevos entrenamientos`);
-      }
-    },
-  });
-};
+
 
 /**
  * Hook para asignar una rutina al usuario actual
@@ -204,6 +177,19 @@ export const useProgressStats = (days: number = 30) => {
 };
 
 /**
+ * Hook para obtener el reporte mensual avanzado
+ * Devuelve datos diarios listos para Recharts
+ */
+export const useMonthlyReport = (params: MonthlyReportParams) => {
+  return useQuery({
+    queryKey: ['monthly-report', params.startDate, params.endDate],
+    queryFn: () => fetchMonthlyReport(params),
+    enabled: !!params.startDate && !!params.endDate,
+    staleTime: 10 * 60 * 1000,
+  });
+};
+
+/**
  * Hook para obtener rutinas disponibles
  * Soporta filtros por ubicación y límite de resultados
  */
@@ -269,6 +255,159 @@ export const usePredesignedPlans = (filters?: {
   });
 };
 
+export const useUserProfile = (userId: string | undefined) => {
+  return useQuery({
+    queryKey: ['user-profile', userId],
+    queryFn: async () => {
+      if (!userId) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+export const useWeeklyWorkouts = (userId: string | undefined, startDate: string) => {
+  return useQuery({
+    queryKey: ['weekly-workouts', userId, startDate],
+    queryFn: async () => {
+      if (!userId) return [];
+      const { data, error } = await supabase
+        .from('workouts')
+        .select('*, workout_exercises(*)')
+        .eq('user_id', userId)
+        .gte('scheduled_date', startDate)
+        .order('scheduled_date', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!userId && !!startDate,
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+export const useDeleteWorkout = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('workouts').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['weekly-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
+      queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
+    }
+  });
+};
+
+export const useCreateWorkout = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mutationFn: async ({ workout, exercises }: { workout: any, exercises: any[] }) => {
+      const { data: workoutData, error: workoutError } = await supabase
+        .from('workouts')
+        .insert([workout])
+        .select()
+        .single();
+
+      if (workoutError) throw workoutError;
+
+      if (exercises.length > 0) {
+        const exercisesToInsert = exercises.map(ex => ({
+          ...ex,
+          workout_id: workoutData.id
+        }));
+        const { error: exercisesError } = await supabase
+          .from('workout_exercises')
+          .insert(exercisesToInsert);
+        
+        if (exercisesError) throw exercisesError;
+      }
+      
+      return workoutData;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['weekly-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
+      queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
+    }
+  });
+};
+
+/**
+ * Hook para obtener entrenamientos de un rango de fechas (Calendario)
+ * Consulta directamente la tabla workouts para máxima fiabilidad
+ * Ordena por scheduled_date para vista ordenada
+ */
+export const useWeeklyCalendarWorkouts = (startDate: string, endDate: string, userId?: string) => {
+  const { user } = useAuth();
+  const finalUserId = userId || user?.id;
+  
+  return useQuery({
+    queryKey: ['weekly-calendar-workouts', finalUserId, startDate, endDate],
+    queryFn: async () => {
+      if (!finalUserId) return [];
+      const { data, error } = await supabase
+        .from('workouts')
+        .select('*, workout_exercises(*)')
+        .eq('user_id', finalUserId)
+        .gte('scheduled_date', startDate)
+        .lte('scheduled_date', endDate)
+        .order('scheduled_date', { ascending: true })
+        .order('weekday', { ascending: true });
+      
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!finalUserId && !!startDate && !!endDate,
+    staleTime: 2 * 60 * 1000, // 2 minutos de cache
+  });
+};
+
+/**
+ * Hook para obtener comidas de un rango de fechas (Historial de Comidas)
+ * Soporta filtros por usuario y rango de fechas
+ */
+export const useMealsHistory = (startDate?: string, endDate?: string, userId?: string) => {
+  const { user } = useAuth();
+  const finalUserId = userId || user?.id;
+  
+  return useQuery({
+    queryKey: ['meals-history', finalUserId, startDate, endDate],
+    queryFn: async () => {
+      if (!finalUserId) return [];
+      let query = supabase
+        .from('meals')
+        .select('*')
+        .eq('user_id', finalUserId)
+        .order('date', { ascending: false });
+      
+      if (startDate) {
+        query = query.gte('date', startDate);
+      }
+      if (endDate) {
+        query = query.lte('date', endDate);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!finalUserId,
+    staleTime: 2 * 60 * 1000, // 2 minutos de cache
+  });
+};
+
 /**
  * Hook para validar cambios de plan
  * Valida si se pueden hacer cambios sin perder progreso
@@ -286,4 +425,80 @@ export const useValidatePlanChange = () => {
  */
 export const useRedistributeWorkouts = () => {
   return useGenerateWeeklyWorkouts();
+};
+
+/**
+ * Hook para generar entrenamientos semanales CON REINTENTOS
+ */
+export const useGenerateWeeklyWorkouts = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (options?: { reassign?: boolean; retries?: number }) => {
+      const userLocalDate = new Date().toISOString().split('T')[0];
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const maxRetries = options?.retries || 3;
+      let lastError: unknown;
+
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`Generating workouts - Attempt ${attempt}/${maxRetries}`);
+          
+          const { data, error } = await supabase.functions.invoke('generate-weekly-workouts', {
+            body: { 
+              ...options, 
+              userLocalDate, 
+              userTimezone,
+              attempt // Pasar el número de intento
+            }
+          });
+          
+          if (error) {
+            lastError = error;
+            console.error(`Attempt ${attempt} failed:`, error);
+            
+            if (attempt < maxRetries) {
+              // Esperar progresivamente más entre reintentos
+              await new Promise(resolve => 
+                setTimeout(resolve, 1000 * attempt)
+              );
+              continue; // Reintentar
+            }
+          } else {
+            return data; // Éxito
+          }
+        } catch (err) {
+          lastError = err;
+          console.error(`Attempt ${attempt} threw exception:`, err);
+          
+          if (attempt < maxRetries) {
+            await new Promise(resolve => 
+              setTimeout(resolve, 1000 * attempt)
+            );
+            continue;
+          }
+        }
+      }
+
+      throw lastError;
+    },
+    onSuccess: async (data) => {
+      queryClient.invalidateQueries({ queryKey: ['user-routine'] });
+      queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
+      queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
+      
+      if (data?.workouts_deleted && data.workouts_deleted > 0) {
+        toast.success(
+          `✅ Entrenamientos actualizados: ${data.workouts_created} nuevos`
+        );
+      }
+    },
+    onError: (error: unknown) => {
+      console.error('All retry attempts failed:', error);
+      toast.error(
+        'No se pudieron generar tus entrenamientos. Por favor intenta más tarde.'
+      );
+    }
+  });
 };

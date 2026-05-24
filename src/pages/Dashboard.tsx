@@ -12,13 +12,13 @@
  */
 
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { StatCard } from "@/components/StatCard";
-import { Flame, Activity, Target, TrendingUp, BarChart3, Sparkles, Lock } from "lucide-react";
+import { Flame, Activity, Target, TrendingUp, BarChart3 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ProButton } from "@/components/ProButton";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -28,12 +28,11 @@ import { RoutineManager } from "@/components/RoutineManager";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DashboardMobileCarousel } from "@/components/DashboardMobileCarousel";
 import { useTodaysWorkouts } from "@/hooks/useBackendApi";
-import { useFeatureFlags } from "@/contexts/FeatureFlagsContext";
 
 const Dashboard = () => {
   // Hook de autenticación
   const { user } = useAuth();
-  const { hasProAccess } = useFeatureFlags();
+  const navigate = useNavigate();
   const sb = supabase as any;
   // Estados de datos del usuario
   const [profile, setProfile] = useState<any>(null);
@@ -44,6 +43,7 @@ const Dashboard = () => {
   // Hook para obtener entrenamientos del día desde backend API
   const { data: todaysData } = useTodaysWorkouts();
   const todayWorkouts = todaysData?.workouts || [];
+  const goToReports = () => navigate("/reports");
 
   // Bloque de carga inicial - Obtiene perfil del usuario y comidas del día
   useEffect(() => {
@@ -58,11 +58,7 @@ const Dashboard = () => {
           .eq("id", user.id)
           .single();
 
-        console.log('Dashboard - Perfil del usuario:', {
-          available_weekdays: profileData?.available_weekdays,
-          assigned_routine_id: profileData?.assigned_routine_id,
-          available_days_per_week: profileData?.available_days_per_week,
-        });
+
 
         setProfile(profileData);
 
@@ -112,7 +108,6 @@ const Dashboard = () => {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('Workout changed:', payload);
           // React Query will auto-refetch
         }
       )
@@ -228,14 +223,23 @@ const Dashboard = () => {
           ]}
           variant="outline"
           className="w-full"
+          onClick={goToReports}
         />
-        <Button variant="outline" className="gap-2 w-full" disabled={!hasProAccess}>
-          <TrendingUp className="w-4 h-4" />
-          Reportes Mensuales
-          <Badge variant={hasProAccess ? "secondary" : "default"} className="ml-auto text-xs gap-1">
-            {hasProAccess ? <><Sparkles className="w-3 h-3" /> Activo</> : <><Lock className="w-3 h-3" /> PRO</>}
-          </Badge>
-        </Button>
+        <ProButton
+          icon={TrendingUp}
+          label="Reportes Mensuales"
+          featureTitle="Reportes Mensuales"
+          featureDescription="Consulta un resumen mensual de entrenamientos, calorías, energía, peso y macros."
+          features={[
+            "Resumen mensual de cumplimiento",
+            "Tendencias de peso y energía",
+            "Calorías quemadas y consumidas",
+            "Totales de macros del periodo"
+          ]}
+          variant="outline"
+          className="w-full"
+          onClick={goToReports}
+        />
       </div>
     </Card>,
 
@@ -445,14 +449,23 @@ const Dashboard = () => {
                   ]}
                   variant="outline"
                   className="w-full"
+                  onClick={goToReports}
                 />
-                <Button variant="outline" className="gap-2 w-full" disabled={!hasProAccess}>
-                  <TrendingUp className="w-4 h-4" />
-                  Reportes Mensuales
-                  <Badge variant={hasProAccess ? "secondary" : "default"} className="ml-auto gap-1">
-                    {hasProAccess ? <><Sparkles className="w-3 h-3" /> Activo</> : <><Lock className="w-3 h-3" /> PRO</>}
-                  </Badge>
-                </Button>
+                <ProButton
+                  icon={TrendingUp}
+                  label="Reportes Mensuales"
+                  featureTitle="Reportes Mensuales"
+                  featureDescription="Consulta un resumen mensual de entrenamientos, calorías, energía, peso y macros."
+                  features={[
+                    "Resumen mensual de cumplimiento",
+                    "Tendencias de peso y energía",
+                    "Calorías quemadas y consumidas",
+                    "Totales de macros del periodo"
+                  ]}
+                  variant="outline"
+                  className="w-full"
+                  onClick={goToReports}
+                />
               </div>
             </Card>
 

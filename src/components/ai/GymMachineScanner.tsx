@@ -1,66 +1,57 @@
-/**
- * GymMachineScanner.tsx - Escáner de máquinas de gimnasio con IA
- * 
- * Permite al usuario:
- * - Tomar foto o subir imagen de una máquina de gym
- * - Identificar la máquina con IA
- * - Ver músculos trabajados, instrucciones y tips
- * - Guardar en historial de consultas
- */
-
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Camera, Upload, Loader2, Dumbbell, Target, BookOpen, AlertCircle, Sparkles, X } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Camera, Upload, Loader2, Dumbbell, Target, BookOpen, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface MachineAnalysis {
   machineName: string;
-  machineType: string;
-  primaryMuscles: string[];
-  secondaryMuscles: string[];
-  usageInstructions: string[];
-  postureTips: string[];
-  relatedExercises: Array<{
-    name: string;
-    description: string;
-  }>;
-  confidence: number;
+  primaryMuscle: string;
+  setupSteps: string[];
+  exercises: {
+    principiante: string[];
+    intermedio: string[];
+    avanzado: string[];
+  };
 }
 
 interface GymMachineScannerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  fitnessLevel?: string | null;
 }
 
-export function GymMachineScanner({ open, onOpenChange }: GymMachineScannerProps) {
+const loadingMessages = [
+  "Subiendo imagen segura...",
+  "Analizando biomecanica...",
+  "Identificando grupo muscular...",
+  "Preparando recomendaciones...",
+];
+
+export function GymMachineScanner({ open, onOpenChange, fitnessLevel }: GymMachineScannerProps) {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [step, setStep] = useState<"capture" | "analyzing" | "results">("capture");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [analysis, setAnalysis] = useState<MachineAnalysis | null>(null);
+  const [loadingIndex, setLoadingIndex] = useState(0);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      processFile(file);
-    }
-  };
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  const processFile = (file: File) => {
     setImageFile(file);
     const reader = new FileReader();
-    reader.onload = (e) => {
-      setImagePreview(e.target?.result as string);
-    };
+    reader.onload = (readerEvent) => setImagePreview(readerEvent.target?.result as string);
     reader.readAsDataURL(file);
   };
 
@@ -68,93 +59,82 @@ export function GymMachineScanner({ open, onOpenChange }: GymMachineScannerProps
     if (!imageFile || !user) return;
 
     setStep("analyzing");
+    setLoadingIndex(0);
+
+    const loadingTimer = window.setInterval(() => {
+      setLoadingIndex((current) => (current + 1) % loadingMessages.length);
+    }, 1400);
 
     try {
-      // Convert image to base64
-      const base64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          const base64Data = result.split(",")[1];
-          resolve(base64Data);
-        };
-        reader.readAsDataURL(imageFile);
+      const extension = imageFile.name.split(".").pop() || "jpg";
+      const fileName = `${user.id}/${Date.now()}-machine.${extension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("ai-analysis-images")
+        .upload(fileName, imageFile, {
+          contentType: imageFile.type || "image/jpeg",
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: signedData, error: signedError } = await supabase.storage
+        .from("ai-analysis-images")
+        .createSignedUrl(fileName, 60 * 10);
+
+      if (signedError || !signedData?.signedUrl) {
+        throw signedError || new Error("No se pudo preparar la imagen.");
+      }
+
+      const { data, error } = await supabase.functions.invoke("analyze-machine", {
+        body: {
+          imageUrl: signedData.signedUrl,
+          fitness_level: fitnessLevel || "principiante",
+        },
       });
 
-      // Call edge function
-      const { data: session } = await supabase.auth.getSession();
-      if (!session.session) {
-        throw new Error("No session");
+      if (error) throw error;
+      if (!data?.success || !data.analysis) {
+        throw new Error("No se pudo identificar la maquina.");
       }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-gym-machine`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.session.access_token}`,
-          },
-          body: JSON.stringify({ imageBase64: base64 }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Error al analizar");
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.analysis) {
-        setAnalysis(data.analysis);
-        setStep("results");
-
-        // Save to history
-        await saveToHistory(data.analysis);
-      } else {
-        throw new Error("No se pudo identificar la máquina");
-      }
+      setAnalysis(data.analysis);
+      setStep("results");
+      await saveToHistory(fileName, data.analysis);
     } catch (error) {
-      console.error("Analysis error:", error);
+      console.error("Machine analysis error:", error);
       toast.error(error instanceof Error ? error.message : "Error al analizar la imagen");
       setStep("capture");
+    } finally {
+      window.clearInterval(loadingTimer);
     }
   };
 
-  const saveToHistory = async (analysisData: MachineAnalysis) => {
-    if (!user || !imageFile) return;
+  const saveToHistory = async (fileName: string, analysisData: MachineAnalysis) => {
+    if (!user) return;
 
     try {
-      // Upload image to storage
-      const fileName = `${user.id}/${Date.now()}-machine.jpg`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { data: urlData } = supabase.storage
         .from("ai-analysis-images")
-        .upload(fileName, imageFile);
+        .getPublicUrl(fileName);
 
-      let imageUrl = "";
-      if (!uploadError && uploadData) {
-        const { data: urlData } = supabase.storage
-          .from("ai-analysis-images")
-          .getPublicUrl(fileName);
-        imageUrl = urlData.publicUrl;
-      }
+      const relatedExercises = Object.entries(analysisData.exercises).flatMap(([level, exercises]) =>
+        exercises.map((name) => ({ name, description: `Nivel ${level}` })),
+      );
 
-      // Save to machine_scan_history
-      const sb = supabase;
-      await sb.from("machine_scan_history").insert({
+      await supabase.from("machine_scan_history").insert({
         user_id: user.id,
-        image_url: imageUrl,
+        image_url: urlData.publicUrl,
         machine_name: analysisData.machineName,
-        machine_type: analysisData.machineType,
-        primary_muscles: analysisData.primaryMuscles,
-        secondary_muscles: analysisData.secondaryMuscles,
-        usage_instructions: analysisData.usageInstructions.join("\n"),
-        posture_tips: analysisData.postureTips.join("\n"),
-        related_exercises: analysisData.relatedExercises,
+        machine_type: analysisData.primaryMuscle,
+        primary_muscles: [analysisData.primaryMuscle],
+        secondary_muscles: [],
+        usage_instructions: analysisData.setupSteps.join("\n"),
+        posture_tips: [],
+        related_exercises: relatedExercises,
       });
     } catch (error) {
-      console.error("Error saving to history:", error);
+      console.error("Error saving machine scan history:", error);
     }
   };
 
@@ -163,50 +143,61 @@ export function GymMachineScanner({ open, onOpenChange }: GymMachineScannerProps
     setImagePreview(null);
     setImageFile(null);
     setAnalysis(null);
+    setLoadingIndex(0);
   };
 
+  const renderExerciseList = (items: string[]) => (
+    <ul className="space-y-2">
+      {items.map((item) => (
+        <li key={item} className="flex gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm">
+          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
-    <Dialog open={open} onOpenChange={(open) => {
-      onOpenChange(open);
-      if (!open) resetState();
-    }}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        onOpenChange(nextOpen);
+        if (!nextOpen) resetState();
+      }}
+    >
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Dumbbell className="w-5 h-5 text-primary" />
-            Identificar Máquina de Gym
+            <Dumbbell className="h-5 w-5 text-primary" />
+            Identificar maquina de gym
           </DialogTitle>
         </DialogHeader>
 
         {step === "capture" && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Toma una foto de cualquier máquina de gimnasio y obtén instrucciones de uso detalladas.
+              Toma una foto clara de la maquina para recibir ajustes, tecnica y ejercicios por nivel.
             </p>
 
             {imagePreview ? (
               <div className="space-y-4">
-                <div className="relative rounded-xl overflow-hidden aspect-video bg-muted">
-                  <img
-                    src={imagePreview}
-                    alt="Vista previa"
-                    className="w-full h-full object-cover"
-                  />
+                <div className="relative aspect-video overflow-hidden rounded-lg bg-muted">
+                  <img src={imagePreview} alt="Vista previa" className="h-full w-full object-cover" />
                   <Button
                     variant="destructive"
                     size="icon"
-                    className="absolute top-2 right-2"
+                    className="absolute right-2 top-2"
                     onClick={() => {
                       setImagePreview(null);
                       setImageFile(null);
                     }}
                   >
-                    <X className="w-4 h-4" />
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
                 <Button onClick={analyzeImage} className="w-full gap-2">
-                  <Sparkles className="w-4 h-4" />
-                  Identificar Máquina
+                  <Sparkles className="h-4 w-4" />
+                  Identificar maquina
                 </Button>
               </div>
             ) : (
@@ -228,23 +219,23 @@ export function GymMachineScanner({ open, onOpenChange }: GymMachineScannerProps
                 />
 
                 <Card
-                  className="p-6 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="flex cursor-pointer flex-col items-center justify-center gap-3 p-6 transition-colors hover:bg-muted/50"
                   onClick={() => cameraInputRef.current?.click()}
                 >
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Camera className="w-6 h-6 text-primary" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                    <Camera className="h-6 w-6 text-primary" />
                   </div>
-                  <span className="text-sm font-medium">Tomar Foto</span>
+                  <span className="text-sm font-medium">Tomar foto</span>
                 </Card>
 
                 <Card
-                  className="p-6 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="flex cursor-pointer flex-col items-center justify-center gap-3 p-6 transition-colors hover:bg-muted/50"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center">
-                    <Upload className="w-6 h-6 text-secondary-foreground" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary/10">
+                    <Upload className="h-6 w-6 text-secondary-foreground" />
                   </div>
-                  <span className="text-sm font-medium">Subir Imagen</span>
+                  <span className="text-sm font-medium">Subir imagen</span>
                 </Card>
               </div>
             )}
@@ -252,128 +243,76 @@ export function GymMachineScanner({ open, onOpenChange }: GymMachineScannerProps
         )}
 
         {step === "analyzing" && (
-          <div className="py-12 flex flex-col items-center justify-center gap-4">
+          <div className="flex flex-col items-center justify-center gap-4 py-12">
             <div className="relative">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <Dumbbell className="w-8 h-8 text-primary" />
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                <Dumbbell className="h-8 w-8 text-primary" />
               </div>
-              <Loader2 className="w-6 h-6 text-primary absolute -top-1 -right-1 animate-spin" />
+              <Loader2 className="absolute -right-1 -top-1 h-6 w-6 animate-spin text-primary" />
             </div>
             <div className="text-center">
-              <p className="font-medium">Identificando máquina...</p>
-              <p className="text-sm text-muted-foreground">Analizando imagen y buscando información</p>
+              <p className="font-medium">{loadingMessages[loadingIndex]}</p>
+              <p className="text-sm text-muted-foreground">Esto puede tardar unos segundos</p>
             </div>
           </div>
         )}
 
         {step === "results" && analysis && (
-          <ScrollArea className="max-h-[60vh]">
+          <ScrollArea className="max-h-[65vh]">
             <div className="space-y-4 pr-4">
-              {/* Image preview */}
               {imagePreview && (
-                <div className="rounded-xl overflow-hidden aspect-video bg-muted">
-                  <img src={imagePreview} alt="Máquina" className="w-full h-full object-cover" />
+                <div className="aspect-video overflow-hidden rounded-lg bg-muted">
+                  <img src={imagePreview} alt="Maquina analizada" className="h-full w-full object-cover" />
                 </div>
               )}
 
-              {/* Machine name and type */}
               <div>
                 <h2 className="text-xl font-bold">{analysis.machineName}</h2>
-                <Badge variant="secondary" className="mt-1">{analysis.machineType}</Badge>
-                {analysis.confidence < 0.7 && (
-                  <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    Identificación con baja confianza
-                  </p>
-                )}
+                <Badge variant="secondary" className="mt-1 gap-1">
+                  <Target className="h-3 w-3" />
+                  {analysis.primaryMuscle}
+                </Badge>
               </div>
 
-              {/* Muscles */}
               <Card className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Target className="w-5 h-5 text-primary" />
-                  <h3 className="font-semibold">Músculos Trabajados</h3>
-                </div>
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Principales</p>
-                    <div className="flex flex-wrap gap-1">
-                      {analysis.primaryMuscles.map((muscle, i) => (
-                        <Badge key={i} variant="default">{muscle}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                  {analysis.secondaryMuscles.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Secundarios</p>
-                      <div className="flex flex-wrap gap-1">
-                        {analysis.secondaryMuscles.map((muscle, i) => (
-                          <Badge key={i} variant="outline">{muscle}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Card>
-
-              {/* Usage instructions */}
-              <Card className="p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <BookOpen className="w-5 h-5 text-primary" />
-                  <h3 className="font-semibold">Cómo Usarla</h3>
+                <div className="mb-3 flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                  <h3 className="font-semibold">Ajuste y ejecucion</h3>
                 </div>
                 <ol className="space-y-2 text-sm">
-                  {analysis.usageInstructions.map((instruction, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-medium">
-                        {i + 1}
+                  {analysis.setupSteps.map((stepText, index) => (
+                    <li key={`${stepText}-${index}`} className="flex gap-2">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                        {index + 1}
                       </span>
-                      <span>{instruction}</span>
+                      <span>{stepText}</span>
                     </li>
                   ))}
                 </ol>
               </Card>
 
-              {/* Posture tips */}
-              {analysis.postureTips.length > 0 && (
-                <Card className="p-4 border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/20">
-                  <div className="flex items-center gap-2 mb-3">
-                    <AlertCircle className="w-5 h-5 text-amber-600" />
-                    <h3 className="font-semibold">Consejos de Postura</h3>
-                  </div>
-                  <ul className="space-y-1 text-sm">
-                    {analysis.postureTips.map((tip, i) => (
-                      <li key={i} className="flex gap-2">
-                        <span className="text-amber-600">•</span>
-                        <span>{tip}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </Card>
-              )}
+              <Card className="p-4">
+                <h3 className="mb-3 font-semibold">Ejercicios sugeridos</h3>
+                <Tabs defaultValue="principiante">
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="principiante">Inicial</TabsTrigger>
+                    <TabsTrigger value="intermedio">Medio</TabsTrigger>
+                    <TabsTrigger value="avanzado">Avanzado</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="principiante" className="mt-3">
+                    {renderExerciseList(analysis.exercises.principiante)}
+                  </TabsContent>
+                  <TabsContent value="intermedio" className="mt-3">
+                    {renderExerciseList(analysis.exercises.intermedio)}
+                  </TabsContent>
+                  <TabsContent value="avanzado" className="mt-3">
+                    {renderExerciseList(analysis.exercises.avanzado)}
+                  </TabsContent>
+                </Tabs>
+              </Card>
 
-              {/* Related exercises */}
-              {analysis.relatedExercises.length > 0 && (
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-3">Ejercicios Relacionados</h3>
-                  <div className="space-y-2">
-                    {analysis.relatedExercises.map((exercise, i) => (
-                      <div key={i} className="p-2 rounded-lg bg-muted/50">
-                        <p className="font-medium text-sm">{exercise.name}</p>
-                        <p className="text-xs text-muted-foreground">{exercise.description}</p>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )}
-
-              {/* Actions */}
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={resetState}
-              >
-                Escanear Otra Máquina
+              <Button variant="outline" className="w-full" onClick={resetState}>
+                Escanear otra maquina
               </Button>
             </div>
           </ScrollArea>

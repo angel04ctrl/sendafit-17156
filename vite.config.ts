@@ -9,7 +9,8 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
+    port: 8083, // Fija el puerto aquí si quieres usar siempre este
+    strictPort: true, // Esto hará que Vite falle si el puerto está ocupado, en lugar de saltar al 8084
   },
   plugins: [
     react(),

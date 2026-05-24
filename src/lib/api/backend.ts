@@ -1,8 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
 /**
  * Backend API client for fitness app
  * Wraps all edge function calls with proper error handling
@@ -49,6 +46,46 @@ export interface StatsResponse {
   calculated_at: string;
 }
 
+export interface MonthlyReportParams {
+  startDate: string;
+  endDate: string;
+}
+
+export interface MonthlyReportDay {
+  date: string;
+  weight: number | null;
+  body_fat_percentage: number | null;
+  energy_level: number | null;
+  calories_burned: number;
+  workouts_completed: number;
+  workouts_scheduled: number;
+  calories_consumed: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+export interface MonthlyReportResponse {
+  range: MonthlyReportParams;
+  daily: MonthlyReportDay[];
+  totals: {
+    calories_burned: number;
+    workouts_completed: number;
+    workouts_scheduled: number;
+    calories_consumed: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+  summary: {
+    total_days: number;
+    completion_rate: number;
+    average_energy_level: number | null;
+    weight_change: number | null;
+  };
+  generated_at: string;
+}
+
 export interface PlanChangeValidation {
   action: string;
   needsReassign: boolean;
@@ -86,8 +123,12 @@ export interface PlanChangeValidation {
  * Assign a routine automatically to the current user based on their profile
  */
 export async function assignRoutine(): Promise<RoutineResponse> {
+  const userLocalDate = new Date().toISOString().split('T')[0];
+  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
   const { data, error } = await supabase.functions.invoke('assign-routine', {
-    method: 'POST'
+    method: 'POST',
+    body: { userLocalDate, userTimezone }
   });
 
   if (error) throw error;
@@ -130,29 +171,13 @@ export async function getWorkoutsByDate(params?: {
   start_date?: string;
   end_date?: string;
 }): Promise<{ workouts: any[]; count: number }> {
-  const queryParams = new URLSearchParams();
-  if (params?.date) queryParams.append('date', params.date);
-  if (params?.start_date) queryParams.append('start_date', params.start_date);
-  if (params?.end_date) queryParams.append('end_date', params.end_date);
-
-  const url = `${SUPABASE_URL}/functions/v1/get-workouts-by-date${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-  
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('No session');
-
-  const response = await fetch(url, {
-    headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json'
-    }
+  const { data, error } = await supabase.functions.invoke('get-workouts-by-date', {
+    method: 'POST',
+    body: params || {}
   });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch workouts: ${response.statusText}`);
-  }
-
-  return response.json();
+  if (error) throw error;
+  return data;
 }
 
 /**
@@ -175,54 +200,39 @@ export async function getProgress(options?: {
   start_date?: string;
   end_date?: string;
 }): Promise<ProgressResponse> {
-  const params = new URLSearchParams();
-  if (options?.limit) params.append('limit', options.limit.toString());
-  if (options?.start_date) params.append('start_date', options.start_date);
-  if (options?.end_date) params.append('end_date', options.end_date);
-
-  const url = `${SUPABASE_URL}/functions/v1/get-progress${params.toString() ? '?' + params.toString() : ''}`;
-  
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('No session');
-
-  const response = await fetch(url, {
-    headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json'
-    }
+  const { data, error } = await supabase.functions.invoke('get-progress', {
+    method: 'POST',
+    body: options || {}
   });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch progress: ${response.statusText}`);
-  }
-
-  return response.json();
+  if (error) throw error;
+  return data;
 }
 
 /**
  * Get progress statistics for the current user
  */
 export async function getProgressStats(days: number = 30): Promise<StatsResponse> {
-  const params = new URLSearchParams({ days: days.toString() });
-  const url = `${SUPABASE_URL}/functions/v1/get-progress-stats?${params.toString()}`;
-  
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('No session');
-
-  const response = await fetch(url, {
-    headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json'
-    }
+  const { data, error } = await supabase.functions.invoke('get-progress-stats', {
+    method: 'POST',
+    body: { days }
   });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch stats: ${response.statusText}`);
-  }
+  if (error) throw error;
+  return data;
+}
 
-  return response.json();
+/**
+ * Get advanced monthly report data ready for charts
+ */
+export async function fetchMonthlyReport(params: MonthlyReportParams): Promise<MonthlyReportResponse> {
+  const { data, error } = await supabase.functions.invoke('get-monthly-report', {
+    method: 'POST',
+    body: params
+  });
+
+  if (error) throw error;
+  return data;
 }
 
 /**
@@ -232,24 +242,13 @@ export async function getRoutines(options?: {
   location?: string;
   limit?: number;
 }): Promise<{ routines: any[]; count: number }> {
-  const params = new URLSearchParams();
-  if (options?.location) params.append('location', options.location);
-  if (options?.limit) params.append('limit', options.limit.toString());
-
-  const url = `${SUPABASE_URL}/functions/v1/get-routines${params.toString() ? '?' + params.toString() : ''}`;
-  
-  const response = await fetch(url, {
-    headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Content-Type': 'application/json'
-    }
+  const { data, error } = await supabase.functions.invoke('get-routines', {
+    method: 'POST',
+    body: options || {}
   });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch routines: ${response.statusText}`);
-  }
-
-  return response.json();
+  if (error) throw error;
+  return data;
 }
 
 /**
@@ -259,32 +258,13 @@ export async function getAllWorkouts(params?: {
   include_completed?: boolean;
   tipo?: 'automatico' | 'manual';
 }): Promise<{ workouts: any[]; stats: any }> {
-  const queryParams = new URLSearchParams();
-  if (params?.include_completed !== undefined) {
-    queryParams.append('include_completed', params.include_completed.toString());
-  }
-  if (params?.tipo) {
-    queryParams.append('tipo', params.tipo);
-  }
-
-  const url = `${SUPABASE_URL}/functions/v1/get-all-workouts${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-  
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('No session');
-
-  const response = await fetch(url, {
-    headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json'
-    }
+  const { data, error } = await supabase.functions.invoke('get-all-workouts', {
+    method: 'POST',
+    body: params || {}
   });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch all workouts: ${response.statusText}`);
-  }
-
-  return response.json();
+  if (error) throw error;
+  return data;
 }
 
 /**
@@ -311,26 +291,13 @@ export async function getPredesignedPlans(filters?: {
   lugar?: string;
   dias_semana?: number;
 }): Promise<{ plans: any[]; count: number }> {
-  const params = new URLSearchParams();
-  if (filters?.objetivo) params.append('objetivo', filters.objetivo);
-  if (filters?.nivel) params.append('nivel', filters.nivel);
-  if (filters?.lugar) params.append('lugar', filters.lugar);
-  if (filters?.dias_semana) params.append('dias_semana', filters.dias_semana.toString());
-
-  const url = `${SUPABASE_URL}/functions/v1/get-predesigned-plans${params.toString() ? '?' + params.toString() : ''}`;
-  
-  const response = await fetch(url, {
-    headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Content-Type': 'application/json'
-    }
+  const { data, error } = await supabase.functions.invoke('get-predesigned-plans', {
+    method: 'POST',
+    body: filters || {}
   });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch predesigned plans: ${response.statusText}`);
-  }
-
-  return response.json();
+  if (error) throw error;
+  return data;
 }
 
 /**

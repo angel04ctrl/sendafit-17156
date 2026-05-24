@@ -18,6 +18,9 @@ verify_jwt = true
 [functions.get-progress]
 verify_jwt = true
 
+[functions.get-monthly-report]
+verify_jwt = true
+
 [functions.get-routines]
 verify_jwt = false
 
@@ -47,3 +50,12 @@ verify_jwt = false
 
 [functions.ai-trainer-chat]
 verify_jwt = false
+
+[functions.analyze-machine]
+verify_jwt = true
+
+[functions.coach-chat]
+verify_jwt = true
+
+[functions.apply-ai-routine]
+verify_jwt = true

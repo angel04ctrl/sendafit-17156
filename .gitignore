@@ -30,8 +30,14 @@ dist-ssr
 # Temporary and tooling
 lint-results.txt
 supabase/.temp/
+supabase/.branches/
 /.cache
 .parcel-cache
 .vercel
 .output
 .idea/
+
+# Local database exports and scratch SQL
+BD-sendaFit/
+DEBUG_QUERIES.sql
+*.csv

@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Dumbbell } from "lucide-react";
+import { Dumbbell, Eye, EyeOff } from "lucide-react";
 import heroImage from "@/assets/hero-fitness.jpg";
 import { z } from "zod";
 
@@ -38,6 +38,9 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  // Estados para mostrar/ocultar contraseña
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordSignUp, setShowPasswordSignUp] = useState(false);
 
   // Bloque de inicio de sesión - Autentica usuario existente
   const handleSignIn = async (e: React.FormEvent) => {
@@ -118,6 +121,26 @@ const Auth = () => {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!email) {
+      toast.error("Por favor ingresa tu email para recuperar la contraseña");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/update-password`,
+      });
+      if (error) throw error;
+      toast.success("Te hemos enviado un enlace para recuperar tu contraseña");
+    } catch (error: unknown) {
+      const err = error as Error;
+      toast.error(err.message || "Error al solicitar recuperación de contraseña");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Right side - Auth Forms - Now full width for mobile */}
@@ -163,14 +186,40 @@ const Auth = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="signin-password">Contraseña</Label>
-                      <Input
-                        id="signin-password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                      />
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="signin-password">Contraseña</Label>
+                        <Button
+                          variant="link"
+                          type="button"
+                          className="px-0 font-normal h-auto text-xs"
+                          onClick={handleResetPassword}
+                          disabled={loading}
+                        >
+                          ¿Olvidaste tu contraseña?
+                        </Button>
+                      </div>
+                      <div className="relative">
+                        <Input
+                          id="signin-password"
+                          type={showPassword ? "text" : "password"}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="pr-10"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <Button type="submit" className="w-full" disabled={loading}>
                       {loading ? "Iniciando..." : "Iniciar Sesión"}
@@ -214,14 +263,29 @@ const Auth = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="signup-password">Contraseña</Label>
-                      <Input
-                        id="signup-password"
-                        type="password"
-                        placeholder="Mínimo 6 caracteres"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                      />
+                      <div className="relative">
+                        <Input
+                          id="signup-password"
+                          type={showPasswordSignUp ? "text" : "password"}
+                          placeholder="Mínimo 6 caracteres"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="pr-10"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswordSignUp(!showPasswordSignUp)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label={showPasswordSignUp ? "Ocultar contraseña" : "Mostrar contraseña"}
+                        >
+                          {showPasswordSignUp ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <Button type="submit" className="w-full" disabled={loading}>
                       {loading ? "Creando cuenta..." : "Crear Cuenta"}

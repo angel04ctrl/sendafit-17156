@@ -15,16 +15,20 @@ import { Navbar } from "@/components/Navbar";
 import { Card } from "@/components/ui/card";
 import { format, startOfWeek, addDays, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, AlertCircle } from "lucide-react";
 import { DashboardMobileCarousel } from "@/components/DashboardMobileCarousel";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useWorkoutsByDate } from "@/hooks/useBackendApi";
+import { useWeeklyCalendarWorkouts } from "@/hooks/useBackendApi";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { dayMap } from "@/lib/dayMapping";
 
 const Calendar = () => {
   // Hook para detectar si es móvil
   const isMobile = useIsMobile();
+  const { user } = useAuth();
+  
   // Estado del día seleccionado
   const [selectedDate, setSelectedDate] = useState(new Date());
   // Estado para mostrar todos los entrenamientos pendientes en móvil
@@ -35,15 +39,15 @@ const Calendar = () => {
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const twoWeeksEnd = addDays(weekStart, 13); // Cargar datos de 2 semanas
 
-  const { data: weekData } = useWorkoutsByDate({
-    start_date: format(weekDays[0], 'yyyy-MM-dd'),
-    end_date: format(twoWeeksEnd, 'yyyy-MM-dd'),
-  });
-
-  const workouts = weekData?.workouts || [];
+  // Usar el nuevo hook que consulta directamente la tabla workouts
+  const { data: workouts = [], isError: workoutsError } = useWeeklyCalendarWorkouts(
+    format(weekDays[0], 'yyyy-MM-dd'),
+    format(twoWeeksEnd, 'yyyy-MM-dd'),
+    user?.id
+  );
 
   // Obtener el perfil del usuario para saber los días disponibles
-  const { data: profile } = useQuery({
+  const { data: profile, isError: profileError } = useQuery({
     queryKey: ["user-profile"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -61,20 +65,18 @@ const Calendar = () => {
   });
 
   const availableWeekdays = profile?.available_weekdays || [];
-
-  // Obtener el usuario actual para el filtro de realtime
-  const { data: currentUser } = useQuery({
-    queryKey: ["current-user"],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      return user;
-    },
-  });
+  const availableWeekdayNumbers = availableWeekdays
+    .map((day) => {
+      const dayCode = String(day);
+      return dayMap[dayCode] ?? Number(dayCode);
+    })
+    .filter((day) => Number.isInteger(day) && day >= 1 && day <= 7);
+  const hasCalendarError = workoutsError || profileError;
 
   // Bloque de suscripción en tiempo real - Escucha cambios en entrenamientos
   // Actualiza automáticamente cuando se marca un entrenamiento como completado
   useEffect(() => {
-    if (!currentUser) return;
+    if (!user) return;
 
     const channel = supabase
       .channel('calendar-workouts')
@@ -84,10 +86,9 @@ const Calendar = () => {
           event: '*',
           schema: 'public',
           table: 'workouts',
-          filter: `user_id=eq.${currentUser.id}`,
+          filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('Workout updated in calendar:', payload);
           // React Query refetch automáticamente
         }
       )
@@ -96,7 +97,7 @@ const Calendar = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUser]);
+  }, [user]);
 
   // Función para obtener entrenamientos de una fecha específica (basado en weekday)
   const getWorkoutsForDate = (date: Date) => {
@@ -114,7 +115,7 @@ const Calendar = () => {
       }
     });
     
-    console.log(`Calendar: Workouts para ${compareDateStr} (weekday ${weekday}):`, matches.length);
+
     return matches;
   };
 
@@ -122,7 +123,7 @@ const Calendar = () => {
   const isScheduledDay = (date: Date) => {
     const jsDay = date.getDay(); // 0=Dom, 1=Lun, ..., 6=Sáb
     const weekdayNumber = jsDay === 0 ? 7 : jsDay; // Convertir a 1=Lun, 2=Mar, ..., 7=Dom
-    return availableWeekdays.includes(weekdayNumber.toString());
+    return availableWeekdayNumbers.includes(weekdayNumber);
   };
 
   return (
@@ -136,6 +137,35 @@ const Calendar = () => {
               Visualiza tu planificación de entrenamientos
             </p>
           </div>
+
+          {hasCalendarError && (
+            <Card className="p-4 bg-amber-50 border-amber-200">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-amber-900 mb-2">Estamos presentando problemas con tu agenda</h3>
+                  <p className="text-sm text-amber-800">
+                    No pudimos cargar tus entrenamientos en este momento. Intenta de nuevo en unos minutos.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Alerta cuando no hay entrenamientos */}
+          {!hasCalendarError && workouts.length === 0 && (
+            <Card className="p-4 bg-amber-50 border-amber-200">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-amber-900 mb-2">Aún no tienes entrenamientos</h3>
+                  <p className="text-sm text-amber-800">
+                    Completa tu perfil y selecciona una rutina para que se generen tus entrenamientos automáticamente.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
 
           {isMobile ? (
             <DashboardMobileCarousel

@@ -143,17 +143,6 @@ const Profile = () => {
     }
   }, [user, sb]);
 
-  // Bloque de debug logging - Registra el estado del perfil y suscripción
-  useEffect(() => {
-    console.log('Profile State Debug:', { 
-      userRole, 
-      subscriptionStatus, 
-      isPro: userRole === "pro", 
-      isActive: subscriptionStatus === "active",
-      showUpgradeButton: userRole !== "pro" && subscriptionStatus !== "active"
-    });
-  }, [userRole, subscriptionStatus]);
-
   // Bloque de carga inicial del perfil - Se ejecuta al montar el componente
   // Detecta si el usuario viene desde un pago exitoso o cancelado
   useEffect(() => {
@@ -247,7 +236,6 @@ const Profile = () => {
           filter: `id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('Profile updated:', payload);
           fetchProfile();
         }
       )
@@ -260,7 +248,6 @@ const Profile = () => {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('User role updated:', payload);
           // Recargar perfil inmediatamente cuando cambia el rol
           fetchProfile();
         }
@@ -274,7 +261,6 @@ const Profile = () => {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('Subscription updated:', payload);
           // Recargar perfil inmediatamente cuando cambia la suscripción
           fetchProfile();
         }
@@ -352,14 +338,19 @@ const Profile = () => {
     // Si hubo cambios en los días disponibles o el objetivo, validamos el cambio
     const oldGoal = profile?.fitness_goal || "";
     const newGoal = formData.fitness_goal as string;
-    const oldDaysCount = profile?.available_days_per_week || 0;
-    const newDaysCount = parseInt(formData.available_days_per_week as string) || 0;
+    const oldWeekdays = Array.isArray(profile?.available_weekdays)
+      ? (profile.available_weekdays as unknown[]).map(String)
+      : [];
+    const newWeekdays = formData.available_weekdays as string[];
+    const weekdaysChanged =
+      oldWeekdays.length !== newWeekdays.length ||
+      oldWeekdays.some((day) => !newWeekdays.includes(day));
     
-    if (oldGoal !== newGoal || oldDaysCount !== newDaysCount) {
+    if (oldGoal !== newGoal || weekdaysChanged) {
       try {
         const validation = await validateMutation.mutateAsync({
            new_goal: newGoal,
-           new_weekdays: formData.available_weekdays as string[],
+           new_weekdays: newWeekdays,
         });
         
         if (validation && validation.action !== "none") {
@@ -379,7 +370,9 @@ const Profile = () => {
     setShowPreviewModal(false);
     await saveProfileChanges();
     try {
-       await generateWorkoutsMutation.mutateAsync({});
+       await generateWorkoutsMutation.mutateAsync({
+         reassign: Boolean(validationData?.needsReassign),
+       });
        toast.success("Plan redistribuido con éxito");
     } catch (e) {
        toast.error("Error al redistribuir plan");
@@ -448,7 +441,6 @@ const Profile = () => {
                   className="w-full" 
                   size="lg"
                   onClick={() => {
-                    console.log('Opening payment modal');
                     setShowPaymentModal(true);
                   }}
                 >

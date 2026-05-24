@@ -27,7 +27,10 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Macros = lazy(() => import("./pages/Macros"));
 const Workouts = lazy(() => import("./pages/Workouts"));
 const Calendar = lazy(() => import("./pages/Calendar"));
+const CoachChat = lazy(() => import("./pages/CoachChat"));
+const Reports = lazy(() => import("./pages/Reports"));
 const Profile = lazy(() => import("./pages/Profile"));
+const UpdatePassword = lazy(() => import("./pages/UpdatePassword"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 /**
@@ -98,6 +101,12 @@ const App = () => {
                     <Route path="/workouts" element={<Workouts />} />
                     {/* Ruta del calendario de entrenamientos */}
                     <Route path="/calendar" element={<Calendar />} />
+                    {/* Ruta del coach inteligente */}
+                    <Route path="/coach-chat" element={<CoachChat />} />
+                    {/* Ruta de reportes avanzados */}
+                    <Route path="/reports" element={<Reports />} />
+                    {/* Ruta de actualización de contraseña */}
+                    <Route path="/update-password" element={<UpdatePassword />} />
                     {/* Ruta del perfil de usuario */}
                     <Route path="/profile" element={<Profile />} />
                     {/* Ruta 404 para páginas no encontradas */}
