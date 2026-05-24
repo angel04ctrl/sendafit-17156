@@ -12,6 +12,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
+import { getPasswordResetRedirectUrl } from "@/lib/authRedirect";
 
 const emailSchema = z.string().email("Email inválido");
 
@@ -32,7 +33,7 @@ export function ForgotPasswordDialog({ open, onOpenChange }: ForgotPasswordDialo
       const validEmail = emailSchema.parse(email);
       
       const { error } = await supabase.auth.resetPasswordForEmail(validEmail, {
-        redirectTo: `${window.location.origin}/auth/update-password`,
+        redirectTo: getPasswordResetRedirectUrl(),
       });
 
       if (error) throw error;

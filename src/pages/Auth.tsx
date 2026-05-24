@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { Dumbbell, Eye, EyeOff } from "lucide-react";
 import heroImage from "@/assets/hero-fitness.jpg";
 import { z } from "zod";
+import { getPasswordResetRedirectUrl } from "@/lib/authRedirect";
 
 // Esquema de validación de datos de autenticación con Zod
 const authSchema = z.object({
@@ -129,7 +130,7 @@ const Auth = () => {
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/update-password`,
+        redirectTo: getPasswordResetRedirectUrl(),
       });
       if (error) throw error;
       toast.success("Te hemos enviado un enlace para recuperar tu contraseña");

@@ -63,7 +63,32 @@ function normalizeWeekday(value: unknown, fallback: number): number {
 }
 
 function normalizeLocation(value: unknown): "casa" | "gimnasio" | "exterior" {
-  return value === "casa" || value === "gimnasio" || value === "exterior" ? value : "gimnasio";
+  const normalized = String(value || "").toLowerCase().trim();
+  return normalized === "casa" || normalized === "gimnasio" || normalized === "exterior" ? normalized : "gimnasio";
+}
+
+function normalizeRoutine(metadataRoutine: MetadataRoutine): MetadataRoutine {
+  return {
+    routine_name: metadataRoutine.routine_name || "Rutina personalizada por IA",
+    days: metadataRoutine.days
+      .filter((day) => Array.isArray(day.exercises) && day.exercises.length > 0)
+      .map((day, dayIndex) => ({
+        ...day,
+        day_name: day.day_name || `Dia ${dayIndex + 1}`,
+        location: normalizeLocation(day.location),
+        duration_minutes: Math.max(10, Math.min(180, Number(day.duration_minutes) || 60)),
+        estimated_calories: Math.max(0, Math.min(2000, Number(day.estimated_calories) || 300)),
+        exercises: day.exercises
+          .filter((exercise) => typeof exercise.name === "string" && exercise.name.trim().length > 0)
+          .map((exercise) => ({
+            ...exercise,
+            name: exercise.name.trim(),
+            sets: Math.max(1, Math.min(10, Number(exercise.sets) || 3)),
+            reps: Math.max(1, Math.min(100, Number(exercise.reps) || 10)),
+            duration_minutes: exercise.duration_minutes ? Math.max(1, Math.min(60, Number(exercise.duration_minutes))) : undefined,
+          })),
+      })),
+  };
 }
 
 serve(async (req) => {
@@ -75,16 +100,22 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) return respond({ error: "No autorizado." }, 401);
 
-    const supabase = createClient(
+    const userClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: authHeader } } },
     );
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
     if (authError || !user) return respond({ error: "Sesion invalida." }, 401);
 
-    const { metadata_routine } = await req.json() as { metadata_routine?: MetadataRoutine };
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY")!,
+    );
+
+    const { metadata_routine: rawRoutine } = await req.json() as { metadata_routine?: MetadataRoutine };
+    const metadata_routine = rawRoutine ? normalizeRoutine(rawRoutine) : undefined;
     if (!metadata_routine?.days?.length) {
       return respond({ error: "La rutina sugerida no contiene dias validos." }, 400);
     }
@@ -130,13 +161,13 @@ serve(async (req) => {
         user_id: user.id,
         name: day.day_name || `${metadata_routine.routine_name || "Rutina IA"} - Dia ${index + 1}`,
         description: metadata_routine.routine_name || "Rutina personalizada por SendaFit AI Coach",
-        location: normalizeLocation(day.location),
+        location: day.location || "gimnasio",
         tipo: "automatico" as const,
         plan_id: null,
         scheduled_date: dateForWeekday(weekday),
         weekday,
-        duration_minutes: Math.max(10, Math.min(180, Number(day.duration_minutes) || 60)),
-        estimated_calories: Math.max(0, Math.min(2000, Number(day.estimated_calories) || 300)),
+        duration_minutes: day.duration_minutes,
+        estimated_calories: day.estimated_calories,
         completed: false,
       };
     });
@@ -151,13 +182,12 @@ serve(async (req) => {
     const exerciseRows = insertedWorkouts.flatMap((workout, workoutIndex) => {
       const day = metadata_routine.days[workoutIndex];
       return (day.exercises || [])
-        .filter((exercise) => typeof exercise.name === "string" && exercise.name.trim())
         .map((exercise) => ({
           workout_id: workout.id,
-          name: exercise.name.trim(),
-          sets: Math.max(1, Math.min(10, Number(exercise.sets) || 3)),
-          reps: Math.max(1, Math.min(100, Number(exercise.reps) || 10)),
-          duration_minutes: exercise.duration_minutes ? Math.max(1, Math.min(60, Number(exercise.duration_minutes))) : null,
+          name: exercise.name,
+          sets: exercise.sets,
+          reps: exercise.reps,
+          duration_minutes: exercise.duration_minutes || null,
           notes: exercise.notes || null,
         }));
     });

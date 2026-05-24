@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
-import { Bot, Check, Loader2, MessageSquare, Send, User, X } from "lucide-react";
+import { Bot, CalendarDays, Check, Dumbbell, Loader2, MessageSquare, Send, User, X } from "lucide-react";
 import { toast } from "sonner";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,16 @@ interface RoutineMetadata {
   }>;
 }
 
+const weekdayNames: Record<number, string> = {
+  1: "Lunes",
+  2: "Martes",
+  3: "Miercoles",
+  4: "Jueves",
+  5: "Viernes",
+  6: "Sabado",
+  7: "Domingo",
+};
+
 interface ChatMessage {
   id: string;
   role: MessageRole;
@@ -53,6 +63,87 @@ function createMessage(role: MessageRole, content: string, metadataRoutine?: Rou
     content,
     metadataRoutine,
   };
+}
+
+function inferMuscleGroup(day: RoutineMetadata["days"][number]) {
+  const text = [
+    day.day_name,
+    ...day.exercises.flatMap((exercise) => [exercise.name, exercise.notes || ""]),
+  ].join(" ").toLowerCase();
+
+  const groups = [
+    ["Pecho", ["pecho", "press banca", "aperturas", "fondos"]],
+    ["Espalda", ["espalda", "remo", "jalon", "dominada", "dorsal"]],
+    ["Piernas", ["pierna", "sentadilla", "prensa", "cuadriceps", "femoral", "gluteo", "pantorrilla"]],
+    ["Hombros", ["hombro", "militar", "elevaciones", "deltoide"]],
+    ["Brazos", ["biceps", "triceps", "curl", "frances"]],
+    ["Core", ["core", "abdomen", "abdominal", "plancha"]],
+    ["Cardio", ["cardio", "correr", "bicicleta", "cuerda"]],
+  ];
+
+  return groups.find(([, keywords]) => keywords.some((keyword) => text.includes(keyword)))?.[0] || day.day_name || "General";
+}
+
+function RoutinePreview({ routine }: { routine: RoutineMetadata }) {
+  const exerciseCount = routine.days.reduce((total, day) => total + day.exercises.length, 0);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="secondary" className="gap-1">
+          <CalendarDays className="h-3 w-3" />
+          {routine.days.length} dias
+        </Badge>
+        <Badge variant="outline" className="gap-1">
+          <Dumbbell className="h-3 w-3" />
+          {exerciseCount} ejercicios
+        </Badge>
+      </div>
+
+      <div className="space-y-3">
+        {routine.days.map((day, dayIndex) => (
+          <div key={`${day.day_name}-${dayIndex}`} className="rounded-md border bg-background/80 p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold">
+                  {day.weekday ? weekdayNames[day.weekday] || `Dia ${day.weekday}` : `Dia ${dayIndex + 1}`}: {day.day_name}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {inferMuscleGroup(day)}
+                  {day.duration_minutes ? ` • ${day.duration_minutes} min` : ""}
+                  {day.location ? ` • ${day.location}` : ""}
+                </p>
+              </div>
+              <Badge variant="outline" className="text-[11px]">
+                {day.exercises.length} ejercicios
+              </Badge>
+            </div>
+            <ul className="space-y-1.5">
+              {day.exercises.map((exercise, exerciseIndex) => (
+                <li key={`${exercise.name}-${exerciseIndex}`} className="text-xs text-foreground">
+                  <span className="font-medium">{exercise.name}</span>
+                  <span className="text-muted-foreground">
+                    {" "}
+                    {exercise.sets || 3}x{exercise.reps || 10}
+                    {exercise.notes ? ` - ${exercise.notes}` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+async function getFunctionErrorMessage(error: unknown) {
+  const maybeError = error as { message?: string; context?: Response };
+  if (maybeError.context instanceof Response) {
+    const body = await maybeError.context.json().catch(() => null);
+    if (body?.error) return String(body.error);
+  }
+  return maybeError.message || "No se pudo completar la solicitud.";
 }
 
 export default function CoachChat() {
@@ -115,7 +206,7 @@ export default function CoachChat() {
       const { data, error } = await supabase.functions.invoke("apply-ai-routine", {
         body: { metadata_routine: metadataRoutine },
       });
-      if (error) throw error;
+      if (error) throw new Error(await getFunctionErrorMessage(error));
       if (!data?.success) throw new Error(data?.error || "No se pudo aplicar la rutina.");
       return data;
     },
@@ -192,7 +283,13 @@ export default function CoachChat() {
 
                   {message.role === "assistant" && message.metadataRoutine && !message.routineDismissed && (
                     <Card className="border-primary/30 p-3">
-                      <p className="text-sm font-medium">Quieres aplicar esta rutina y reemplazar tu plan actual?</p>
+                      <p className="text-sm font-medium">
+                        {message.metadataRoutine.routine_name || "Rutina sugerida por el Coach"}
+                      </p>
+                      <div className="mt-3">
+                        <RoutinePreview routine={message.metadataRoutine} />
+                      </div>
+                      <p className="mt-3 text-sm font-medium">Quieres aplicar esta rutina y reemplazar tu plan actual?</p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         Se eliminaran los entrenamientos automaticos previos y se insertara la rutina sugerida por el Coach.
                       </p>
