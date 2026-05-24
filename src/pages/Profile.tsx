@@ -380,9 +380,9 @@ const Profile = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-dvh overflow-y-auto bg-background page-scroll-shell">
       <Navbar />
-      <div className="pt-14 sm:pt-16 pb-16 sm:pb-20 px-3 sm:px-4 overflow-x-hidden">
+      <div className="min-h-full pt-14 sm:pt-16 pb-24 sm:pb-24 px-3 sm:px-4 overflow-x-hidden">
         <div className="max-w-4xl mx-auto space-y-2 sm:space-y-3">
           <div>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-1">Mi Perfil</h1>

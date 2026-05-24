@@ -154,6 +154,37 @@ export default function CoachChat() {
 
   const [messages, setMessages] = useState<ChatMessage[]>([initialMessage]);
   const [inputValue, setInputValue] = useState("");
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const chatStorageKey = user?.id ? `sendafit-coach-chat:${user.id}` : null;
+
+  useEffect(() => {
+    if (!chatStorageKey) {
+      setHistoryLoaded(false);
+      return;
+    }
+
+    try {
+      const storedMessages = window.localStorage.getItem(chatStorageKey);
+      if (!storedMessages) {
+        setMessages([initialMessage]);
+        setHistoryLoaded(true);
+        return;
+      }
+
+      const parsed = JSON.parse(storedMessages) as ChatMessage[];
+      setMessages(Array.isArray(parsed) && parsed.length > 0 ? parsed : [initialMessage]);
+    } catch (error) {
+      console.warn("Could not load coach chat history:", error);
+      setMessages([initialMessage]);
+    } finally {
+      setHistoryLoaded(true);
+    }
+  }, [chatStorageKey]);
+
+  useEffect(() => {
+    if (!chatStorageKey || !historyLoaded) return;
+    window.localStorage.setItem(chatStorageKey, JSON.stringify(messages.slice(-40)));
+  }, [chatStorageKey, historyLoaded, messages]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
