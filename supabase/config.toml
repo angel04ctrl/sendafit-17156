@@ -45,6 +45,9 @@ verify_jwt = true
 [functions.analyze-food]
 verify_jwt = false
 
+[functions.analyze-meal]
+verify_jwt = true
+
 [functions.analyze-gym-machine]
 verify_jwt = false
 

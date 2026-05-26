@@ -1,45 +1,45 @@
 /**
- * FoodAnalysisModal.tsx - Modal para análisis de comida con IA (Food Vision)
- * 
- * Permite al usuario:
- * - Tomar foto o subir imagen de comida
- * - Analizar con IA para detectar alimentos
- * - Ver estimación de macronutrientes
- * - Ajustar porciones
- * - Guardar en registro diario de macros
+ * FoodAnalysisModal.tsx - Modal para analisis de comida con IA.
  */
 
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Camera, Upload, Loader2, Check, X, Sparkles, Utensils, Flame } from "lucide-react";
+import { Camera, Check, Flame, Loader2, Sparkles, Upload, Utensils, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 
-interface FoodItem {
+type MealType = "desayuno" | "colacion_am" | "comida" | "colacion_pm" | "cena";
+type ConfidenceScore = "alta" | "media" | "baja";
+
+interface DetectedIngredient {
   name: string;
-  portion: string;
-  confidence: number;
-  calories: number;
+  estimatedWeightGrams: number;
   protein: number;
   carbs: number;
-  fat: number;
+  fats: number;
+}
+
+interface MealMacros {
+  calories: number;
+  protein: number;
+  carbohydrates: number;
+  fats: number;
 }
 
 interface AnalysisResult {
-  foods: FoodItem[];
-  totals: {
-    calories: number;
-    protein: number;
-    carbs: number;
-    fat: number;
-  };
+  dishName: string;
+  estimatedTotalWeightGrams: number;
+  confidenceScore: ConfidenceScore;
+  macros: MealMacros;
+  detectedIngredients: DetectedIngredient[];
+  coachFeedback: string;
 }
 
 interface FoodAnalysisModalProps {
@@ -48,41 +48,95 @@ interface FoodAnalysisModalProps {
   onSaved?: () => void;
 }
 
-const mealTypes = [
+const emptyMacros: MealMacros = {
+  calories: 0,
+  protein: 0,
+  carbohydrates: 0,
+  fats: 0,
+};
+
+const mealTypes: { value: MealType; label: string }[] = [
   { value: "desayuno", label: "Desayuno" },
-  { value: "colacion_am", label: "Colación AM" },
-  { value: "comida", label: "Almuerzo" },
-  { value: "colacion_pm", label: "Colación PM" },
+  { value: "colacion_am", label: "Colacion AM" },
+  { value: "comida", label: "Comida" },
+  { value: "colacion_pm", label: "Colacion PM" },
   { value: "cena", label: "Cena" },
 ];
+
+const confidenceLabels: Record<ConfidenceScore, string> = {
+  alta: "Confianza alta",
+  media: "Confianza media",
+  baja: "Confianza baja",
+};
+
+function toNumber(value: unknown) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, Math.round(numeric)) : 0;
+}
+
+function normalizeAnalysis(value: unknown): AnalysisResult {
+  const source = value as Partial<AnalysisResult>;
+  const rawMacros = source.macros || emptyMacros;
+  const confidence = source.confidenceScore === "alta" || source.confidenceScore === "media" || source.confidenceScore === "baja"
+    ? source.confidenceScore
+    : "media";
+
+  return {
+    dishName: String(source.dishName || "Comida analizada").trim(),
+    estimatedTotalWeightGrams: toNumber(source.estimatedTotalWeightGrams),
+    confidenceScore: confidence,
+    macros: {
+      calories: toNumber(rawMacros.calories),
+      protein: toNumber(rawMacros.protein),
+      carbohydrates: toNumber(rawMacros.carbohydrates),
+      fats: toNumber(rawMacros.fats),
+    },
+    detectedIngredients: Array.isArray(source.detectedIngredients)
+      ? source.detectedIngredients.map((ingredient) => ({
+        name: String(ingredient.name || "Ingrediente").trim(),
+        estimatedWeightGrams: toNumber(ingredient.estimatedWeightGrams),
+        protein: toNumber(ingredient.protein),
+        carbs: toNumber(ingredient.carbs),
+        fats: toNumber(ingredient.fats),
+      }))
+      : [],
+    coachFeedback: String(source.coachFeedback || "Revisa los valores estimados y ajustalos antes de registrar esta comida.").trim(),
+  };
+}
 
 export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisModalProps) {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [step, setStep] = useState<"capture" | "analyzing" | "results">("capture");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
-  const [adjustedFoods, setAdjustedFoods] = useState<FoodItem[]>([]);
-  const [mealType, setMealType] = useState("comida");
+  const [editedDishName, setEditedDishName] = useState("");
+  const [editedMacros, setEditedMacros] = useState<MealMacros>(emptyMacros);
+  const [mealType, setMealType] = useState<MealType>("comida");
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      processFile(file);
-    }
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) processFile(file);
   };
 
   const processFile = (file: File) => {
     setImageFile(file);
     const reader = new FileReader();
-    reader.onload = (e) => {
-      setImagePreview(e.target?.result as string);
+    reader.onload = (event) => {
+      setImagePreview(event.target?.result as string);
     };
     reader.readAsDataURL(file);
+  };
+
+  const updateMacro = (key: keyof MealMacros, value: string) => {
+    setEditedMacros((current) => ({
+      ...current,
+      [key]: toNumber(value),
+    }));
   };
 
   const analyzeImage = async () => {
@@ -91,50 +145,40 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
     setStep("analyzing");
 
     try {
-      // Convert image to base64
       const base64 = await new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onload = () => {
           const result = reader.result as string;
-          // Remove data:image/...;base64, prefix
-          const base64Data = result.split(",")[1];
-          resolve(base64Data);
+          resolve(result.split(",")[1]);
         };
         reader.readAsDataURL(imageFile);
       });
 
-      // Call edge function
-      const { data: session } = await supabase.auth.getSession();
-      if (!session.session) {
-        throw new Error("No session");
+      const { data, error } = await supabase.functions.invoke("analyze-meal", {
+        body: {
+          imageBase64: base64,
+          mimeType: imageFile.type || "image/jpeg",
+        },
+      });
+
+      if (error) {
+        const functionError = error as { message?: string; context?: Response };
+        const body = functionError.context instanceof Response
+          ? await functionError.context.json().catch(() => null)
+          : null;
+        throw new Error(body?.error || functionError.message || "Error al analizar");
       }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-food`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.session.access_token}`,
-          },
-          body: JSON.stringify({ imageBase64: base64 }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Error al analizar");
+      const responseAnalysis = data?.analysis || data;
+      if (!responseAnalysis) {
+        throw new Error("No se pudo analizar la comida");
       }
 
-      const data = await response.json();
-      
-      if (data.success && data.analysis) {
-        setAnalysis(data.analysis);
-        setAdjustedFoods(data.analysis.foods);
-        setStep("results");
-      } else {
-        throw new Error("No se pudieron detectar alimentos");
-      }
+      const normalized = normalizeAnalysis(responseAnalysis);
+      setAnalysis(normalized);
+      setEditedDishName(normalized.dishName);
+      setEditedMacros(normalized.macros);
+      setStep("results");
     } catch (error) {
       console.error("Analysis error:", error);
       toast.error(error instanceof Error ? error.message : "Error al analizar la imagen");
@@ -142,45 +186,16 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
     }
   };
 
-  const updateFoodPortion = (index: number, multiplier: number) => {
-    if (!analysis) return;
-    
-    const original = analysis.foods[index];
-    const updated = [...adjustedFoods];
-    updated[index] = {
-      ...original,
-      calories: Math.round(original.calories * multiplier),
-      protein: Math.round(original.protein * multiplier),
-      carbs: Math.round(original.carbs * multiplier),
-      fat: Math.round(original.fat * multiplier),
-      portion: `${multiplier}x ${original.portion}`,
-    };
-    setAdjustedFoods(updated);
-  };
-
-  const calculateTotals = () => {
-    return adjustedFoods.reduce(
-      (acc, food) => ({
-        calories: acc.calories + food.calories,
-        protein: acc.protein + food.protein,
-        carbs: acc.carbs + food.carbs,
-        fat: acc.fat + food.fat,
-      }),
-      { calories: 0, protein: 0, carbs: 0, fat: 0 }
-    );
-  };
-
   const saveToMacros = async () => {
-    if (!user || adjustedFoods.length === 0) return;
+    if (!user || !analysis) return;
 
     setIsSaving(true);
-    const sb = supabase;
 
     try {
-      // Upload image to storage
       let imageUrl = "";
       if (imageFile) {
-        const fileName = `${user.id}/${Date.now()}-${imageFile.name}`;
+        const extension = imageFile.name.split(".").pop() || "jpg";
+        const fileName = `${user.id}/${crypto.randomUUID()}.${extension}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("ai-analysis-images")
           .upload(fileName, imageFile);
@@ -193,40 +208,46 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
         }
       }
 
-      const totals = calculateTotals();
       const today = format(new Date(), "yyyy-MM-dd");
+      const adjustedMacros = {
+        calories: editedMacros.calories,
+        protein: editedMacros.protein,
+        carbs: editedMacros.carbohydrates,
+        fat: editedMacros.fats,
+      };
 
-      // Save to food_analysis_logs
-      await sb.from("food_analysis_logs").insert({
+      await supabase.from("food_analysis_logs").insert({
         user_id: user.id,
         image_url: imageUrl,
-        detected_foods: analysis?.foods || [],
-        estimated_macros: analysis?.totals || {},
-        adjusted_macros: totals,
+        detected_foods: analysis.detectedIngredients,
+        estimated_macros: analysis.macros,
+        adjusted_macros: {
+          ...adjustedMacros,
+          dishName: editedDishName,
+          mealType,
+        },
         saved_to_daily: true,
         analysis_date: today,
       });
 
-      // Save to meals table (integrated with existing macros system)
-      const foodNames = adjustedFoods.map(f => f.name).join(", ");
-      await sb.from("meals").insert({
+      await supabase.from("meals").insert({
         user_id: user.id,
         meal_type: mealType,
-        name: `Análisis IA: ${foodNames}`,
-        calories: totals.calories,
-        protein: totals.protein,
-        carbs: totals.carbs,
-        fat: totals.fat,
+        name: editedDishName || "Comida analizada con IA",
+        calories: adjustedMacros.calories,
+        protein: adjustedMacros.protein,
+        carbs: adjustedMacros.carbs,
+        fat: adjustedMacros.fat,
         date: today,
       });
 
-      toast.success("Comida guardada en tus macros");
+      toast.success("Comida registrada en tu historial");
       onOpenChange(false);
       onSaved?.();
       resetState();
     } catch (error) {
       console.error("Save error:", error);
-      toast.error("Error al guardar");
+      toast.error("Error al guardar la comida");
     } finally {
       setIsSaving(false);
     }
@@ -237,51 +258,55 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
     setImagePreview(null);
     setImageFile(null);
     setAnalysis(null);
-    setAdjustedFoods([]);
+    setEditedDishName("");
+    setEditedMacros(emptyMacros);
     setMealType("comida");
   };
 
   return (
-    <Dialog open={open} onOpenChange={(open) => {
-      onOpenChange(open);
-      if (!open) resetState();
-    }}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        onOpenChange(nextOpen);
+        if (!nextOpen) resetState();
+      }}
+    >
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            Análisis de Comida con IA
+            <Sparkles className="size-5 text-primary" />
+            Analisis de Comida con IA
           </DialogTitle>
         </DialogHeader>
 
         {step === "capture" && (
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
-              Toma una foto o sube una imagen de tu comida para analizar automáticamente los macronutrientes.
+              Toma una foto o sube una imagen de tu comida para analizar automaticamente los macronutrientes.
             </p>
 
             {imagePreview ? (
-              <div className="space-y-4">
-                <div className="relative rounded-xl overflow-hidden aspect-video bg-muted">
+              <div className="flex flex-col gap-4">
+                <div className="relative aspect-video overflow-hidden rounded-xl bg-muted">
                   <img
                     src={imagePreview}
                     alt="Vista previa"
-                    className="w-full h-full object-cover"
+                    className="h-full w-full object-cover"
                   />
                   <Button
                     variant="destructive"
                     size="icon"
-                    className="absolute top-2 right-2"
+                    className="absolute right-2 top-2"
                     onClick={() => {
                       setImagePreview(null);
                       setImageFile(null);
                     }}
                   >
-                    <X className="w-4 h-4" />
+                    <X className="size-4" />
                   </Button>
                 </div>
                 <Button onClick={analyzeImage} className="w-full gap-2">
-                  <Sparkles className="w-4 h-4" />
+                  <Sparkles className="size-4" />
                   Analizar Comida
                 </Button>
               </div>
@@ -304,21 +329,21 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
                 />
 
                 <Card
-                  className="p-6 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="flex cursor-pointer flex-col items-center justify-center gap-3 p-6 transition-colors hover:bg-muted/50"
                   onClick={() => cameraInputRef.current?.click()}
                 >
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Camera className="w-6 h-6 text-primary" />
+                  <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
+                    <Camera className="size-6 text-primary" />
                   </div>
                   <span className="text-sm font-medium">Tomar Foto</span>
                 </Card>
 
                 <Card
-                  className="p-6 flex flex-col items-center justify-center gap-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="flex cursor-pointer flex-col items-center justify-center gap-3 p-6 transition-colors hover:bg-muted/50"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center">
-                    <Upload className="w-6 h-6 text-secondary-foreground" />
+                  <div className="flex size-12 items-center justify-center rounded-full bg-secondary/10">
+                    <Upload className="size-6 text-secondary-foreground" />
                   </div>
                   <span className="text-sm font-medium">Subir Imagen</span>
                 </Card>
@@ -328,12 +353,12 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
         )}
 
         {step === "analyzing" && (
-          <div className="py-12 flex flex-col items-center justify-center gap-4">
+          <div className="flex flex-col items-center justify-center gap-4 py-12">
             <div className="relative">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <Utensils className="w-8 h-8 text-primary" />
+              <div className="flex size-16 items-center justify-center rounded-full bg-primary/10">
+                <Utensils className="size-8 text-primary" />
               </div>
-              <Loader2 className="w-6 h-6 text-primary absolute -top-1 -right-1 animate-spin" />
+              <Loader2 className="absolute -right-1 -top-1 size-6 animate-spin text-primary" />
             </div>
             <div className="text-center">
               <p className="font-medium">Analizando comida...</p>
@@ -343,18 +368,37 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
         )}
 
         {step === "results" && analysis && (
-          <div className="space-y-4">
-            {/* Image preview */}
+          <div className="flex flex-col gap-4">
             {imagePreview && (
-              <div className="rounded-xl overflow-hidden aspect-video bg-muted">
-                <img src={imagePreview} alt="Comida analizada" className="w-full h-full object-cover" />
+              <div className="aspect-video overflow-hidden rounded-xl bg-muted">
+                <img src={imagePreview} alt="Comida analizada" className="h-full w-full object-cover" />
               </div>
             )}
 
-            {/* Meal type selector */}
-            <div className="space-y-2">
-              <Label>Guardar como</Label>
-              <Select value={mealType} onValueChange={setMealType}>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="dish-name">Nombre del plato</Label>
+              <Input
+                id="dish-name"
+                value={editedDishName}
+                onChange={(event) => setEditedDishName(event.target.value)}
+                placeholder="Nombre del plato"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <Card className="p-3">
+                <p className="text-muted-foreground">Peso estimado</p>
+                <p className="text-lg font-semibold">{analysis.estimatedTotalWeightGrams} g</p>
+              </Card>
+              <Card className="p-3">
+                <p className="text-muted-foreground">Confianza</p>
+                <p className="text-lg font-semibold">{confidenceLabels[analysis.confidenceScore]}</p>
+              </Card>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label>Momento del dia</Label>
+              <Select value={mealType} onValueChange={(value) => setMealType(value as MealType)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -368,58 +412,75 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
               </Select>
             </div>
 
-            {/* Detected foods */}
-            <div className="space-y-3">
-              <h3 className="font-semibold">Alimentos Detectados</h3>
-              {adjustedFoods.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No se detectaron alimentos</p>
+            <Card className="border-primary/20 bg-primary/5 p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <Flame className="size-5 text-primary" />
+                <h3 className="font-semibold">Macros estimados</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="calories">Calorias</Label>
+                  <Input
+                    id="calories"
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={editedMacros.calories}
+                    onChange={(event) => updateMacro("calories", event.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="protein">Proteinas</Label>
+                  <Input
+                    id="protein"
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={editedMacros.protein}
+                    onChange={(event) => updateMacro("protein", event.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="carbohydrates">Carbohidratos</Label>
+                  <Input
+                    id="carbohydrates"
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={editedMacros.carbohydrates}
+                    onChange={(event) => updateMacro("carbohydrates", event.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="fats">Grasas</Label>
+                  <Input
+                    id="fats"
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={editedMacros.fats}
+                    onChange={(event) => updateMacro("fats", event.target.value)}
+                  />
+                </div>
+              </div>
+            </Card>
+
+            <div className="flex flex-col gap-3">
+              <h3 className="font-semibold">Ingredientes detectados</h3>
+              {analysis.detectedIngredients.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No se detectaron ingredientes con suficiente claridad.</p>
               ) : (
-                adjustedFoods.map((food, index) => (
-                  <Card key={index} className="p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{food.name}</p>
-                        <p className="text-xs text-muted-foreground">{food.portion}</p>
-                        <div className="flex flex-wrap gap-2 mt-2 text-xs">
-                          <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
-                            {food.calories} kcal
-                          </span>
-                          <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
-                            {food.protein}g prot
-                          </span>
-                          <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                            {food.carbs}g carbs
-                          </span>
-                          <span className="px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">
-                            {food.fat}g grasa
-                          </span>
-                        </div>
+                analysis.detectedIngredients.map((ingredient, index) => (
+                  <Card key={`${ingredient.name}-${index}`} className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">{ingredient.name}</p>
+                        <p className="text-xs text-muted-foreground">{ingredient.estimatedWeightGrams} g estimados</p>
                       </div>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          onClick={() => updateFoodPortion(index, 0.5)}
-                        >
-                          ½
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          onClick={() => updateFoodPortion(index, 1.5)}
-                        >
-                          1.5
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 w-7 p-0"
-                          onClick={() => updateFoodPortion(index, 2)}
-                        >
-                          2x
-                        </Button>
+                      <div className="flex flex-wrap justify-end gap-2 text-xs">
+                        <span className="rounded-full bg-muted px-2 py-1">{ingredient.protein}g prot</span>
+                        <span className="rounded-full bg-muted px-2 py-1">{ingredient.carbs}g carbs</span>
+                        <span className="rounded-full bg-muted px-2 py-1">{ingredient.fats}g grasa</span>
                       </div>
                     </div>
                   </Card>
@@ -427,42 +488,14 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
               )}
             </div>
 
-            {/* Totals */}
-            {adjustedFoods.length > 0 && (
-              <Card className="p-4 bg-primary/5 border-primary/20">
-                <div className="flex items-center gap-2 mb-3">
-                  <Flame className="w-5 h-5 text-primary" />
-                  <h3 className="font-semibold">Total</h3>
-                </div>
-                <div className="grid grid-cols-4 gap-2 text-center">
-                  {(() => {
-                    const totals = calculateTotals();
-                    return (
-                      <>
-                        <div>
-                          <p className="text-lg font-bold">{totals.calories}</p>
-                          <p className="text-xs text-muted-foreground">kcal</p>
-                        </div>
-                        <div>
-                          <p className="text-lg font-bold">{totals.protein}g</p>
-                          <p className="text-xs text-muted-foreground">proteína</p>
-                        </div>
-                        <div>
-                          <p className="text-lg font-bold">{totals.carbs}g</p>
-                          <p className="text-xs text-muted-foreground">carbos</p>
-                        </div>
-                        <div>
-                          <p className="text-lg font-bold">{totals.fat}g</p>
-                          <p className="text-xs text-muted-foreground">grasa</p>
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              </Card>
-            )}
+            <Card className="border-primary/20 p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <Sparkles className="size-5 text-primary" />
+                <h3 className="font-semibold">Coach de Bolsillo</h3>
+              </div>
+              <p className="text-sm text-muted-foreground">{analysis.coachFeedback}</p>
+            </Card>
 
-            {/* Actions */}
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -478,14 +511,14 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
               <Button
                 className="flex-1 gap-2"
                 onClick={saveToMacros}
-                disabled={isSaving || adjustedFoods.length === 0}
+                disabled={isSaving || !editedDishName.trim()}
               >
                 {isSaving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                 ) : (
-                  <Check className="w-4 h-4" />
+                  <Check className="size-4" />
                 )}
-                Guardar en Macros
+                Registrar en mi Historial
               </Button>
             </div>
           </div>
