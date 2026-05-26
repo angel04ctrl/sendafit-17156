@@ -17,9 +17,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { hydrateQueryCache, subscribeQueryCachePersistence } from "./lib/queryPersistence";
 
 const OnboardingForm = lazy(() => import("./components/onboarding/OnboardingForm"));
 const Auth = lazy(() => import("./pages/Auth"));
@@ -53,9 +54,45 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      networkMode: "offlineFirst",
+      gcTime: 1000 * 60 * 60 * 24 * 14,
+    },
+    mutations: {
+      networkMode: "offlineFirst",
     },
   },
 });
+
+if (typeof window !== "undefined") {
+  hydrateQueryCache(queryClient);
+  subscribeQueryCachePersistence(queryClient);
+}
+
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) return <PageLoader />;
+  if (!user) return <Navigate to="/auth" replace />;
+
+  return <>{children}</>;
+};
+
+const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) return <PageLoader />;
+  if (user) return <Navigate to="/dashboard" replace />;
+
+  return <>{children}</>;
+};
+
+const HomeRedirect = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) return <PageLoader />;
+
+  return <Navigate to={user ? "/dashboard" : "/auth"} replace />;
+};
 
 /**
  * Componente principal App
@@ -88,27 +125,27 @@ const App = () => {
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
                     {/* Ruta raíz redirige a autenticación */}
-                    <Route path="/" element={<Navigate to="/auth" replace />} />
+                    <Route path="/" element={<HomeRedirect />} />
                     {/* Ruta de autenticación (login/registro) */}
-                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
                     {/* Ruta de onboarding para nuevos usuarios */}
                     <Route path="/onboarding" element={<OnboardingForm />} />
                     {/* Ruta del dashboard principal */}
-                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                     {/* Ruta de seguimiento de macros/nutrición */}
-                    <Route path="/macros" element={<Macros />} />
+                    <Route path="/macros" element={<ProtectedRoute><Macros /></ProtectedRoute>} />
                     {/* Ruta de gestión de entrenamientos */}
-                    <Route path="/workouts" element={<Workouts />} />
+                    <Route path="/workouts" element={<ProtectedRoute><Workouts /></ProtectedRoute>} />
                     {/* Ruta del calendario de entrenamientos */}
-                    <Route path="/calendar" element={<Calendar />} />
+                    <Route path="/calendar" element={<ProtectedRoute><Calendar /></ProtectedRoute>} />
                     {/* Ruta del coach inteligente */}
-                    <Route path="/coach-chat" element={<CoachChat />} />
+                    <Route path="/coach-chat" element={<ProtectedRoute><CoachChat /></ProtectedRoute>} />
                     {/* Ruta de reportes avanzados */}
-                    <Route path="/reports" element={<Reports />} />
+                    <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
                     {/* Ruta de actualización de contraseña */}
                     <Route path="/update-password" element={<UpdatePassword />} />
                     {/* Ruta del perfil de usuario */}
-                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                     {/* Ruta 404 para páginas no encontradas */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>

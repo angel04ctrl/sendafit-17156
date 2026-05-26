@@ -33,6 +33,15 @@ import {
   type ProgressData
 } from '@/lib/api/backend';
 
+const getLocalDateString = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+};
+
 /**
  * Hook para obtener la rutina asignada al usuario
  * Retorna la rutina actual con todos sus ejercicios organizados por día
@@ -435,7 +444,7 @@ export const useGenerateWeeklyWorkouts = () => {
   
   return useMutation({
     mutationFn: async (options?: { reassign?: boolean; retries?: number }) => {
-      const userLocalDate = new Date().toISOString().split('T')[0];
+      const userLocalDate = getLocalDateString();
       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const maxRetries = options?.retries || 3;
       let lastError: unknown;
@@ -485,6 +494,8 @@ export const useGenerateWeeklyWorkouts = () => {
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['user-routine'] });
       queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['weekly-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['weekly-calendar-workouts'] });
       queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
       queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
       

@@ -54,11 +54,45 @@ export function AITrainerChat({ open, onOpenChange }: AITrainerChatProps) {
   const { user } = useAuth();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const chatStorageKey = user?.id ? `sendafit-ai-trainer-chat:${user.id}` : null;
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [chatMode, setChatMode] = useState<string>("general");
+
+  useEffect(() => {
+    if (!chatStorageKey) {
+      queueMicrotask(() => setMessages([]));
+      return;
+    }
+
+    try {
+      const storedMessages = window.localStorage.getItem(chatStorageKey);
+      if (!storedMessages) return;
+
+      const parsed = JSON.parse(storedMessages) as Array<Omit<Message, "timestamp"> & { timestamp: string }>;
+      if (!Array.isArray(parsed)) return;
+
+      const restoredMessages = parsed.map((message) => ({
+        ...message,
+        timestamp: new Date(message.timestamp),
+      }));
+      queueMicrotask(() => setMessages(restoredMessages));
+    } catch (error) {
+      console.warn("Could not load AI trainer chat history:", error);
+    }
+  }, [chatStorageKey]);
+
+  useEffect(() => {
+    if (!chatStorageKey || messages.length === 0) return;
+
+    try {
+      window.localStorage.setItem(chatStorageKey, JSON.stringify(messages.slice(-40)));
+    } catch (error) {
+      console.warn("Could not persist AI trainer chat history:", error);
+    }
+  }, [chatStorageKey, messages]);
 
   useEffect(() => {
     // Scroll to bottom when messages change
@@ -70,11 +104,11 @@ export function AITrainerChat({ open, onOpenChange }: AITrainerChatProps) {
   useEffect(() => {
     // Add initial greeting when opening
     if (open && messages.length === 0) {
-      setMessages([{
+      queueMicrotask(() => setMessages([{
         role: "assistant",
         content: "¡Hola! 👋 Soy **Coach Senda**, tu entrenador personal con IA. Puedo ayudarte a:\n\n• 🏋️ Crear rutinas de entrenamiento personalizadas\n• 🥗 Diseñar planes de alimentación\n• 💡 Responder tus dudas sobre fitness y nutrición\n\n¿En qué puedo ayudarte hoy?",
         timestamp: new Date(),
-      }]);
+      }]));
     }
   }, [open, messages.length]);
 
@@ -209,11 +243,16 @@ export function AITrainerChat({ open, onOpenChange }: AITrainerChatProps) {
   };
 
   const clearChat = () => {
-    setMessages([{
+    const resetMessages: Message[] = [{
       role: "assistant",
       content: "Chat reiniciado. ¿En qué puedo ayudarte?",
       timestamp: new Date(),
-    }]);
+    }];
+
+    setMessages(resetMessages);
+    if (chatStorageKey) {
+      window.localStorage.setItem(chatStorageKey, JSON.stringify(resetMessages));
+    }
   };
 
   return (

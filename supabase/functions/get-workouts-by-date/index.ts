@@ -35,11 +35,18 @@ serve(async (req) => {
       );
     }
 
-    // Parse query parameters
+    let bodyParams: { date?: string; start_date?: string; end_date?: string } = {};
+    try {
+      bodyParams = await req.json();
+    } catch {
+      bodyParams = {};
+    }
+
+    // Parse query parameters and support POST body params from supabase.functions.invoke
     const url = new URL(req.url);
-    const date = url.searchParams.get('date');
-    const startDate = url.searchParams.get('start_date');
-    const endDate = url.searchParams.get('end_date');
+    const date = url.searchParams.get('date') || bodyParams.date;
+    const startDate = url.searchParams.get('start_date') || bodyParams.start_date;
+    const endDate = url.searchParams.get('end_date') || bodyParams.end_date;
 
     console.log('Fetching workouts for user:', user.id, 'date:', date, 'range:', startDate, '-', endDate);
 
@@ -55,8 +62,13 @@ serve(async (req) => {
       'L': 1, 'M': 2, 'Mi': 3, 'J': 4, 'V': 5, 'S': 6, 'D': 7
     };
     const availableWeekdaysNumbers = (profile?.available_weekdays || [])
-      .map((d: string) => dayMap[d])
-      .filter(Boolean) as number[];
+      .map((d: string | number) => {
+        if (typeof d === 'number') return d;
+        const numericDay = parseInt(d, 10);
+        if (!isNaN(numericDay)) return numericDay;
+        return dayMap[d];
+      })
+      .filter((day: number | undefined): day is number => Number.isInteger(day) && day >= 1 && day <= 7);
 
     let allWorkouts: Record<string, unknown>[] = [];
 

@@ -36,10 +36,20 @@ serve(async (req) => {
 
     console.log(`Fetching all workouts for user ${user.id}`);
 
-    // Parse query parameters
+    let bodyParams: { include_completed?: boolean; tipo?: string } = {};
+    try {
+      bodyParams = await req.json();
+    } catch {
+      bodyParams = {};
+    }
+
+    // Parse query parameters and support POST body params from supabase.functions.invoke
     const url = new URL(req.url);
-    const includeCompleted = url.searchParams.get('include_completed') !== 'false';
-    const tipo = url.searchParams.get('tipo'); // 'automatico' or 'manual'
+    const includeCompletedParam = url.searchParams.get('include_completed');
+    const includeCompleted = includeCompletedParam !== null
+      ? includeCompletedParam !== 'false'
+      : bodyParams.include_completed !== false;
+    const tipo = url.searchParams.get('tipo') || bodyParams.tipo; // 'automatico' or 'manual'
 
     // Build query
     let query = supabase

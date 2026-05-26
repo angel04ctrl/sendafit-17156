@@ -122,7 +122,7 @@ serve(async (req) => {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("available_weekdays")
+      .select("available_weekdays, assigned_routine_id")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -130,40 +130,18 @@ serve(async (req) => {
       .map((day: string) => normalizeWeekday(day, 0))
       .filter((day: number) => day >= 1 && day <= 7);
 
-    const { data: oldWorkouts, error: oldError } = await supabase
-      .from("workouts")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("tipo", "automatico");
-
-    if (oldError) throw oldError;
-
-    const oldIds = oldWorkouts?.map((workout) => workout.id) || [];
-    if (oldIds.length > 0) {
-      const { error: deleteExercisesError } = await supabase
-        .from("workout_exercises")
-        .delete()
-        .in("workout_id", oldIds);
-      if (deleteExercisesError) throw deleteExercisesError;
-
-      const { error: deleteWorkoutsError } = await supabase
-        .from("workouts")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("tipo", "automatico");
-      if (deleteWorkoutsError) throw deleteWorkoutsError;
-    }
-
     const workoutRows = metadata_routine.days.map((day, index) => {
       const fallback = fallbackWeekdays[index] || ((index % 7) + 1);
       const weekday = normalizeWeekday(day.weekday, fallback);
+      const hasAssignedPlan = Boolean(profile?.assigned_routine_id);
+
       return {
         user_id: user.id,
         name: day.day_name || `${metadata_routine.routine_name || "Rutina IA"} - Dia ${index + 1}`,
         description: metadata_routine.routine_name || "Rutina personalizada por SendaFit AI Coach",
         location: day.location || "gimnasio",
-        tipo: "automatico" as const,
-        plan_id: null,
+        tipo: hasAssignedPlan ? "automatico" as const : "manual" as const,
+        plan_id: hasAssignedPlan ? profile.assigned_routine_id : null,
         scheduled_date: dateForWeekday(weekday),
         weekday,
         duration_minutes: day.duration_minutes,
@@ -196,7 +174,37 @@ serve(async (req) => {
       const { error: insertExercisesError } = await supabase
         .from("workout_exercises")
         .insert(exerciseRows);
-      if (insertExercisesError) throw insertExercisesError;
+      if (insertExercisesError) {
+        await supabase
+          .from("workouts")
+          .delete()
+          .in("id", insertedWorkouts.map((workout) => workout.id));
+        throw insertExercisesError;
+      }
+    }
+
+    const { data: oldWorkouts, error: oldError } = await supabase
+      .from("workouts")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("tipo", "automatico")
+      .not("id", "in", `(${insertedWorkouts.map((workout) => workout.id).join(",")})`);
+
+    if (oldError) throw oldError;
+
+    const oldIds = oldWorkouts?.map((workout) => workout.id) || [];
+    if (oldIds.length > 0) {
+      const { error: deleteExercisesError } = await supabase
+        .from("workout_exercises")
+        .delete()
+        .in("workout_id", oldIds);
+      if (deleteExercisesError) throw deleteExercisesError;
+
+      const { error: deleteWorkoutsError } = await supabase
+        .from("workouts")
+        .delete()
+        .in("id", oldIds);
+      if (deleteWorkoutsError) throw deleteWorkoutsError;
     }
 
     return respond({

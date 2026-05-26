@@ -12,7 +12,7 @@
  * - Actualizar en tiempo real al completar entrenamientos
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,7 +35,8 @@ import {
   useWeeklyWorkouts, 
   useUserProfile, 
   useDeleteWorkout, 
-  useCreateWorkout 
+  useCreateWorkout,
+  useGenerateWeeklyWorkouts,
 } from "@/hooks/useBackendApi";
 import { ProButton } from "@/components/ProButton";
 import { ExerciseDetailModal } from "@/components/ExerciseDetailModal";
@@ -175,6 +176,7 @@ const Workouts = () => {
   const deleteMutation = useDeleteWorkout();
   const createMutation = useCreateWorkout();
   const completeWorkoutMutation = useCompleteWorkout();
+  const generateWeeklyWorkouts = useGenerateWeeklyWorkouts();
 
   const [availableDays, setAvailableDays] = useState<string[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -194,6 +196,7 @@ const Workouts = () => {
   const [open, setOpen] = useState(false);
   const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false);
   const [completingWorkout, setCompletingWorkout] = useState<string | null>(null);
+  const repairAttemptedRef = useRef(false);
 
   const fetchExercisesForDay = async (dayOfWeek: string, location: string) => {
     const query = sb.from("workout_exercises").select("*");
@@ -326,6 +329,21 @@ const Workouts = () => {
   
   // Use backend data for today's workouts
   const todayWorkouts = todaysData?.workouts || [];
+
+  useEffect(() => {
+    if (!user?.id || !profile?.assigned_routine_id || repairAttemptedRef.current) return;
+    if (generateWeeklyWorkouts.isPending) return;
+    if (todayWorkouts.length > 0 || upcomingWorkouts.length > 0) return;
+
+    repairAttemptedRef.current = true;
+    generateWeeklyWorkouts.mutate({ retries: 1 });
+  }, [
+    user?.id,
+    profile?.assigned_routine_id,
+    generateWeeklyWorkouts,
+    todayWorkouts.length,
+    upcomingWorkouts.length,
+  ]);
   
   // Calculate today's weekday (1=Lunes, 7=Domingo)
   const todayWeekday = (() => {
