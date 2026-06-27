@@ -41,3 +41,11 @@ supabase/.branches/
 BD-sendaFit/
 DEBUG_QUERIES.sql
 *.csv
+
+# Local planning/audit scratch files, not production artifacts
+Auditoria*.md
+Plan-de-sprints.md
+prompt de auditoria.md
+Untitled*.txt
+docs/sendafit-audit/
+docs/progress-source-of-truth.md
