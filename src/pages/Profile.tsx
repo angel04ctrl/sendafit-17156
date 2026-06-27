@@ -372,8 +372,14 @@ const Profile = () => {
     setShowPreviewModal(false);
     await saveProfileChanges();
 
-    if (validationData?.planProtection?.isProtected && planChangeAction === "keep") {
-      toast.success("Dias actualizados. Tu plan actual se mantiene sin reemplazarse.");
+    if (validationData?.planProtection?.isProtected) {
+      if (planChangeAction === "keep") {
+        toast.success("Dias actualizados. Tu plan actual se mantiene sin reemplazarse.");
+      } else if (planChangeAction === "adapt") {
+        toast.info("Dias actualizados. Tu plan protegido se conserva; ajustalo manualmente desde Entrenamientos.");
+      } else {
+        toast.info("Dias actualizados. Tu plan protegido no se borro; crea o aplica un nuevo plan cuando estes listo.");
+      }
       return;
     }
 

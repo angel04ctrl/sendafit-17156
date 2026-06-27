@@ -160,7 +160,7 @@ serve(async (req) => {
     }
 
     if (planProtection.isProtected && action !== 'none') {
-      reason = 'Cambiaste tus dias de entrenamiento. Tu plan actual puede no coincidir con tu nueva disponibilidad y necesita confirmacion antes de modificarlo.';
+      reason = 'Cambiaste tus dias de entrenamiento. Tu plan actual puede no coincidir con tu nueva disponibilidad. Puedes mantenerlo, crear uno nuevo o adaptarlo manualmente.';
     }
 
     const response = {

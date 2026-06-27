@@ -1,6 +1,15 @@
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Dumbbell, Target, AlertCircle } from "lucide-react";
+import { AlertCircle, Calendar, Dumbbell, Target } from "lucide-react";
 
 interface PlanChangePreviewModalProps {
   open: boolean;
@@ -42,20 +51,20 @@ interface PlanChangePreviewModalProps {
 }
 
 const goalLabels: Record<string, string> = {
-  'perder_peso': 'Perder peso',
-  'aumentar_masa_muscular': 'Aumentar masa muscular',
-  'tonificar': 'Tonificar',
-  'mantener_peso': 'Mantener peso',
+  perder_peso: "Perder peso",
+  aumentar_masa_muscular: "Aumentar masa muscular",
+  tonificar: "Tonificar",
+  mantener_peso: "Mantener peso",
 };
 
 const dayLabels: Record<string, string> = {
-  'L': 'Lunes',
-  'M': 'Martes',
-  'X': 'Miércoles',
-  'J': 'Jueves',
-  'V': 'Viernes',
-  'S': 'Sábado',
-  'D': 'Domingo',
+  L: "Lunes",
+  M: "Martes",
+  X: "Miercoles",
+  J: "Jueves",
+  V: "Viernes",
+  S: "Sabado",
+  D: "Domingo",
 };
 
 export function PlanChangePreviewModal({
@@ -65,11 +74,19 @@ export function PlanChangePreviewModal({
   planAction,
   onPlanActionChange,
   validationData,
-  isLoading
+  isLoading,
 }: PlanChangePreviewModalProps) {
   if (!validationData) return null;
 
   const { changes, impact, currentPlan, reason, action, planProtection } = validationData;
+  const isProtected = Boolean(planProtection?.isProtected);
+
+  const protectedOptions = [
+    ["keep", "Mantener mi plan actual"],
+    ["adapt", "Mantener plan y ajustar manualmente despues"],
+    ["new_suggested", "Crear nuevo plan sugerido despues"],
+    ["archive_replace", "Adaptacion avanzada proximamente"],
+  ];
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -77,38 +94,38 @@ export function PlanChangePreviewModal({
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-warning" />
-            Confirmación de cambios en tu plan
+            Confirmacion de cambios en tu plan
           </AlertDialogTitle>
           <AlertDialogDescription className="text-base">
-            {reason}
+            {isProtected
+              ? "Cambiaste tus dias de entrenamiento. Tu plan actual puede no coincidir con tu nueva disponibilidad. Puedes mantenerlo, crear uno nuevo o adaptarlo manualmente."
+              : reason}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <div className="space-y-4 my-4">
-          {/* Current Plan Info */}
+        <div className="my-4 space-y-4">
           {currentPlan && (
-            <div className="bg-muted/50 p-4 rounded-lg">
-              <h4 className="font-semibold mb-2 text-sm">Plan actual</h4>
+            <div className="rounded-lg bg-muted/50 p-4">
+              <h4 className="mb-2 text-sm font-semibold">Plan actual</h4>
               <p className="text-sm text-muted-foreground">{currentPlan.nombre_plan}</p>
-              <div className="flex gap-2 mt-2">
-                <Badge variant="outline">{currentPlan.dias_semana} días/semana</Badge>
+              <div className="mt-2 flex gap-2">
+                <Badge variant="outline">{currentPlan.dias_semana} dias/semana</Badge>
                 <Badge variant="outline">{goalLabels[currentPlan.objetivo] || currentPlan.objetivo}</Badge>
               </div>
             </div>
           )}
 
-          {/* Changes Summary */}
           <div className="space-y-3">
             {changes.goalChanged && (
-              <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-                <Target className="h-5 w-5 mt-0.5 text-primary" />
+              <div className="flex items-start gap-3 rounded-lg bg-muted/30 p-3">
+                <Target className="mt-0.5 h-5 w-5 text-primary" />
                 <div className="flex-1">
-                  <p className="font-medium text-sm">Objetivo de fitness</p>
-                  <div className="flex items-center gap-2 mt-1">
+                  <p className="text-sm font-medium">Objetivo de fitness</p>
+                  <div className="mt-1 flex items-center gap-2">
                     <span className="text-sm text-muted-foreground line-through">
                       {goalLabels[changes.oldGoal] || changes.oldGoal}
                     </span>
-                    <span className="text-sm">→</span>
+                    <span className="text-sm">a</span>
                     <span className="text-sm font-medium text-primary">
                       {goalLabels[changes.newGoal] || changes.newGoal}
                     </span>
@@ -118,17 +135,17 @@ export function PlanChangePreviewModal({
             )}
 
             {changes.weekdaysCountChanged && (
-              <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-                <Dumbbell className="h-5 w-5 mt-0.5 text-primary" />
+              <div className="flex items-start gap-3 rounded-lg bg-muted/30 p-3">
+                <Dumbbell className="mt-0.5 h-5 w-5 text-primary" />
                 <div className="flex-1">
-                  <p className="font-medium text-sm">Cantidad de días</p>
-                  <div className="flex items-center gap-2 mt-1">
+                  <p className="text-sm font-medium">Cantidad de dias</p>
+                  <div className="mt-1 flex items-center gap-2">
                     <span className="text-sm text-muted-foreground line-through">
-                      {changes.oldDaysCount} días/semana
+                      {changes.oldDaysCount} dias/semana
                     </span>
-                    <span className="text-sm">→</span>
+                    <span className="text-sm">a</span>
                     <span className="text-sm font-medium text-primary">
-                      {changes.newDaysCount} días/semana
+                      {changes.newDaysCount} dias/semana
                     </span>
                   </div>
                 </div>
@@ -136,21 +153,20 @@ export function PlanChangePreviewModal({
             )}
 
             {changes.weekdaysChanged && !changes.weekdaysCountChanged && (
-              <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-                <Calendar className="h-5 w-5 mt-0.5 text-primary" />
+              <div className="flex items-start gap-3 rounded-lg bg-muted/30 p-3">
+                <Calendar className="mt-0.5 h-5 w-5 text-primary" />
                 <div className="flex-1">
-                  <p className="font-medium text-sm">Días de entrenamiento</p>
-                  <div className="space-y-1 mt-1">
+                  <p className="text-sm font-medium">Dias de entrenamiento</p>
+                  <div className="mt-1 space-y-1">
                     <div className="flex flex-wrap gap-1">
-                      {changes.oldWeekdays.map(day => (
+                      {changes.oldWeekdays.map((day) => (
                         <Badge key={day} variant="outline" className="text-xs line-through">
                           {dayLabels[day] || day}
                         </Badge>
                       ))}
                     </div>
-                    <span className="text-sm">↓</span>
                     <div className="flex flex-wrap gap-1">
-                      {changes.newWeekdays.map(day => (
+                      {changes.newWeekdays.map((day) => (
                         <Badge key={day} variant="default" className="text-xs">
                           {dayLabels[day] || day}
                         </Badge>
@@ -162,46 +178,52 @@ export function PlanChangePreviewModal({
             )}
           </div>
 
-          {/* Impact */}
-          <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg">
-            <h4 className="font-semibold mb-2 text-sm flex items-center gap-2">
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+            <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold">
               <AlertCircle className="h-4 w-4" />
               Impacto en tus entrenamientos
             </h4>
             <div className="space-y-1 text-sm">
-              {action === 'reassign_and_redistribute' && (
-                <p>• Se creará un nuevo plan personalizado y se redistribuirán tus entrenamientos</p>
-              )}
-              {action === 'reassign' && (
-                <p>• Se asignará un nuevo plan que se ajusta a tu nuevo objetivo</p>
-              )}
-              {action === 'redistribute' && (
-                <p>• Tus entrenamientos se redistribuirán en los nuevos días seleccionados</p>
+              {isProtected ? (
+                <>
+                  <p>No se reemplazara automaticamente tu plan protegido.</p>
+                  <p>Tus entrenamientos personalizados, manuales o de IA se conservan en Entrenamientos e Historial.</p>
+                </>
+              ) : (
+                <>
+                  {action === "reassign_and_redistribute" && (
+                    <p>Se creara un nuevo plan sugerido y se redistribuiran tus entrenamientos pendientes.</p>
+                  )}
+                  {action === "reassign" && (
+                    <p>Se asignara un nuevo plan que se ajusta a tu nuevo objetivo.</p>
+                  )}
+                  {action === "redistribute" && (
+                    <p>Tus entrenamientos se redistribuiran en los nuevos dias seleccionados.</p>
+                  )}
+                </>
               )}
               {impact.pendingWorkoutsCount > 0 && (
-                <p>• {impact.pendingWorkoutsCount} entrenamientos pendientes serán actualizados</p>
+                <p>
+                  {impact.pendingWorkoutsCount} entrenamientos pendientes{" "}
+                  {isProtected ? "se revisaran antes de cualquier cambio." : "seran actualizados."}
+                </p>
               )}
               {impact.completedWorkoutsCount > 0 && (
                 <p className="text-muted-foreground">
-                  • {impact.completedWorkoutsCount} entrenamientos completados se mantendrán intactos
+                  {impact.completedWorkoutsCount} entrenamientos completados se mantendran intactos.
                 </p>
               )}
             </div>
           </div>
 
-          {planProtection?.isProtected && (
+          {isProtected && (
             <div className="rounded-lg border border-warning/30 bg-warning/10 p-4">
-              <h4 className="font-semibold mb-2 text-sm">Plan protegido</h4>
-              <p className="text-sm text-muted-foreground mb-3">
-                {planProtection.reason || "Tu plan actual puede ser personalizado o creado por IA. No se reemplazara sin confirmacion."}
+              <h4 className="mb-2 text-sm font-semibold">Plan protegido</h4>
+              <p className="mb-3 text-sm text-muted-foreground">
+                {planProtection?.reason || "Tu plan actual puede ser personalizado o creado por IA. No se reemplazara sin confirmacion."}
               </p>
               <div className="space-y-2 text-sm">
-                {[
-                  ["keep", "Mantener mi plan actual"],
-                  ["adapt", "Adaptar mi plan actual a mis nuevos dias"],
-                  ["new_suggested", "Crear un nuevo plan sugerido"],
-                  ["archive_replace", "Guardar mi plan actual como historial y reemplazarlo"],
-                ].map(([value, label]) => (
+                {protectedOptions.map(([value, label]) => (
                   <label key={value} className="flex items-center gap-2 rounded-md border bg-background p-2">
                     <input
                       type="radio"
@@ -221,7 +243,7 @@ export function PlanChangePreviewModal({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isLoading}>Cancelar</AlertDialogCancel>
           <AlertDialogAction onClick={onConfirm} disabled={isLoading}>
-            {isLoading ? 'Actualizando...' : 'Confirmar cambios'}
+            {isLoading ? "Actualizando..." : "Confirmar cambios"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
