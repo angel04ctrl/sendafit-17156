@@ -193,6 +193,10 @@ serve(async (req) => {
               end_date: plan === "anual" 
                 ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
                 : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+              current_period_start: new Date().toISOString(),
+              current_period_end: plan === "anual"
+                ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+                : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
             }, {
               onConflict: 'user_id',
             });
@@ -236,6 +240,9 @@ serve(async (req) => {
             .from("user_subscriptions")
             .update({ 
               status: "active",
+              current_period_start: new Date().toISOString(),
+              current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+              end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
               last_event: "invoice.payment_succeeded" 
             })
             .eq("stripe_subscription_id", subscriptionId);
@@ -258,6 +265,7 @@ serve(async (req) => {
               status: "canceled",
               last_event: "customer.subscription.deleted",
               end_date: new Date().toISOString(),
+              current_period_end: new Date().toISOString(),
             })
             .eq("stripe_subscription_id", subscription.id);
 

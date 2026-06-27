@@ -69,6 +69,9 @@ const confidenceLabels: Record<ConfidenceScore, string> = {
   baja: "Confianza baja",
 };
 
+const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
 function toNumber(value: unknown) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? Math.max(0, Math.round(numeric)) : 0;
@@ -124,6 +127,16 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
   };
 
   const processFile = (file: File) => {
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      toast.error("Imagen invalida. Usa JPG, PNG o WebP.");
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error("La imagen es demasiado grande. Usa una imagen menor a 6 MB.");
+      return;
+    }
+
     setImageFile(file);
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -192,7 +205,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
     setIsSaving(true);
 
     try {
-      let imageUrl = "";
+      let imagePath = "";
       if (imageFile) {
         const extension = imageFile.name.split(".").pop() || "jpg";
         const fileName = `${user.id}/${crypto.randomUUID()}.${extension}`;
@@ -200,12 +213,9 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
           .from("ai-analysis-images")
           .upload(fileName, imageFile);
 
-        if (!uploadError && uploadData) {
-          const { data: urlData } = supabase.storage
-            .from("ai-analysis-images")
-            .getPublicUrl(fileName);
-          imageUrl = urlData.publicUrl;
-        }
+        if (uploadError) throw uploadError;
+        if (!uploadData?.path) throw new Error("No se pudo guardar la imagen.");
+        imagePath = uploadData.path;
       }
 
       const today = format(new Date(), "yyyy-MM-dd");
@@ -218,7 +228,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
 
       await supabase.from("food_analysis_logs").insert({
         user_id: user.id,
-        image_url: imageUrl,
+        image_url: imagePath,
         detected_foods: analysis.detectedIngredients,
         estimated_macros: analysis.macros,
         adjusted_macros: {
@@ -283,6 +293,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
           <div className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
               Toma una foto o sube una imagen de tu comida para analizar automaticamente los macronutrientes.
+              La imagen se procesa con IA y el resultado es una estimacion que puedes corregir antes de guardar.
             </p>
 
             {imagePreview ? (

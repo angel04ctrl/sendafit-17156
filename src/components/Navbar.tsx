@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Calendar, Dumbbell, Apple, UserCircle, Moon, Sun, LogOut, MessageSquare } from "lucide-react";
+import { Home, Dumbbell, Apple, UserCircle, Moon, Sun, LogOut, MessageSquare } from "lucide-react";
 import { Button } from "./ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,10 +19,9 @@ export const Navbar = () => {
 
   const navItems = [
     { path: "/dashboard", icon: Home, label: "Inicio" },
-    { path: "/macros", icon: Apple, label: "Macros" },
     { path: "/workouts", icon: Dumbbell, label: "Entrenar" },
+    { path: "/macros", icon: Apple, label: "Macros" },
     { path: "/coach-chat", icon: MessageSquare, label: "Coach" },
-    { path: "/calendar", icon: Calendar, label: "Agenda" },
     { path: "/profile", icon: UserCircle, label: "Perfil" },
   ];
 
@@ -64,7 +63,7 @@ export const Navbar = () => {
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/70 bg-card/95 backdrop-blur-xl safe-area-bottom">
         <div className="w-full px-1.5 py-1.5 sm:px-4">
-          <div className="mx-auto grid max-w-4xl grid-cols-6 items-end gap-1">
+          <div className="mx-auto grid max-w-4xl grid-cols-5 items-end gap-1">
             {navItems.map((item) => {
               const active = isActive(item.path);
               return (

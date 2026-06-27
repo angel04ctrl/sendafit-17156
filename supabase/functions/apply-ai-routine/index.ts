@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { handleCors, isAllowedRequestOrigin, jsonResponse } from "../_shared/cors.ts";
 
 interface RoutineExercise {
   name: string;
@@ -39,13 +35,6 @@ const WEEKDAY_BY_NAME: Record<string, number> = {
   "sábado": 6,
   domingo: 7,
 };
-
-function respond(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
 
 function dateForWeekday(weekday: number): string {
   const today = new Date();
@@ -92,13 +81,15 @@ function normalizeRoutine(metadataRoutine: MetadataRoutine): MetadataRoutine {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    if (req.method !== "POST") return respond({ error: "Metodo no permitido." }, 405);
+    if (!isAllowedRequestOrigin(req)) return jsonResponse(req, { error: "Origen no permitido." }, 403);
+    if (req.method !== "POST") return jsonResponse(req, { error: "Metodo no permitido." }, 405);
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return respond({ error: "No autorizado." }, 401);
+    if (!authHeader?.startsWith("Bearer ")) return jsonResponse(req, { error: "No autorizado." }, 401);
 
     const userClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -107,7 +98,7 @@ serve(async (req) => {
     );
 
     const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) return respond({ error: "Sesion invalida." }, 401);
+    if (authError || !user) return jsonResponse(req, { error: "Sesion invalida." }, 401);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -117,7 +108,7 @@ serve(async (req) => {
     const { metadata_routine: rawRoutine } = await req.json() as { metadata_routine?: MetadataRoutine };
     const metadata_routine = rawRoutine ? normalizeRoutine(rawRoutine) : undefined;
     if (!metadata_routine?.days?.length) {
-      return respond({ error: "La rutina sugerida no contiene dias validos." }, 400);
+      return jsonResponse(req, { error: "La rutina sugerida no contiene dias validos." }, 400);
     }
 
     const { data: profile } = await supabase
@@ -207,7 +198,7 @@ serve(async (req) => {
       if (deleteWorkoutsError) throw deleteWorkoutsError;
     }
 
-    return respond({
+    return jsonResponse(req, {
       success: true,
       workouts_created: insertedWorkouts.length,
       exercises_created: exerciseRows.length,
@@ -215,7 +206,7 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("apply-ai-routine error:", error);
-    return respond({
+    return jsonResponse(req, {
       error: error instanceof Error ? error.message : "No se pudo aplicar la rutina.",
     }, 500);
   }

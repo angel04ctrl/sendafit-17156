@@ -1,11 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callAi } from "../_shared/aiClient.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { handleCors, isAllowedRequestOrigin, jsonResponse, getCorsHeaders } from "../_shared/cors.ts";
 
 interface MachineAnalysis {
   machineName: string;
@@ -18,10 +14,10 @@ interface MachineAnalysis {
   };
 }
 
-function respond(body: unknown, status = 200) {
+function respond(req: Request, body: unknown, status = 200, extraHeaders: HeadersInit = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...getCorsHeaders(req), ...extraHeaders, "Content-Type": "application/json" },
   });
 }
 
@@ -64,13 +60,15 @@ function normalizeAnalysis(value: unknown): MachineAnalysis {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    if (req.method !== "POST") return respond({ error: "Metodo no permitido." }, 405);
+    if (!isAllowedRequestOrigin(req)) return jsonResponse(req, { error: "Origen no permitido." }, 403);
+    if (req.method !== "POST") return respond(req, { error: "Metodo no permitido." }, 405);
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return respond({ error: "No autorizado." }, 401);
+    if (!authHeader?.startsWith("Bearer ")) return respond(req, { error: "No autorizado." }, 401);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -79,11 +77,44 @@ serve(async (req) => {
     );
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return respond({ error: "Sesion invalida." }, 401);
+    if (authError || !user) return respond(req, { error: "Sesion invalida." }, 401);
 
     const { imageUrl, fitness_level } = await req.json();
     if (typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
-      return respond({ error: "imageUrl es requerido y debe ser una URL valida." }, 400);
+      return respond(req, { error: "imageUrl es requerido y debe ser una URL valida." }, 400);
+    }
+
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    const { data: limitResult, error: limitError } = await admin.rpc("check_ai_rate_limit", {
+      _user_id: user.id,
+      _function_name: "analyze-machine",
+      _hourly_limit: 5,
+      _daily_limit: 20,
+    });
+
+    if (limitError) {
+      console.error("rate limit error:", limitError);
+      return respond(req, { error: "No se pudo validar la cuota de IA." }, 503);
+    }
+
+    const rateLimit = limitResult as {
+      allowed?: boolean;
+      limit?: "hour" | "day";
+      retryAfterSeconds?: number;
+    };
+
+    if (!rateLimit?.allowed) {
+      const retryAfter = String(rateLimit?.retryAfterSeconds || 3600);
+      return respond(
+        req,
+        { error: "Limite de analisis alcanzado. Intenta mas tarde.", limit: rateLimit?.limit || "hour" },
+        429,
+        { "Retry-After": retryAfter },
+      );
     }
 
     const systemPrompt = `Eres un experto en biomecanica y maquinas de gimnasio. Responde unicamente con JSON valido, sin markdown ni texto extra.
@@ -120,10 +151,10 @@ Usa espanol claro. Prioriza seguridad. Adapta las sugerencias al nivel del usuar
     const analysis = normalizeAnalysis(parseJsonObject(content));
     console.log(`analyze-machine user=${user.id} machine=${analysis.machineName}`);
 
-    return respond({ success: true, analysis });
+    return respond(req, { success: true, analysis });
   } catch (error) {
     console.error("analyze-machine error:", error);
-    return respond({
+    return respond(req, {
       error: error instanceof Error ? error.message : "No se pudo analizar la imagen.",
     }, 500);
   }

@@ -8,11 +8,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callAi } from "../_shared/aiClient.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { handleCors, isAllowedRequestOrigin, jsonResponse } from "../_shared/cors.ts";
 
 type ConfidenceScore = "alta" | "media" | "baja";
 
@@ -58,6 +54,8 @@ const fallbackAnalysis: MealAnalysis = {
   coachFeedback: "No pude identificar comida con suficiente claridad. Toma una foto mas cercana, bien iluminada y centrada en el plato para volver a analizarla.",
 };
 
+const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+
 const systemPrompt = `Eres un Nutricionista Deportivo y Experto en Análisis Visual de Alimentos de SendaFit.
 Tu única tarea es analizar la imagen de un plato de comida provista por el usuario, identificar los alimentos presentes, estimar de forma madura y profesional sus porciones en gramos y calcular los macronutrientes correspondientes (Calorías, Proteínas, Carbohidratos y Grasas).
 
@@ -88,11 +86,10 @@ ESTRUCTURA DEL JSON A DEVOLVER:
   "coachFeedback": "string motivacional y educativo de 2 frases máximo sobre la calidad del plato analizado"
 }`;
 
-function respond(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+function getBase64Size(base64: string): number {
+  const normalized = base64.replace(/\s/g, "");
+  const padding = normalized.endsWith("==") ? 2 : normalized.endsWith("=") ? 1 : 0;
+  return Math.floor((normalized.length * 3) / 4) - padding;
 }
 
 function extractJsonObject(content: string) {
@@ -171,13 +168,15 @@ function normalizeAnalysis(raw: unknown): MealAnalysis {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    if (req.method !== "POST") return respond({ error: "Metodo no permitido." }, 405);
+    if (!isAllowedRequestOrigin(req)) return jsonResponse(req, { error: "Origen no permitido." }, 403);
+    if (req.method !== "POST") return jsonResponse(req, { error: "Metodo no permitido." }, 405);
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return respond({ error: "No autorizado." }, 401);
+    if (!authHeader?.startsWith("Bearer ")) return jsonResponse(req, { error: "No autorizado." }, 401);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -186,11 +185,19 @@ serve(async (req) => {
     );
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return respond({ error: "Sesion invalida." }, 401);
+    if (authError || !user) return jsonResponse(req, { error: "Sesion invalida." }, 401);
 
     const { imageBase64, imageUrl, mimeType = "image/jpeg" } = await req.json() as AnalyzeMealBody;
     if (!imageBase64 && !imageUrl) {
-      return respond({ error: "Debes enviar una imagen para analizar." }, 400);
+      return jsonResponse(req, { error: "Debes enviar una imagen para analizar." }, 400);
+    }
+
+    if (imageBase64 && getBase64Size(imageBase64) > MAX_IMAGE_BYTES) {
+      return jsonResponse(req, { error: "La imagen es demasiado grande. Usa una imagen menor a 6 MB." }, 413);
+    }
+
+    if (imageBase64 && !["image/jpeg", "image/png", "image/webp"].includes(mimeType)) {
+      return jsonResponse(req, { error: "Formato de imagen no valido. Usa JPG, PNG o WebP." }, 415);
     }
 
     const imageSource = imageBase64
@@ -229,10 +236,10 @@ serve(async (req) => {
       `Meal analysis for user ${user.id}: ${analysis.detectedIngredients.length} ingredients detected`,
     );
 
-    return respond(analysis);
+    return jsonResponse(req, analysis);
   } catch (error) {
     console.error("analyze-meal error:", error);
-    return respond({
+    return jsonResponse(req, {
       error: error instanceof Error ? error.message : "No se pudo analizar la imagen.",
     }, 500);
   }

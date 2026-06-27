@@ -1,11 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callAi } from "../_shared/aiClient.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { handleCors, isAllowedRequestOrigin, jsonResponse } from "../_shared/cors.ts";
 
 interface ChatHistoryItem {
   role: "user" | "assistant";
@@ -37,13 +33,6 @@ interface CoachResponse {
   } | null;
 }
 
-function respond(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
-
 function extractJson(content: string): unknown {
   try {
     return JSON.parse(content);
@@ -66,14 +55,62 @@ function normalizeCoachResponse(value: unknown): CoachResponse {
   };
 }
 
+const weekdayLabels: Record<number, string> = {
+  1: "lunes",
+  2: "martes",
+  3: "miercoles",
+  4: "jueves",
+  5: "viernes",
+  6: "sabado",
+  7: "domingo",
+};
+
+const weekdayByText: Record<string, number> = {
+  lunes: 1,
+  martes: 2,
+  miercoles: 3,
+  "miércoles": 3,
+  jueves: 4,
+  viernes: 5,
+  sabado: 6,
+  "sábado": 6,
+  domingo: 7,
+};
+
+function normalizeProfileWeekdays(days: unknown): number[] {
+  if (!Array.isArray(days)) return [];
+  return [...new Set(days
+    .map((day) => weekdayByText[String(day).toLowerCase()] || Number(day))
+    .filter((day) => Number.isInteger(day) && day >= 1 && day <= 7))]
+    .sort((a, b) => a - b);
+}
+
+function requestedWeekdaysFromMessage(message: string): number[] | null {
+  const normalized = message.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (/toda la semana|semana completa|lunes a domingo/.test(normalized)) return [1, 2, 3, 4, 5, 6, 7];
+  if (/lunes a sabado/.test(normalized)) return [1, 2, 3, 4, 5, 6];
+
+  const explicit = Object.entries(weekdayByText)
+    .filter(([label]) => normalized.includes(label.normalize("NFD").replace(/[\u0300-\u036f]/g, "")))
+    .map(([, value]) => value);
+
+  return explicit.length > 0 ? [...new Set(explicit)].sort((a, b) => a - b) : null;
+}
+
+function formatWeekdays(days: number[]): string {
+  return days.map((day) => weekdayLabels[day] || String(day)).join(", ");
+}
+
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    if (req.method !== "POST") return respond({ error: "Metodo no permitido." }, 405);
+    if (!isAllowedRequestOrigin(req)) return jsonResponse(req, { error: "Origen no permitido." }, 403);
+    if (req.method !== "POST") return jsonResponse(req, { error: "Metodo no permitido." }, 405);
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return respond({ error: "No autorizado." }, 401);
+    if (!authHeader?.startsWith("Bearer ")) return jsonResponse(req, { error: "No autorizado." }, 401);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -82,11 +119,11 @@ serve(async (req) => {
     );
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return respond({ error: "Sesion invalida." }, 401);
+    if (authError || !user) return jsonResponse(req, { error: "Sesion invalida." }, 401);
 
     const { user_message, history = [], user_context = {} } = await req.json();
     if (typeof user_message !== "string" || !user_message.trim()) {
-      return respond({ error: "user_message es requerido." }, 400);
+      return jsonResponse(req, { error: "user_message es requerido." }, 400);
     }
 
     const { data: profile } = await supabase
@@ -96,6 +133,25 @@ serve(async (req) => {
       .maybeSingle();
 
     const context = { ...profile, ...user_context };
+    const profileWeekdays = normalizeProfileWeekdays(profile?.available_weekdays || []);
+    const requestedWeekdays = requestedWeekdaysFromMessage(user_message);
+
+    if (requestedWeekdays && profileWeekdays.length > 0) {
+      const sameDays = requestedWeekdays.length === profileWeekdays.length
+        && requestedWeekdays.every((day) => profileWeekdays.includes(day));
+
+      if (!sameDays) {
+        return jsonResponse(req, {
+          success: true,
+          message: `Actualmente en tu perfil tienes seleccionados: ${formatWeekdays(profileWeekdays)}. Cuando dices "${user_message.trim()}", ¿te refieres a esos dias o quieres cambiarlo a ${formatWeekdays(requestedWeekdays)}? Puedo crear este plan como temporal o ayudarte a actualizar tus dias de entrenamiento en el perfil. ¿Que prefieres?`,
+          metadata_routine: null,
+          needs_day_confirmation: true,
+          profile_weekdays: profileWeekdays,
+          requested_weekdays: requestedWeekdays,
+        });
+      }
+    }
+
     const compactHistory = (history as ChatHistoryItem[]).slice(-8).map((item) => ({
       role: item.role,
       content: String(item.content || "").slice(0, 1200),
@@ -154,10 +210,10 @@ ${JSON.stringify(context)}`;
       ],
     });
 
-    return respond({ success: true, ...normalizeCoachResponse(extractJson(content)) });
+    return jsonResponse(req, { success: true, ...normalizeCoachResponse(extractJson(content)) });
   } catch (error) {
     console.error("coach-chat error:", error);
-    return respond({
+    return jsonResponse(req, {
       error: error instanceof Error ? error.message : "No se pudo procesar el mensaje.",
     }, 500);
   }

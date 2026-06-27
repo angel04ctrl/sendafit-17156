@@ -1,10 +1,10 @@
-/**
- * Workouts.tsx - Página de gestión de entrenamientos
+﻿/**
+ * Workouts.tsx - Pagina de gestion de entrenamientos
  * 
  * Este documento gestiona todos los entrenamientos del usuario.
  * Se encarga de:
- * - Mostrar entrenamientos del día por ubicación (casa, gimnasio, exterior)
- * - Listar entrenamientos de otros días del plan actual
+ * - Mostrar entrenamientos del dia por ubicacion (casa, gimnasio, exterior)
+ * - Listar entrenamientos de otros dias del plan actual
  * - Crear nuevos entrenamientos personalizados con ejercicios
  * - Marcar entrenamientos como completados/pendientes
  * - Eliminar entrenamientos
@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,19 +38,39 @@ import {
   useDeleteWorkout, 
   useCreateWorkout,
   useGenerateWeeklyWorkouts,
+  useAllWorkouts,
+  useStartWorkoutSession,
 } from "@/hooks/useBackendApi";
 import { ProButton } from "@/components/ProButton";
 import { ExerciseDetailModal } from "@/components/ExerciseDetailModal";
 import { GymMachineScanner } from "@/components/ai/GymMachineScanner";
+import { RoutineManager } from "@/components/RoutineManager";
+import { ActiveWorkout } from "@/components/ActiveWorkout";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { getActiveWorkoutSession, type WorkoutSession } from "@/lib/api/backend";
 
 const getTodayDate = () => format(new Date(), "yyyy-MM-dd");
 
-const WorkoutList = ({ workouts, isToday = false, completingWorkout, handleCompleteWorkout, handleStartWorkout, handleDeleteWorkout, handleShowExerciseDetails }: { 
+const locationLabels: Record<string, string> = {
+  casa: "Casa",
+  gimnasio: "Gimnasio",
+  gym: "Gimnasio",
+  exterior: "Calistenia",
+  outdoor: "Calistenia",
+};
+
+const getLocationLabel = (location?: string | null) => {
+  if (!location) return "Sin lugar";
+  return locationLabels[location] || location;
+};
+
+const WorkoutList = ({ workouts, emptyTitle = "No hay entrenamientos", emptyActionLabel, onEmptyAction, completingWorkout, handleCompleteWorkout, handleStartWorkout, handleDeleteWorkout, handleShowExerciseDetails }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   workouts: any[]; 
-  isToday?: boolean;
+  emptyTitle?: string;
+  emptyActionLabel?: string;
+  onEmptyAction?: () => void;
   completingWorkout: string | null;
   handleCompleteWorkout: (id: string, completed: boolean) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -61,7 +82,12 @@ const WorkoutList = ({ workouts, isToday = false, completingWorkout, handleCompl
     {workouts.length === 0 ? (
       <div className="text-center py-6 sm:py-8 text-muted-foreground border-2 border-dashed rounded-xl">
         <Dumbbell className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-2 sm:mb-3 opacity-50" />
-        <p className="text-xs sm:text-sm">No hay entrenamientos</p>
+        <p className="text-xs sm:text-sm">{emptyTitle}</p>
+        {emptyActionLabel && onEmptyAction && (
+          <Button variant="outline" size="sm" className="mt-3" onClick={onEmptyAction}>
+            {emptyActionLabel}
+          </Button>
+        )}
       </div>
     ) : (
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -95,8 +121,8 @@ const WorkoutList = ({ workouts, isToday = false, completingWorkout, handleCompl
                   </p>
                 </div>
               </div>
-              <Badge variant={workout.completed ? "secondary" : "default"} className="capitalize text-[10px] sm:text-xs shrink-0">
-                {workout.location}
+              <Badge variant={workout.completed ? "secondary" : "default"} className="text-[10px] sm:text-xs shrink-0">
+                {getLocationLabel(workout.location)}
               </Badge>
             </div>
           </CardHeader>
@@ -131,7 +157,7 @@ const WorkoutList = ({ workouts, isToday = false, completingWorkout, handleCompl
                       </button>
                     </span>
                     <span className="text-muted-foreground font-medium shrink-0 bg-background px-2 py-0.5 rounded shadow-sm border">
-                      {exercise.sets}×{exercise.reps}
+                      {exercise.sets} x {exercise.reps}
                     </span>
                   </div>
                 ))}
@@ -167,16 +193,19 @@ const WorkoutList = ({ workouts, isToday = false, completingWorkout, handleCompl
 const Workouts = () => {
   const { user } = useAuth();
   const sb = supabase;
+  const [searchParams, setSearchParams] = useSearchParams();
   
   const todayDateString = getTodayDate();
   const { data: profile } = useUserProfile(user?.id);
   const { data: upcomingWorkouts = [] } = useWeeklyWorkouts(user?.id, todayDateString);
+  const { data: allWorkoutsData } = useAllWorkouts({ include_completed: true });
   const { data: todaysData } = useTodaysWorkouts();
   
   const deleteMutation = useDeleteWorkout();
   const createMutation = useCreateWorkout();
   const completeWorkoutMutation = useCompleteWorkout();
   const generateWeeklyWorkouts = useGenerateWeeklyWorkouts();
+  const startWorkoutSessionMutation = useStartWorkoutSession();
 
   const [availableDays, setAvailableDays] = useState<string[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -196,7 +225,16 @@ const Workouts = () => {
   const [open, setOpen] = useState(false);
   const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false);
   const [completingWorkout, setCompletingWorkout] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [activeWorkout, setActiveWorkout] = useState<any | null>(null);
+  const [activeSession, setActiveSession] = useState<WorkoutSession | null>(null);
   const repairAttemptedRef = useRef(false);
+  const activeMainTab = searchParams.get("tab") || "hoy";
+  const showLegacyUpcomingSection = activeMainTab === "__legacy";
+
+  const handleMainTabChange = (value: string) => {
+    setSearchParams(value === "hoy" ? {} : { tab: value });
+  };
 
   const fetchExercisesForDay = async (dayOfWeek: string, location: string) => {
     const query = sb.from("workout_exercises").select("*");
@@ -242,7 +280,7 @@ const Workouts = () => {
   };
 
   const getTotalDuration = () => {
-    // Estimamos 3 segundos por repetición + 60 segundos de descanso entre series
+    // Estimamos 3 segundos por repeticion + 60 segundos de descanso entre series
     const totalSeconds = configuredExercises.reduce((total, ex) => {
       const repTime = ex.repeticiones * ex.series * 3;
       const restTime = (ex.series - 1) * 60;
@@ -274,6 +312,7 @@ const Workouts = () => {
     };
 
     const exercisesToInsert = configuredExercises.map(ex => ({
+      exercise_id: ex.exercise.id,
       name: ex.exercise.nombre,
       sets: ex.series,
       reps: ex.repeticiones,
@@ -310,13 +349,38 @@ const Workouts = () => {
     }
   };
 
-  const handleStartWorkout = (workout: Record<string, unknown>) => {
-    // Implementar navegación a página de entrenamiento activo si existe
-    toast.info(`Iniciando entrenamiento: ${workout.name}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleStartWorkout = async (workout: any) => {
+    if (!workout?.id) return;
+
+    try {
+      const existingSession = await getActiveWorkoutSession(workout.id);
+      if (existingSession) {
+        const shouldContinue = confirm("Hay una sesión activa para este entrenamiento. ¿Deseas continuarla?");
+        if (!shouldContinue) return;
+
+        setActiveWorkout(workout);
+        setActiveSession(existingSession);
+        return;
+      }
+
+      const session = await startWorkoutSessionMutation.mutateAsync(workout.id);
+      setActiveWorkout(workout);
+      setActiveSession(session);
+      toast.success(`Sesión iniciada: ${workout.name}`);
+    } catch (error) {
+      console.error("Error starting workout session:", error);
+      toast.error("No se pudo iniciar el entrenamiento");
+    }
+  };
+
+  const handleCloseActiveWorkout = () => {
+    setActiveWorkout(null);
+    setActiveSession(null);
   };
 
   const handleDeleteWorkout = async (id: string) => {
-    if (!confirm("¿Eliminar entrenamiento?")) return;
+    if (!confirm("Eliminar entrenamiento?")) return;
     try {
       await deleteMutation.mutateAsync(id);
       toast.success("Entrenamiento eliminado");
@@ -353,8 +417,8 @@ const Workouts = () => {
   
   // Weekday names mapping
   const weekdayNames: Record<number, string> = {
-    1: 'Lunes', 2: 'Martes', 3: 'Miércoles',
-    4: 'Jueves', 5: 'Viernes', 6: 'Sábado', 7: 'Domingo'
+    1: 'Lunes', 2: 'Martes', 3: 'Miercoles',
+    4: 'Jueves', 5: 'Viernes', 6: 'Sabado', 7: 'Domingo'
   };
   
 
@@ -377,10 +441,38 @@ const Workouts = () => {
     return true;
   });
   
-  // Filtros por ubicación para el día actual
+  // Filtros por ubicacion para el dia actual
   const todayHome = todayWorkouts.filter((w) => w.location === "casa");
   const todayGym = todayWorkouts.filter((w) => w.location === "gimnasio");
-  const todayOutdoor = todayWorkouts.filter((w) => w.location === "exterior");
+  const todayCalisthenics = todayWorkouts.filter((w) => w.location === "exterior" || w.location === "outdoor");
+  const allWorkouts = allWorkoutsData?.workouts || [];
+  const completedHistory = allWorkouts
+    .filter((workout) => workout.completed)
+    .sort((a, b) => String(b.scheduled_date).localeCompare(String(a.scheduled_date)))
+    .slice(0, 12);
+  const weeklyWorkoutsByDate = upcomingWorkouts.reduce<Record<string, typeof upcomingWorkouts>>((groups, workout) => {
+    const date = workout.scheduled_date || todayDateString;
+    groups[date] = groups[date] ? [...groups[date], workout] : [workout];
+    return groups;
+  }, {});
+  const weeklyDates = Object.keys(weeklyWorkoutsByDate).sort();
+
+  if (activeWorkout && activeSession) {
+    return (
+      <div className="h-dvh overflow-y-auto bg-background page-scroll-shell">
+        <Navbar />
+        <div className="min-h-full pt-14 sm:pt-16 pb-24 sm:pb-24 px-3 sm:px-4 overflow-x-hidden">
+          <div className="max-w-7xl mx-auto">
+            <ActiveWorkout
+              workout={activeWorkout}
+              session={activeSession}
+              onClose={handleCloseActiveWorkout}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-dvh overflow-y-auto bg-background page-scroll-shell">
@@ -418,7 +510,7 @@ const Workouts = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label>Ubicación</Label>
+                    <Label>Ubicacion</Label>
                     <Select
                       value={formData.location}
                       onValueChange={(value) => setFormData({ ...formData, location: value })}
@@ -429,7 +521,7 @@ const Workouts = () => {
                       <SelectContent>
                         <SelectItem value="casa">Casa</SelectItem>
                         <SelectItem value="gimnasio">Gimnasio</SelectItem>
-                        <SelectItem value="exterior">Exterior</SelectItem>
+                        <SelectItem value="exterior">Calistenia</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -484,8 +576,8 @@ const Workouts = () => {
                                 </button>
                               </div>
                               <p className="text-sm text-muted-foreground">
-                                {ex.series} series × {ex.repeticiones} reps
-                                {ex.peso > 0 && ` • ${ex.peso}kg`}
+                                {ex.series} series x {ex.repeticiones} reps
+                                {ex.peso > 0 && ` â€¢ ${ex.peso}kg`}
                               </p>
                               <p className="text-sm text-primary font-medium">
                                 ~{ex.estimatedCalories} kcal
@@ -550,10 +642,10 @@ const Workouts = () => {
                 featureTitle="Biblioteca Premium de Ejercicios"
                 featureDescription="Accede a miles de ejercicios con videos y tutoriales profesionales"
                 features={[
-                  "Más de 1000+ ejercicios con videos HD",
+                  "Mas de 1000+ ejercicios con videos HD",
                   "Tutoriales paso a paso",
-                  "Filtros avanzados por músculo/equipo",
-                  "Guías de técnica correcta",
+                  "Filtros avanzados por musculo/equipo",
+                  "Guias de tecnica correcta",
                   "Ejercicios progresivos por nivel"
                 ]}
                 className="w-full sm:w-auto"
@@ -580,7 +672,15 @@ const Workouts = () => {
             fitnessLevel={profile?.fitness_level}
           />
 
-          <div className="space-y-4 sm:space-y-6">
+          <Tabs value={activeMainTab} onValueChange={handleMainTabChange} className="space-y-4">
+            <TabsList className="grid w-full grid-cols-4 bg-muted/50 p-1">
+              <TabsTrigger value="hoy" className="text-xs sm:text-sm">Hoy</TabsTrigger>
+              <TabsTrigger value="semana" className="text-xs sm:text-sm">Semana</TabsTrigger>
+              <TabsTrigger value="rutina" className="text-xs sm:text-sm">Rutina</TabsTrigger>
+              <TabsTrigger value="historial" className="text-xs sm:text-sm">Historial</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="hoy" className="space-y-4">
             <div>
               <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-3">Entrenamientos de Hoy</h2>
               <Tabs defaultValue="all" className="w-full">
@@ -588,12 +688,14 @@ const Workouts = () => {
                   <TabsTrigger value="all" className="text-xs sm:text-sm">Todos</TabsTrigger>
                   <TabsTrigger value="casa" className="text-xs sm:text-sm">Casa</TabsTrigger>
                   <TabsTrigger value="gimnasio" className="text-xs sm:text-sm">Gym</TabsTrigger>
-                  <TabsTrigger value="exterior" className="text-xs sm:text-sm">Outdoor</TabsTrigger>
+                  <TabsTrigger value="calistenia" className="text-xs sm:text-sm">Calistenia</TabsTrigger>
                 </TabsList>
                 <TabsContent value="all" className="mt-3 sm:mt-4">
                   <WorkoutList 
-                    workouts={todayWorkouts} 
-                    isToday 
+                    workouts={todayWorkouts}
+                    emptyTitle="No hay entrenamiento para hoy"
+                    emptyActionLabel="Ver rutina semanal"
+                    onEmptyAction={() => handleMainTabChange("semana")}
                     completingWorkout={completingWorkout}
                     handleCompleteWorkout={handleCompleteWorkout}
                     handleStartWorkout={handleStartWorkout}
@@ -603,8 +705,10 @@ const Workouts = () => {
                 </TabsContent>
                 <TabsContent value="casa" className="mt-3 sm:mt-4">
                   <WorkoutList 
-                    workouts={todayHome} 
-                    isToday 
+                    workouts={todayHome}
+                    emptyTitle="No hay entrenamiento en casa para hoy"
+                    emptyActionLabel="Crear entrenamiento"
+                    onEmptyAction={() => setOpen(true)}
                     completingWorkout={completingWorkout}
                     handleCompleteWorkout={handleCompleteWorkout}
                     handleStartWorkout={handleStartWorkout}
@@ -614,8 +718,10 @@ const Workouts = () => {
                 </TabsContent>
                 <TabsContent value="gimnasio" className="mt-3 sm:mt-4">
                   <WorkoutList 
-                    workouts={todayGym} 
-                    isToday 
+                    workouts={todayGym}
+                    emptyTitle="No hay entrenamiento de gimnasio para hoy"
+                    emptyActionLabel="Crear entrenamiento"
+                    onEmptyAction={() => setOpen(true)}
                     completingWorkout={completingWorkout}
                     handleCompleteWorkout={handleCompleteWorkout}
                     handleStartWorkout={handleStartWorkout}
@@ -623,10 +729,12 @@ const Workouts = () => {
                     handleShowExerciseDetails={handleShowExerciseDetails}
                   />
                 </TabsContent>
-                <TabsContent value="exterior" className="mt-3 sm:mt-4">
+                <TabsContent value="calistenia" className="mt-3 sm:mt-4">
                   <WorkoutList 
-                    workouts={todayOutdoor} 
-                    isToday 
+                    workouts={todayCalisthenics}
+                    emptyTitle="No hay entrenamiento de calistenia para hoy"
+                    emptyActionLabel="Crear entrenamiento"
+                    onEmptyAction={() => setOpen(true)}
                     completingWorkout={completingWorkout}
                     handleCompleteWorkout={handleCompleteWorkout}
                     handleStartWorkout={handleStartWorkout}
@@ -637,7 +745,7 @@ const Workouts = () => {
               </Tabs>
             </div>
 
-            {otherDaysWorkouts.length > 0 && (
+            {showLegacyUpcomingSection && otherDaysWorkouts.length > 0 && (
               <Card className="p-4 bg-muted/30">
                 <Collapsible open={otherDaysOpen} onOpenChange={setOtherDaysOpen}>
                   <CollapsibleTrigger asChild>
@@ -646,7 +754,7 @@ const Workouts = () => {
                       className="w-full justify-between hover:bg-transparent p-0 h-auto mb-2"
                     >
                       <div>
-                        <h3 className="text-lg font-medium">Próximos Entrenamientos</h3>
+                        <h3 className="text-lg font-medium">Proximos Entrenamientos</h3>
                         <p className="text-sm text-muted-foreground text-left">
                           {otherDaysWorkouts.length} entrenamientos programados esta semana
                         </p>
@@ -710,7 +818,98 @@ const Workouts = () => {
                 </Collapsible>
               </Card>
             )}
-          </div>
+            </TabsContent>
+
+            <TabsContent value="semana" className="space-y-3">
+              {weeklyDates.length === 0 ? (
+                <Card className="p-6 text-center">
+                  <CalendarDays className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                  <h3 className="font-semibold">No hay entrenamientos programados</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Genera tu semana o crea un entrenamiento para empezar.
+                  </p>
+                  <div className="mt-4 flex flex-col sm:flex-row justify-center gap-2">
+                    <Button onClick={() => generateWeeklyWorkouts.mutate({ retries: 1 })}>
+                      Generar entrenamiento
+                    </Button>
+                    <Button variant="outline" onClick={() => setOpen(true)}>
+                      Crear manualmente
+                    </Button>
+                  </div>
+                </Card>
+              ) : (
+                weeklyDates.map((date) => (
+                  <Card key={date} className="p-3 sm:p-4">
+                    <div className="mb-3">
+                      <h3 className="font-semibold">
+                        {format(new Date(`${date}T00:00:00`), "EEEE d 'de' MMMM", { locale: es })}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {weeklyWorkoutsByDate[date].length} entrenamiento{weeklyWorkoutsByDate[date].length === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      {weeklyWorkoutsByDate[date].map((workout) => (
+                        <div key={workout.id} className="flex items-center justify-between gap-3 rounded-lg bg-muted/60 p-3">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <button onClick={() => handleCompleteWorkout(workout.id, workout.completed)}>
+                              {workout.completed ? (
+                                <CheckCircle2 className="w-5 h-5 text-primary" />
+                              ) : (
+                                <Circle className="w-5 h-5 text-muted-foreground" />
+                              )}
+                            </button>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">{workout.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {workout.duration_minutes} min - {workout.estimated_calories} kcal - {getLocationLabel(workout.location)}
+                              </p>
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => handleStartWorkout(workout)}>
+                            Abrir
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                ))
+              )}
+            </TabsContent>
+
+            <TabsContent value="rutina" className="min-h-[560px] rounded-lg border bg-card/40">
+              <RoutineManager />
+            </TabsContent>
+
+            <TabsContent value="historial" className="space-y-3">
+              {completedHistory.length === 0 ? (
+                <Card className="p-6 text-center">
+                  <CheckCircle2 className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                  <h3 className="font-semibold">Aun no hay historial</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Completa tu primer entrenamiento para verlo aqui.
+                  </p>
+                  <Button className="mt-4" onClick={() => handleMainTabChange("hoy")}>
+                    Completar entrenamiento
+                  </Button>
+                </Card>
+              ) : (
+                completedHistory.map((workout) => (
+                  <Card key={workout.id} className="p-3 sm:p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate font-semibold">{workout.name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {format(new Date(`${workout.scheduled_date}T00:00:00`), "d MMM yyyy", { locale: es })}
+                        </p>
+                      </div>
+                      <Badge variant="secondary">{getLocationLabel(workout.location)}</Badge>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

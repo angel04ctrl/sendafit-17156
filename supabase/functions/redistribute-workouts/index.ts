@@ -74,6 +74,14 @@ const groupPlanExercisesByDay = (planExercises: unknown[]) => {
   return exercisesByDay;
 };
 
+function dateForWeekday(weekday: number, baseDate = new Date()): string {
+  const current = baseDate.getDay() === 0 ? 7 : baseDate.getDay();
+  const diff = (weekday - current + 7) % 7;
+  const target = new Date(baseDate);
+  target.setDate(baseDate.getDate() + diff);
+  return target.toISOString().slice(0, 10);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -164,7 +172,6 @@ serve(async (req) => {
       .eq("id", profile.assigned_routine_id)
       .maybeSingle();
 
-    const todayStr = new Date().toISOString().split("T")[0];
     const workoutsToCreate = selectedWeekdays.map((weekday, index) => {
       const planDay = planDays[index];
       const dayExercises = exercisesByDay[planDay] || [];
@@ -183,7 +190,7 @@ serve(async (req) => {
         user_id: user.id,
         name: `${planData?.nombre_plan || "Entrenamiento"} - ${dayNames[weekday]}`,
         description: `${muscleGroup} - ${planData?.descripcion_plan || "Rutina personalizada"}`,
-        scheduled_date: todayStr,
+        scheduled_date: dateForWeekday(weekday),
         weekday,
         plan_id: profile.assigned_routine_id,
         location: normalizeLocation(planData?.lugar),
@@ -231,6 +238,7 @@ serve(async (req) => {
           const exercise = pe.exercises;
           return {
             workout_id: workout.id,
+            exercise_id: exercise.id,
             name: exercise.nombre,
             sets: exercise.series_sugeridas || 3,
             reps: exercise.repeticiones_sugeridas || 10,

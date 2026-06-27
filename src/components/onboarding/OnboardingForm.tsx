@@ -332,6 +332,8 @@ const OnboardingForm = () => {
           daily_protein_goal: calculatedMacros?.protein || 150,
           daily_carbs_goal: calculatedMacros?.carbs || 200,
           daily_fat_goal: calculatedMacros?.fat || 50,
+          routine_assignment_status: "pending",
+          routine_assignment_error: null,
           onboarding_completed: false // Será completado por la función de backend
         });
 
@@ -374,6 +376,12 @@ const OnboardingForm = () => {
         if (routineError) {
           console.error("Error al asignar rutina:", routineError);
           toast.warning("Cuenta creada, pero hubo un error al asignar tu rutina. Puedes asignarla después desde el dashboard.");
+        } else if (routineData?.success === false || routineData?.status === "failed") {
+          console.warn("Routine assignment failed:", routineData);
+          toast.warning(
+            routineData?.error ||
+              "Cuenta creada, pero no pudimos asignar tu rutina. Podrás reintentarlo desde el dashboard.",
+          );
         } else {
           toast.success(`¡Cuenta creada! Se te asignó el plan: ${routineData.plan?.nombre_plan || 'personalizado'} 🎉`);
         }

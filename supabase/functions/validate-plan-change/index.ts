@@ -102,7 +102,7 @@ serve(async (req) => {
     // Get affected workouts
     const { data: upcomingWorkouts, error: workoutsError } = await supabase
       .from('workouts')
-      .select('id, name, scheduled_date, completed, tipo')
+      .select('id, name, description, scheduled_date, completed, tipo, plan_id')
       .eq('user_id', user.id)
       .eq('completed', false)
       .gte('scheduled_date', new Date().toISOString().split('T')[0])
@@ -118,14 +118,49 @@ serve(async (req) => {
 
     // Get current plan info
     let currentPlanInfo = null;
+    let planProtection = {
+      isProtected: false,
+      reason: '',
+      planType: 'predesigned',
+    };
+
     if (profile.assigned_routine_id) {
       const { data: planData } = await supabase
         .from('predesigned_plans')
         .select('nombre_plan, dias_semana, objetivo')
         .eq('id', profile.assigned_routine_id)
-        .single();
+        .maybeSingle();
       
       currentPlanInfo = planData;
+
+      if (!planData) {
+        planProtection = {
+          isProtected: true,
+          reason: 'El plan actual no pertenece al catalogo prediseñado.',
+          planType: 'custom_or_ai',
+        };
+      }
+    }
+
+    const hasCustomAiWorkouts = affectedWorkouts.some((workout) => {
+      const description = String(workout.description || '').toLowerCase();
+      return workout.tipo === 'manual'
+        || !workout.plan_id
+        || description.includes('ia')
+        || description.includes('personalizada')
+        || description.includes('coach');
+    });
+
+    if (hasCustomAiWorkouts) {
+      planProtection = {
+        isProtected: true,
+        reason: 'Hay entrenamientos manuales, personalizados o creados por IA que no deben reemplazarse automaticamente.',
+        planType: 'custom_or_ai',
+      };
+    }
+
+    if (planProtection.isProtected && action !== 'none') {
+      reason = 'Cambiaste tus dias de entrenamiento. Tu plan actual puede no coincidir con tu nueva disponibilidad y necesita confirmacion antes de modificarlo.';
     }
 
     const response = {
@@ -150,6 +185,7 @@ serve(async (req) => {
         pendingWorkoutsCount: pendingCount,
         willPreserveCompleted: needsRedistribute,
       },
+      planProtection,
       currentPlan: currentPlanInfo,
       preview: {
         message: reason,

@@ -96,6 +96,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   terms_accepted boolean DEFAULT false,
   onboarding_completed boolean DEFAULT false,
   assigned_routine_id text,
+  routine_assignment_status text NOT NULL DEFAULT 'pending',
+  routine_assignment_error text,
   dev_override boolean DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -172,6 +174,7 @@ CREATE TABLE IF NOT EXISTS public.workouts (
 CREATE TABLE IF NOT EXISTS public.workout_exercises (
   id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   workout_id uuid NOT NULL REFERENCES public.workouts(id),
+  exercise_id text REFERENCES public.exercises(id) ON DELETE SET NULL,
   name text NOT NULL,
   sets integer,
   reps integer,
@@ -179,6 +182,116 @@ CREATE TABLE IF NOT EXISTS public.workout_exercises (
   notes text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- workout_sessions
+CREATE TABLE IF NOT EXISTS public.workout_sessions (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  workout_id uuid NOT NULL REFERENCES public.workouts(id) ON DELETE CASCADE,
+  started_at timestamptz NOT NULL DEFAULT now(),
+  finished_at timestamptz,
+  status text NOT NULL DEFAULT 'active',
+  duration_seconds integer,
+  notes text,
+  session_feeling text,
+  pain_flag boolean NOT NULL DEFAULT false,
+  pain_notes text,
+  overall_rpe numeric,
+  user_notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT workout_sessions_status_check CHECK (status IN ('active', 'completed', 'cancelled')),
+  CONSTRAINT workout_sessions_duration_non_negative CHECK (duration_seconds IS NULL OR duration_seconds >= 0),
+  CONSTRAINT workout_sessions_session_feeling_check CHECK (session_feeling IS NULL OR session_feeling IN ('strong', 'normal', 'tired', 'pain')),
+  CONSTRAINT workout_sessions_overall_rpe_check CHECK (overall_rpe IS NULL OR overall_rpe BETWEEN 1 AND 10)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS workout_sessions_one_active_per_workout
+  ON public.workout_sessions (user_id, workout_id)
+  WHERE status = 'active';
+
+CREATE INDEX IF NOT EXISTS workout_sessions_user_status_idx
+  ON public.workout_sessions (user_id, status, started_at DESC);
+
+-- workout_session_sets
+CREATE TABLE IF NOT EXISTS public.workout_session_sets (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  session_id uuid NOT NULL REFERENCES public.workout_sessions(id) ON DELETE CASCADE,
+  workout_exercise_id uuid REFERENCES public.workout_exercises(id) ON DELETE SET NULL,
+  exercise_id text,
+  exercise_name_snapshot text,
+  workout_exercise_name_snapshot text,
+  set_number integer NOT NULL,
+  target_reps integer,
+  actual_reps integer,
+  target_weight numeric,
+  actual_weight numeric,
+  rir integer,
+  rpe integer,
+  rest_seconds integer,
+  completed boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT workout_session_sets_set_number_check CHECK (set_number > 0),
+  CONSTRAINT workout_session_sets_actual_reps_check CHECK (actual_reps IS NULL OR actual_reps >= 0),
+  CONSTRAINT workout_session_sets_target_reps_check CHECK (target_reps IS NULL OR target_reps >= 0),
+  CONSTRAINT workout_session_sets_weight_check CHECK (
+    (target_weight IS NULL OR target_weight >= 0)
+    AND (actual_weight IS NULL OR actual_weight >= 0)
+  ),
+  CONSTRAINT workout_session_sets_rir_check CHECK (rir IS NULL OR rir BETWEEN 0 AND 10),
+  CONSTRAINT workout_session_sets_rpe_check CHECK (rpe IS NULL OR rpe BETWEEN 1 AND 10),
+  CONSTRAINT workout_session_sets_rest_check CHECK (rest_seconds IS NULL OR rest_seconds >= 0),
+  CONSTRAINT workout_session_sets_unique_set UNIQUE (session_id, workout_exercise_id, set_number)
+);
+
+CREATE INDEX IF NOT EXISTS workout_session_sets_session_idx
+  ON public.workout_session_sets (session_id, workout_exercise_id, set_number);
+
+CREATE INDEX IF NOT EXISTS workout_session_sets_exercise_id_idx
+  ON public.workout_session_sets (exercise_id);
+
+CREATE INDEX IF NOT EXISTS workout_exercises_exercise_id_idx
+  ON public.workout_exercises (exercise_id);
+
+-- exercise_progression_suggestions
+CREATE TABLE IF NOT EXISTS public.exercise_progression_suggestions (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  exercise_id text,
+  exercise_name_snapshot text NOT NULL,
+  workout_session_id uuid REFERENCES public.workout_sessions(id) ON DELETE CASCADE,
+  exercise_key text GENERATED ALWAYS AS (COALESCE(exercise_id, exercise_name_snapshot)) STORED,
+  source text NOT NULL DEFAULT 'snapshot',
+  previous_weight numeric,
+  previous_reps integer[] DEFAULT '{}'::integer[],
+  suggested_action text NOT NULL,
+  suggested_weight numeric,
+  suggested_reps integer,
+  confidence text NOT NULL DEFAULT 'low',
+  reason text NOT NULL,
+  based_on_session_id uuid REFERENCES public.workout_sessions(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT exercise_progression_suggestions_source_check CHECK (source IN ('exercise_id', 'snapshot')),
+  CONSTRAINT exercise_progression_suggestions_action_check CHECK (suggested_action IN ('increase_weight', 'maintain_weight', 'decrease_weight', 'increase_reps', 'no_data', 'blocked_pain')),
+  CONSTRAINT exercise_progression_suggestions_confidence_check CHECK (confidence IN ('high', 'medium', 'low')),
+  CONSTRAINT exercise_progression_suggestions_weight_check CHECK (
+    (previous_weight IS NULL OR previous_weight >= 0)
+    AND (suggested_weight IS NULL OR suggested_weight >= 0)
+  ),
+  CONSTRAINT exercise_progression_suggestions_reps_check CHECK (suggested_reps IS NULL OR suggested_reps >= 0)
+);
+
+CREATE INDEX IF NOT EXISTS exercise_progression_suggestions_user_created_idx
+  ON public.exercise_progression_suggestions (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS exercise_progression_suggestions_exercise_idx
+  ON public.exercise_progression_suggestions (user_id, exercise_id, created_at DESC)
+  WHERE exercise_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS exercise_progression_suggestions_session_unique
+  ON public.exercise_progression_suggestions (user_id, exercise_key, workout_session_id, suggested_action);
+
+CREATE INDEX IF NOT EXISTS exercise_progression_suggestions_session_idx
+  ON public.exercise_progression_suggestions (user_id, workout_session_id, created_at DESC);
 
 -- meals
 CREATE TABLE IF NOT EXISTS public.meals (
@@ -279,7 +392,10 @@ CREATE TABLE IF NOT EXISTS public.user_subscriptions (
   last_event text,
   start_date timestamptz NOT NULL DEFAULT now(),
   end_date timestamptz,
-  created_at timestamptz NOT NULL DEFAULT now()
+  current_period_start timestamptz,
+  current_period_end timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT user_subscriptions_provider_check CHECK (provider IN ('stripe', 'paypal', 'manual_admin'))
 );
 
 -- user_settings
@@ -389,7 +505,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = 'public' 
   SELECT EXISTS (
     SELECT 1 FROM public.user_subscriptions
     WHERE user_id = _user_id AND status = 'active'
-      AND (end_date IS NULL OR end_date > now())
+      AND (COALESCE(current_period_end, end_date) IS NULL OR COALESCE(current_period_end, end_date) > now())
   );
 $$;
 
@@ -572,6 +688,9 @@ CREATE TRIGGER workouts_validate BEFORE INSERT OR UPDATE ON public.workouts
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.workouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.workout_exercises ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.workout_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.workout_session_sets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.exercise_progression_suggestions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.meals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.foods ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.progress_logs ENABLE ROW LEVEL SECURITY;
@@ -610,6 +729,39 @@ CREATE POLICY "Users can update exercises in own workouts" ON public.workout_exe
   USING (EXISTS (SELECT 1 FROM workouts WHERE workouts.id = workout_exercises.workout_id AND workouts.user_id = auth.uid()));
 CREATE POLICY "Users can delete exercises from own workouts" ON public.workout_exercises FOR DELETE
   USING (EXISTS (SELECT 1 FROM workouts WHERE workouts.id = workout_exercises.workout_id AND workouts.user_id = auth.uid()));
+
+-- workout_sessions
+CREATE POLICY "Users can view own workout sessions" ON public.workout_sessions FOR SELECT
+  USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own workout sessions" ON public.workout_sessions FOR INSERT
+  WITH CHECK (
+    auth.uid() = user_id
+    AND EXISTS (SELECT 1 FROM public.workouts WHERE workouts.id = workout_sessions.workout_id AND workouts.user_id = auth.uid())
+  );
+CREATE POLICY "Users can update own workout sessions" ON public.workout_sessions FOR UPDATE
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete own workout sessions" ON public.workout_sessions FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- workout_session_sets
+CREATE POLICY "Users can view own workout session sets" ON public.workout_session_sets FOR SELECT
+  USING (EXISTS (SELECT 1 FROM public.workout_sessions WHERE workout_sessions.id = workout_session_sets.session_id AND workout_sessions.user_id = auth.uid()));
+CREATE POLICY "Users can insert own workout session sets" ON public.workout_session_sets FOR INSERT
+  WITH CHECK (EXISTS (SELECT 1 FROM public.workout_sessions WHERE workout_sessions.id = workout_session_sets.session_id AND workout_sessions.user_id = auth.uid() AND workout_sessions.status = 'active'));
+CREATE POLICY "Users can update own workout session sets" ON public.workout_session_sets FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM public.workout_sessions WHERE workout_sessions.id = workout_session_sets.session_id AND workout_sessions.user_id = auth.uid()))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.workout_sessions WHERE workout_sessions.id = workout_session_sets.session_id AND workout_sessions.user_id = auth.uid()));
+CREATE POLICY "Users can delete own workout session sets" ON public.workout_session_sets FOR DELETE
+  USING (EXISTS (SELECT 1 FROM public.workout_sessions WHERE workout_sessions.id = workout_session_sets.session_id AND workout_sessions.user_id = auth.uid()));
+
+-- exercise_progression_suggestions
+CREATE POLICY "Users can view own progression suggestions" ON public.exercise_progression_suggestions FOR SELECT
+  USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own progression suggestions" ON public.exercise_progression_suggestions FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete own progression suggestions" ON public.exercise_progression_suggestions FOR DELETE
+  USING (auth.uid() = user_id);
 
 -- meals
 CREATE POLICY "Users can view own meals" ON public.meals FOR SELECT USING (auth.uid() = user_id);
@@ -692,14 +844,21 @@ CREATE POLICY "Users can delete own machine scans" ON public.machine_scan_histor
 -- ========================
 INSERT INTO storage.buckets (id, name, public) VALUES ('exercise-images', 'exercise-images', true) ON CONFLICT DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('exercise-videos', 'exercise-videos', true) ON CONFLICT DO NOTHING;
-INSERT INTO storage.buckets (id, name, public) VALUES ('ai-analysis-images', 'ai-analysis-images', true) ON CONFLICT DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('ai-analysis-images', 'ai-analysis-images', false) ON CONFLICT DO NOTHING;
 
 CREATE POLICY "Public read exercise-images" ON storage.objects FOR SELECT USING (bucket_id = 'exercise-images');
 CREATE POLICY "Auth upload exercise-images" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'exercise-images' AND auth.role() = 'authenticated');
 CREATE POLICY "Public read exercise-videos" ON storage.objects FOR SELECT USING (bucket_id = 'exercise-videos');
 CREATE POLICY "Auth upload exercise-videos" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'exercise-videos' AND auth.role() = 'authenticated');
-CREATE POLICY "Public read ai-analysis-images" ON storage.objects FOR SELECT USING (bucket_id = 'ai-analysis-images');
-CREATE POLICY "Auth upload ai-analysis-images" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'ai-analysis-images' AND auth.role() = 'authenticated');
+CREATE POLICY "Users can read own AI analysis images" ON storage.objects FOR SELECT
+  USING (bucket_id = 'ai-analysis-images' AND auth.uid()::text = (storage.foldername(name))[1]);
+CREATE POLICY "Users can upload own AI analysis images" ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'ai-analysis-images' AND auth.uid()::text = (storage.foldername(name))[1]);
+CREATE POLICY "Users can update own AI analysis images" ON storage.objects FOR UPDATE
+  USING (bucket_id = 'ai-analysis-images' AND auth.uid()::text = (storage.foldername(name))[1])
+  WITH CHECK (bucket_id = 'ai-analysis-images' AND auth.uid()::text = (storage.foldername(name))[1]);
+CREATE POLICY "Users can delete own AI analysis images" ON storage.objects FOR DELETE
+  USING (bucket_id = 'ai-analysis-images' AND auth.uid()::text = (storage.foldername(name))[1]);
 
 -- ============================================================
 -- END OF SCHEMA EXPORT

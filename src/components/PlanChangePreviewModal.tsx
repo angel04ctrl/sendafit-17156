@@ -6,6 +6,8 @@ interface PlanChangePreviewModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
+  planAction: string;
+  onPlanActionChange: (action: string) => void;
   validationData: {
     action: string;
     reason: string;
@@ -24,6 +26,11 @@ interface PlanChangePreviewModalProps {
       affectedWorkoutsCount: number;
       completedWorkoutsCount: number;
       pendingWorkoutsCount: number;
+    };
+    planProtection?: {
+      isProtected: boolean;
+      reason: string;
+      planType: string;
     };
     currentPlan?: {
       nombre_plan: string;
@@ -55,12 +62,14 @@ export function PlanChangePreviewModal({
   open,
   onOpenChange,
   onConfirm,
+  planAction,
+  onPlanActionChange,
   validationData,
   isLoading
 }: PlanChangePreviewModalProps) {
   if (!validationData) return null;
 
-  const { changes, impact, currentPlan, reason, action } = validationData;
+  const { changes, impact, currentPlan, reason, action, planProtection } = validationData;
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -179,6 +188,34 @@ export function PlanChangePreviewModal({
               )}
             </div>
           </div>
+
+          {planProtection?.isProtected && (
+            <div className="rounded-lg border border-warning/30 bg-warning/10 p-4">
+              <h4 className="font-semibold mb-2 text-sm">Plan protegido</h4>
+              <p className="text-sm text-muted-foreground mb-3">
+                {planProtection.reason || "Tu plan actual puede ser personalizado o creado por IA. No se reemplazara sin confirmacion."}
+              </p>
+              <div className="space-y-2 text-sm">
+                {[
+                  ["keep", "Mantener mi plan actual"],
+                  ["adapt", "Adaptar mi plan actual a mis nuevos dias"],
+                  ["new_suggested", "Crear un nuevo plan sugerido"],
+                  ["archive_replace", "Guardar mi plan actual como historial y reemplazarlo"],
+                ].map(([value, label]) => (
+                  <label key={value} className="flex items-center gap-2 rounded-md border bg-background p-2">
+                    <input
+                      type="radio"
+                      name="plan-change-action"
+                      value={value}
+                      checked={planAction === value}
+                      onChange={() => onPlanActionChange(value)}
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <AlertDialogFooter>

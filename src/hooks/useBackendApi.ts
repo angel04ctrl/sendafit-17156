@@ -25,12 +25,22 @@ import {
   getWorkoutsByDate,
   getAllWorkouts,
   completeWorkout,
+  cancelWorkoutSession,
+  getExerciseProgressSummary,
   getPredesignedPlans,
+  getActiveWorkoutSession,
+  getWorkoutSessionSets,
+  finishWorkoutSession,
+  saveProgressionSuggestion,
+  saveWorkoutSessionSet,
+  startWorkoutSession,
   fetchMonthlyReport,
   redistributeWorkouts,
   validatePlanChange,
   type MonthlyReportParams,
-  type ProgressData
+  type ProgressData,
+  type SaveProgressionSuggestionInput,
+  type SaveWorkoutSessionSetInput,
 } from '@/lib/api/backend';
 
 const getLocalDateString = () => {
@@ -247,6 +257,104 @@ export const useCompleteWorkout = () => {
   });
 };
 
+export const useActiveWorkoutSession = (workoutId?: string | null) => {
+  return useQuery({
+    queryKey: ['active-workout-session', workoutId],
+    queryFn: () => getActiveWorkoutSession(workoutId || ''),
+    enabled: !!workoutId,
+    staleTime: 30 * 1000,
+  });
+};
+
+export const useWorkoutSessionSets = (sessionId?: string | null) => {
+  return useQuery({
+    queryKey: ['workout-session-sets', sessionId],
+    queryFn: () => getWorkoutSessionSets(sessionId || ''),
+    enabled: !!sessionId,
+    staleTime: 15 * 1000,
+  });
+};
+
+export const useExerciseProgressSummary = (params?: {
+  exerciseId?: string | null;
+  exerciseName?: string | null;
+}) => {
+  const exerciseId = params?.exerciseId?.trim() || '';
+  const normalizedName = params?.exerciseName?.trim() || '';
+
+  return useQuery({
+    queryKey: ['exercise-progress-summary', exerciseId || normalizedName],
+    queryFn: () => getExerciseProgressSummary({ exerciseId, exerciseName: normalizedName }),
+    enabled: !!exerciseId || !!normalizedName,
+    staleTime: 60 * 1000,
+  });
+};
+
+export const useStartWorkoutSession = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (workoutId: string) => startWorkoutSession(workoutId),
+    onSuccess: (session) => {
+      queryClient.invalidateQueries({ queryKey: ['active-workout-session', session.workout_id] });
+      queryClient.invalidateQueries({ queryKey: ['workout-session-sets', session.id] });
+    },
+  });
+};
+
+export const useSaveWorkoutSessionSet = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: SaveWorkoutSessionSetInput) => saveWorkoutSessionSet(input),
+    onSuccess: (set) => {
+      queryClient.invalidateQueries({ queryKey: ['workout-session-sets', set.session_id] });
+      queryClient.invalidateQueries({ queryKey: ['exercise-progress-summary'] });
+    },
+  });
+};
+
+export const useSaveProgressionSuggestion = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: SaveProgressionSuggestionInput) => saveProgressionSuggestion(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['progression-suggestions'] });
+    },
+  });
+};
+
+export const useFinishWorkoutSession = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: finishWorkoutSession,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['active-workout-session', data.session.workout_id] });
+      queryClient.invalidateQueries({ queryKey: ['workout-session-sets', data.session.id] });
+      queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['weekly-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
+      queryClient.invalidateQueries({ queryKey: ['weekly-calendar-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['exercise-progress-summary'] });
+    },
+  });
+};
+
+export const useCancelWorkoutSession = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (sessionId: string) => cancelWorkoutSession(sessionId),
+    onSuccess: (session) => {
+      queryClient.invalidateQueries({ queryKey: ['active-workout-session', session.workout_id] });
+      queryClient.invalidateQueries({ queryKey: ['workout-session-sets', session.id] });
+    },
+  });
+};
+
 /**
  * Hook para obtener planes prediseñados
  * Soporta filtros por objetivo, nivel, lugar y días por semana
@@ -443,7 +551,7 @@ export const useGenerateWeeklyWorkouts = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (options?: { reassign?: boolean; retries?: number }) => {
+    mutationFn: async (options?: { reassign?: boolean; retries?: number; planChangeAction?: string }) => {
       const userLocalDate = getLocalDateString();
       const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const maxRetries = options?.retries || 3;

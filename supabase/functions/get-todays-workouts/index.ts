@@ -109,7 +109,7 @@ serve(async (req) => {
         .from('workouts')
         .select(`*, workout_exercises (*)`)
         .eq('user_id', user.id)
-        .eq('weekday', weekday)
+        .eq('scheduled_date', todayDate)
         .eq('tipo', 'automatico');
 
       // Filter by current plan if user has one

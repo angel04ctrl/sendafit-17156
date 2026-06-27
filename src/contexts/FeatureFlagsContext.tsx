@@ -168,15 +168,9 @@ export const FeatureFlagsProvider = ({ children }: { children: React.ReactNode }
 
     const checkSubscription = async () => {
       try {
-        const { data } = await supabase
-          .from("user_subscriptions")
-          .select("status, plan")
-          .eq("user_id", user.id)
-          .eq("status", "active")
-          .eq("plan", "pro")
-          .maybeSingle();
+        const { data } = await supabase.rpc("is_user_pro", { _user_id: user.id });
 
-        if (data) {
+        if (data === true) {
           setUserFlags(prev => ({ ...prev, isPro: true }));
         }
       } catch (e) {

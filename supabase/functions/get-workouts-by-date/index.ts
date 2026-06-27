@@ -97,7 +97,8 @@ serve(async (req) => {
           .select(`*, workout_exercises (*)`)
           .eq('user_id', user.id)
           .eq('tipo', 'automatico')
-          .in('weekday', validWeekdays);
+          .gte('scheduled_date', startDate)
+          .lte('scheduled_date', endDate);
 
         if (profile?.assigned_routine_id) {
           automaticQuery = automaticQuery.eq('plan_id', profile.assigned_routine_id);
@@ -135,7 +136,7 @@ serve(async (req) => {
           .select(`*, workout_exercises (*)`)
           .eq('user_id', user.id)
           .eq('tipo', 'automatico')
-          .eq('weekday', weekday);
+          .eq('scheduled_date', date);
 
         if (profile?.assigned_routine_id) {
           automaticQuery = automaticQuery.eq('plan_id', profile.assigned_routine_id);

@@ -50,7 +50,8 @@ const Profile = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false); // Modal de pago abierto
   const [showSuccessModal, setShowSuccessModal] = useState(false); // Modal de éxito en pago
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [validationData, setValidationData] = useState<any>(null); // Datos de validaciÃ³n de cambios
+  const [validationData, setValidationData] = useState<any>(null); // Datos de validacion de cambios
+  const [planChangeAction, setPlanChangeAction] = useState("keep");
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null); // Estado de suscripción
   const [searchParams] = useSearchParams(); // Parámetros de URL para detectar pagos
   const [formData, setFormData] = useState({
@@ -355,6 +356,7 @@ const Profile = () => {
         
         if (validation && validation.action !== "none") {
            setValidationData(validation);
+           setPlanChangeAction(validation.planProtection?.isProtected ? "keep" : "new_suggested");
            setShowPreviewModal(true);
            return;
         }
@@ -369,9 +371,16 @@ const Profile = () => {
   const handleConfirmPlanChange = async () => {
     setShowPreviewModal(false);
     await saveProfileChanges();
+
+    if (validationData?.planProtection?.isProtected && planChangeAction === "keep") {
+      toast.success("Dias actualizados. Tu plan actual se mantiene sin reemplazarse.");
+      return;
+    }
+
     try {
        await generateWorkoutsMutation.mutateAsync({
          reassign: Boolean(validationData?.needsReassign),
+         planChangeAction,
        });
        toast.success("Plan redistribuido con éxito");
     } catch (e) {
@@ -710,6 +719,8 @@ const Profile = () => {
         open={showPreviewModal}
         onOpenChange={setShowPreviewModal}
         onConfirm={handleConfirmPlanChange}
+        planAction={planChangeAction}
+        onPlanActionChange={setPlanChangeAction}
         // @ts-expect-error: validation typing from API
         validationData={validationData}
         isLoading={loading}

@@ -34,6 +34,9 @@ const loadingMessages = [
   "Preparando recomendaciones...",
 ];
 
+const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
 export function GymMachineScanner({ open, onOpenChange, fitnessLevel }: GymMachineScannerProps) {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,6 +51,16 @@ export function GymMachineScanner({ open, onOpenChange, fitnessLevel }: GymMachi
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      toast.error("Imagen invalida. Usa JPG, PNG o WebP.");
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error("La imagen es demasiado grande. Usa una imagen menor a 6 MB.");
+      return;
+    }
 
     setImageFile(file);
     const reader = new FileReader();
@@ -67,9 +80,9 @@ export function GymMachineScanner({ open, onOpenChange, fitnessLevel }: GymMachi
 
     try {
       const extension = imageFile.name.split(".").pop() || "jpg";
-      const fileName = `${user.id}/${Date.now()}-machine.${extension}`;
+      const fileName = `${user.id}/${crypto.randomUUID()}-machine.${extension}`;
 
-      const { error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from("ai-analysis-images")
         .upload(fileName, imageFile, {
           contentType: imageFile.type || "image/jpeg",
@@ -77,6 +90,7 @@ export function GymMachineScanner({ open, onOpenChange, fitnessLevel }: GymMachi
         });
 
       if (uploadError) throw uploadError;
+      if (!uploadData?.path) throw new Error("No se pudo guardar la imagen.");
 
       const { data: signedData, error: signedError } = await supabase.storage
         .from("ai-analysis-images")
@@ -100,7 +114,7 @@ export function GymMachineScanner({ open, onOpenChange, fitnessLevel }: GymMachi
 
       setAnalysis(data.analysis);
       setStep("results");
-      await saveToHistory(fileName, data.analysis);
+      await saveToHistory(uploadData.path, data.analysis);
     } catch (error) {
       console.error("Machine analysis error:", error);
       toast.error(error instanceof Error ? error.message : "Error al analizar la imagen");
@@ -110,27 +124,23 @@ export function GymMachineScanner({ open, onOpenChange, fitnessLevel }: GymMachi
     }
   };
 
-  const saveToHistory = async (fileName: string, analysisData: MachineAnalysis) => {
+  const saveToHistory = async (imagePath: string, analysisData: MachineAnalysis) => {
     if (!user) return;
 
     try {
-      const { data: urlData } = supabase.storage
-        .from("ai-analysis-images")
-        .getPublicUrl(fileName);
-
       const relatedExercises = Object.entries(analysisData.exercises).flatMap(([level, exercises]) =>
         exercises.map((name) => ({ name, description: `Nivel ${level}` })),
       );
 
       await supabase.from("machine_scan_history").insert({
         user_id: user.id,
-        image_url: urlData.publicUrl,
+        image_url: imagePath,
         machine_name: analysisData.machineName,
         machine_type: analysisData.primaryMuscle,
         primary_muscles: [analysisData.primaryMuscle],
         secondary_muscles: [],
         usage_instructions: analysisData.setupSteps.join("\n"),
-        posture_tips: [],
+        posture_tips: "Verifica el nombre de la maquina antes de usarla. Si sientes dolor, detente.",
         related_exercises: relatedExercises,
       });
     } catch (error) {
@@ -177,6 +187,7 @@ export function GymMachineScanner({ open, onOpenChange, fitnessLevel }: GymMachi
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Toma una foto clara de la maquina para recibir ajustes, tecnica y ejercicios por nivel.
+              La imagen se procesa con IA; la identificacion puede equivocarse y no sustituye la guia de un profesional.
             </p>
 
             {imagePreview ? (

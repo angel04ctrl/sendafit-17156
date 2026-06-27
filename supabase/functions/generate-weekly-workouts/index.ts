@@ -2,11 +2,7 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { handleCors, isAllowedRequestOrigin, jsonResponse } from "../_shared/cors.ts";
 
 const dayMap: Record<string, number> = {
   L: 1,
@@ -186,10 +182,21 @@ const findCompatiblePlan = async (
     .sort((a, b) => b.score - a.score);
 
   let lastCoverageFailure = null;
+  let fallbackWithExercises: {
+    plan: unknown;
+    exercisesByDay: Record<number, Record<string, unknown>[]>;
+  } | null = null;
 
   for (const { plan } of scoredPlans) {
     const candidateExercises = await getPlanExercises(supabase, plan.id);
     const candidatePlanDays = Object.keys(candidateExercises.exercisesByDay).map(Number).sort((a, b) => a - b);
+
+    if (!fallbackWithExercises && candidatePlanDays.length > 0) {
+      fallbackWithExercises = {
+        plan,
+        exercisesByDay: candidateExercises.exercisesByDay,
+      };
+    }
 
     if (candidatePlanDays.length === selectedWeekdays.length) {
       return {
@@ -208,6 +215,19 @@ const findCompatiblePlan = async (
     };
   }
 
+  if (fallbackWithExercises) {
+    return {
+      plan: fallbackWithExercises.plan,
+      exercisesByDay: fallbackWithExercises.exercisesByDay,
+      reassigned: fallbackWithExercises.plan.id !== preferredPlanId,
+      lastCoverageFailure: {
+        ...lastCoverageFailure,
+        fallback_used: true,
+        reason: "No exact day-count match; using nearest scored plan with exercises.",
+      },
+    };
+  }
+
   return { plan: null, exercisesByDay: {}, reassigned: false, lastCoverageFailure };
 };
 
@@ -217,10 +237,18 @@ const buildWorkoutPayload = (
   exercisesByDay: Record<number, Record<string, unknown>[]>,
   planDays: number[],
   selectedWeekdays: number[],
-  userLocalDate: string,
+  monday: Date,
+  baseDate: Date,
 ) => {
   return selectedWeekdays.map((weekday, index) => {
-    const planDay = planDays[index];
+    const planDay = planDays[index % planDays.length];
+    const workoutDate = new Date(monday);
+    workoutDate.setUTCDate(monday.getUTCDate() + (weekday - 1));
+
+    if (workoutDate < baseDate) {
+      workoutDate.setUTCDate(workoutDate.getUTCDate() + 7);
+    }
+
     const dayExercises = exercisesByDay[planDay] || [];
     const estimatedCalories = dayExercises.reduce((total: number, pe: unknown) => {
       const exercise = pe.exercises;
@@ -237,7 +265,7 @@ const buildWorkoutPayload = (
       user_id: userId,
       name: `${plan.nombre_plan} - ${dayNames[weekday]}`,
       description: `${muscleGroup} - ${plan.descripcion_plan || "Plan personalizado"}`,
-      scheduled_date: userLocalDate,
+      scheduled_date: workoutDate.toISOString().split("T")[0],
       weekday,
       plan_id: plan.id,
       location: normalizeLocation(plan.lugar),
@@ -251,22 +279,24 @@ const buildWorkoutPayload = (
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
+    if (!isAllowedRequestOrigin(req)) return jsonResponse(req, { error: "Origen no permitido." }, 403);
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "No authorization header" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonResponse(req, { error: "No authorization header" }, 401);
     }
 
     const requestBody = await req.json().catch(() => ({}));
     const userLocalDate = requestBody.userLocalDate || new Date().toISOString().split("T")[0];
     const forceReassign = Boolean(requestBody.reassign);
+    const baseDate = new Date(`${userLocalDate}T00:00:00Z`);
+    const currentDay = baseDate.getUTCDay();
+    const monday = new Date(baseDate);
+    monday.setUTCDate(baseDate.getUTCDate() - currentDay + (currentDay === 0 ? -6 : 1));
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -276,10 +306,7 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
     if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Invalid token" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonResponse(req, { error: "Invalid token" }, 401);
     }
 
     const { data: profile, error: profileError } = await supabase
@@ -289,18 +316,12 @@ serve(async (req) => {
       .single();
 
     if (profileError || !profile) {
-      return new Response(
-        JSON.stringify({ error: "Profile not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonResponse(req, { error: "Profile not found" }, 404);
     }
 
     const selectedWeekdays = normalizeSelectedWeekdays(profile.available_weekdays || []);
     if (selectedWeekdays.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "No valid training weekdays configured" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonResponse(req, { error: "No valid training weekdays configured" }, 400);
     }
 
     const compatiblePlan = await findCompatiblePlan(
@@ -311,14 +332,19 @@ serve(async (req) => {
     );
 
     if (!compatiblePlan.plan) {
-      return new Response(
-        JSON.stringify({
+      await supabase
+        .from("profiles")
+        .update({
+          routine_assignment_status: "failed",
+          routine_assignment_error: "No compatible plan matches the selected weekday count",
+        })
+        .eq("id", user.id);
+
+      return jsonResponse(req, {
           error: "No compatible plan matches the selected weekday count",
           selected_weekdays: selectedWeekdays,
           last_coverage_failure: compatiblePlan.lastCoverageFailure,
-        }),
-        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+        }, 409);
     }
 
     const workoutsToCreate = buildWorkoutPayload(
@@ -327,18 +353,16 @@ serve(async (req) => {
       compatiblePlan.exercisesByDay,
       Object.keys(compatiblePlan.exercisesByDay).map(Number).sort((a, b) => a - b),
       selectedWeekdays,
-      userLocalDate,
+      monday,
+      baseDate,
     );
 
     if (workoutsToCreate.length !== selectedWeekdays.length) {
-      return new Response(
-        JSON.stringify({
+      return jsonResponse(req, {
           error: "Workout preparation did not cover all selected weekdays",
           selected_weekdays: selectedWeekdays,
           workouts_prepared: workoutsToCreate.length,
-        }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+        }, 500);
     }
 
     const { data: deletedWorkouts, error: deleteError } = await supabase
@@ -346,13 +370,12 @@ serve(async (req) => {
       .delete()
       .eq("user_id", user.id)
       .eq("tipo", "automatico")
+      .eq("completed", false)
+      .gte("scheduled_date", userLocalDate)
       .select("id");
 
     if (deleteError) {
-      return new Response(
-        JSON.stringify({ error: "Failed to delete old automatic workouts", details: deleteError }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonResponse(req, { error: "Failed to delete old automatic workouts", details: deleteError }, 500);
     }
 
     const createdWorkouts = [];
@@ -379,6 +402,7 @@ serve(async (req) => {
           const exercise = pe.exercises;
           return {
             workout_id: workout.id,
+            exercise_id: exercise.id,
             name: exercise.nombre,
             sets: exercise.series_sugeridas || 3,
             reps: exercise.repeticiones_sugeridas || 10,
@@ -403,28 +427,28 @@ serve(async (req) => {
     }
 
     if (createdWorkouts.length !== workoutsToCreate.length) {
-      return new Response(
-        JSON.stringify({
+      return jsonResponse(req, {
           error: "Failed to create all workouts",
           details: lastError,
           workouts_created: createdWorkouts.length,
           workouts_expected: workoutsToCreate.length,
-        }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+        }, 500);
     }
 
     const { error: profileUpdateError } = await supabase
       .from("profiles")
-      .update({ assigned_routine_id: compatiblePlan.plan.id })
+      .update({
+        assigned_routine_id: compatiblePlan.plan.id,
+        routine_assignment_status: "assigned",
+        routine_assignment_error: null,
+      })
       .eq("id", user.id);
 
     if (profileUpdateError) {
       console.error("Error updating assigned routine:", profileUpdateError);
     }
 
-    return new Response(
-      JSON.stringify({
+    return jsonResponse(req, {
         success: true,
         message: "Entrenamientos generados correctamente",
         plan_id: compatiblePlan.plan.id,
@@ -432,17 +456,12 @@ serve(async (req) => {
         workouts_deleted: deletedWorkouts?.length || 0,
         training_weekdays: selectedWeekdays,
         reassignment_triggered: compatiblePlan.reassigned || forceReassign,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+      });
   } catch (error) {
     console.error("Error in generate-weekly-workouts:", error);
-    return new Response(
-      JSON.stringify({
+    return jsonResponse(req, {
         error: error instanceof Error ? error.message : "Unknown error",
         type: error instanceof Error ? error.constructor.name : "UnknownError",
-      }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+      }, 500);
   }
 });

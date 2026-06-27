@@ -15,12 +15,13 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { StatCard } from "@/components/StatCard";
-import { Flame, Activity, Target, TrendingUp, BarChart3 } from "lucide-react";
+import { Flame, Activity, Target, TrendingUp, BarChart3, Dumbbell, Apple } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ProButton } from "@/components/ProButton";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -43,7 +44,11 @@ const Dashboard = () => {
   // Hook para obtener entrenamientos del día desde backend API
   const { data: todaysData } = useTodaysWorkouts();
   const todayWorkouts = todaysData?.workouts || [];
+  const completedToday = todayWorkouts.filter((workout) => workout.completed).length;
+  const pendingToday = todayWorkouts.filter((workout) => !workout.completed);
+  const nextWorkout = pendingToday[0];
   const goToReports = () => navigate("/reports");
+  const showSecondaryDashboardCards = location.search.includes("showSecondaryDashboardCards=true");
 
   // Bloque de carga inicial - Obtiene perfil del usuario y comidas del día
   useEffect(() => {
@@ -161,7 +166,7 @@ const Dashboard = () => {
         <StatCard
           title="Ejercicio"
           value={todayWorkouts.length}
-          subtitle={`${todayWorkouts.filter((w) => w.completed).length} completados`}
+          subtitle={`${completedToday} completados`}
           icon={Activity}
         />
         <StatCard
@@ -196,8 +201,36 @@ const Dashboard = () => {
       </Card>
     </div>,
 
+    <Card key="next-action" className="p-4 shadow-card h-full flex flex-col justify-center">
+      <h3 className="text-lg font-semibold mb-2">Próxima acción</h3>
+      {nextWorkout ? (
+        <>
+          <p className="text-sm text-muted-foreground mb-4">
+            Tu siguiente entrenamiento es {nextWorkout.name}.
+          </p>
+          <Button className="w-full" onClick={() => navigate("/workouts")}>
+            Ir a entrenar
+          </Button>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground mb-4">
+            No tienes entrenamiento pendiente hoy. Revisa tu semana o registra comida.
+          </p>
+          <div className="grid gap-2">
+            <Button onClick={() => navigate("/workouts?tab=semana")}>
+              Ver rutina semanal
+            </Button>
+            <Button variant="outline" onClick={() => navigate("/macros")}>
+              Registrar comida
+            </Button>
+          </div>
+        </>
+      )}
+    </Card>,
+
     // Sección 2: Análisis Avanzado PRO
-    <Card key="advanced-analytics" className="p-4 shadow-card bg-gradient-card h-full flex flex-col justify-center">
+    showSecondaryDashboardCards && <Card key="advanced-analytics" className="p-4 shadow-card bg-gradient-card h-full flex flex-col justify-center">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-semibold">Análisis Avanzado</h3>
         <Badge variant="default" className="gap-1">
@@ -273,7 +306,7 @@ const Dashboard = () => {
     </Card>,
 
     // Sección 4: Gestor de Rutinas
-    <div key="routine-manager" className="h-full overflow-hidden">
+    showSecondaryDashboardCards && <div key="routine-manager" className="h-full overflow-hidden">
       <RoutineManager />
     </div>,
 
@@ -316,7 +349,7 @@ const Dashboard = () => {
         </div>
       </div>
     </Card>,
-  ];
+  ].filter(Boolean);
 
   return (
     <div className="min-h-screen bg-background">
@@ -356,7 +389,7 @@ const Dashboard = () => {
               <StatCard
                 title="Ejercicio"
                 value={todayWorkouts.length}
-                subtitle={`${todayWorkouts.filter((w) => w.completed).length} completados`}
+                subtitle={`${completedToday} completados`}
                 icon={Activity}
               />
               <StatCard
@@ -395,7 +428,12 @@ const Dashboard = () => {
               <Card className="p-3 sm:p-4 shadow-card">
                 <h3 className="text-base sm:text-lg font-semibold mb-2">Entrenamientos de Hoy</h3>
                 {todayWorkouts.length === 0 ? (
-                  <p className="text-muted-foreground">No hay entrenamientos programados para hoy</p>
+                  <div className="space-y-3">
+                    <p className="text-muted-foreground">No hay entrenamientos programados para hoy</p>
+                    <Button variant="outline" onClick={() => navigate("/workouts?tab=semana")}>
+                      Ver rutina semanal
+                    </Button>
+                  </div>
                 ) : (
                   <div className="space-y-3">
                     {todayWorkouts.map((workout) => (
@@ -421,9 +459,40 @@ const Dashboard = () => {
               </Card>
             </div>
 
-            <RoutineManager />
+            <Card className="p-3 sm:p-4 shadow-card">
+              <h3 className="text-base sm:text-lg font-semibold mb-2">Próxima acción recomendada</h3>
+              {nextWorkout ? (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium">{nextWorkout.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {nextWorkout.duration_minutes} min · {nextWorkout.estimated_calories} kcal
+                    </p>
+                  </div>
+                  <Button onClick={() => navigate("/workouts")}>
+                    Ir a entrenar
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Revisa tu semana o registra tu siguiente comida.
+                  </p>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button onClick={() => navigate("/workouts?tab=semana")}>
+                      Ver semana
+                    </Button>
+                    <Button variant="outline" onClick={() => navigate("/macros")}>
+                      Registrar comida
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Card>
 
-            <Card className="p-3 sm:p-4 shadow-card bg-gradient-card">
+            {showSecondaryDashboardCards && <RoutineManager />}
+
+            {showSecondaryDashboardCards && <Card className="p-3 sm:p-4 shadow-card bg-gradient-card">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-base sm:text-lg font-semibold">Análisis Avanzado</h3>
                 <Badge variant="default" className="gap-1">
@@ -467,7 +536,7 @@ const Dashboard = () => {
                   onClick={goToReports}
                 />
               </div>
-            </Card>
+            </Card>}
 
             <Card className="p-3 sm:p-4 shadow-card bg-gradient-card">
               <h3 className="text-base sm:text-lg font-semibold mb-2">Consejos del Día</h3>

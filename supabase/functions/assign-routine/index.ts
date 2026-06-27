@@ -2,11 +2,7 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { handleCors, isAllowedRequestOrigin, jsonResponse } from "../_shared/cors.ts";
 
 const dayMap: Record<string, number> = {
   L: 1,
@@ -160,7 +156,7 @@ const buildWorkoutPayload = (
   baseDate: Date,
 ) => {
   return selectedWeekdays.map((weekday, index) => {
-    const planDay = planDays[index];
+    const planDay = planDays[index % planDays.length];
     const workoutDate = new Date(monday);
     workoutDate.setUTCDate(monday.getUTCDate() + (weekday - 1));
 
@@ -198,17 +194,15 @@ const buildWorkoutPayload = (
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
+    if (!isAllowedRequestOrigin(req)) return jsonResponse(req, { error: "Origen no permitido." }, 403);
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "No authorization header" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonResponse(req, { error: "No authorization header" }, 401);
     }
 
     const requestBody = await req.json().catch(() => ({}));
@@ -222,10 +216,7 @@ serve(async (req) => {
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Invalid token", details: userError }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonResponse(req, { error: "Invalid token", details: userError }, 401);
     }
 
     const baseDate = new Date(`${userLocalDate}T00:00:00Z`);
@@ -240,18 +231,25 @@ serve(async (req) => {
       .single();
 
     if (profileError || !profile) {
-      return new Response(
-        JSON.stringify({ error: "Profile not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonResponse(req, { error: "Profile not found" }, 404);
     }
 
     const selectedWeekdays = normalizeSelectedWeekdays(profile.available_weekdays || []);
     if (selectedWeekdays.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "No valid training weekdays configured" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      await supabase
+        .from("profiles")
+        .update({
+          onboarding_completed: true,
+          routine_assignment_status: "failed",
+          routine_assignment_error: "No valid training weekdays configured",
+        })
+        .eq("id", user.id);
+
+      return jsonResponse(req, {
+        success: false,
+        status: "failed",
+        error: "No valid training weekdays configured",
+      });
     }
 
     const { data: plans, error: plansError } = await supabase
@@ -259,10 +257,20 @@ serve(async (req) => {
       .select("*");
 
     if (plansError || !plans?.length) {
-      return new Response(
-        JSON.stringify({ error: "No predesigned plans available" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      await supabase
+        .from("profiles")
+        .update({
+          onboarding_completed: true,
+          routine_assignment_status: "failed",
+          routine_assignment_error: "No predesigned plans available",
+        })
+        .eq("id", user.id);
+
+      return jsonResponse(req, {
+        success: false,
+        status: "failed",
+        error: "No predesigned plans available",
+      });
     }
 
     const scoredPlans = plans
@@ -272,6 +280,8 @@ serve(async (req) => {
     let selectedPlan = null;
     let exercisesByDay: Record<number, Record<string, unknown>[]> = {};
     let lastCoverageFailure: Record<string, unknown> | null = null;
+    let fallbackPlan = null;
+    let fallbackExercisesByDay: Record<number, Record<string, unknown>[]> = {};
 
     for (const { plan } of scoredPlans) {
       const { data: planExercises, error: planExercisesError } = await supabase
@@ -285,6 +295,11 @@ serve(async (req) => {
 
       const candidateExercisesByDay = groupPlanExercisesByDay(planExercises);
       const candidatePlanDays = Object.keys(candidateExercisesByDay).map(Number).sort((a, b) => a - b);
+
+      if (!fallbackPlan && candidatePlanDays.length > 0) {
+        fallbackPlan = plan;
+        fallbackExercisesByDay = candidateExercisesByDay;
+      }
 
       if (candidatePlanDays.length === selectedWeekdays.length) {
         selectedPlan = plan;
@@ -300,29 +315,51 @@ serve(async (req) => {
       };
     }
 
+    if (!selectedPlan && fallbackPlan) {
+      selectedPlan = fallbackPlan;
+      exercisesByDay = fallbackExercisesByDay;
+      lastCoverageFailure = {
+        ...lastCoverageFailure,
+        fallback_used: true,
+        reason: "No exact day-count match; using highest scored plan with exercises.",
+      };
+      console.warn("assign-routine fallback used", {
+        user_id: user.id,
+        selected_weekdays: selectedWeekdays,
+        selected_plan: selectedPlan.id,
+        lastCoverageFailure,
+      });
+    }
+
     if (!selectedPlan) {
-      return new Response(
-        JSON.stringify({
+      await supabase
+        .from("profiles")
+        .update({
+          onboarding_completed: true,
+          routine_assignment_status: "failed",
+          routine_assignment_error: "No compatible plan matches the selected weekday count",
+        })
+        .eq("id", user.id);
+
+      return jsonResponse(req, {
+          success: false,
+          status: "failed",
           error: "No compatible plan matches the selected weekday count",
           selected_weekdays: selectedWeekdays,
           last_coverage_failure: lastCoverageFailure,
-        }),
-        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+        });
     }
 
     const { error: deleteError } = await supabase
       .from("workouts")
       .delete()
+      .eq("user_id", user.id)
       .eq("tipo", "automatico")
       .eq("completed", false)
       .gte("scheduled_date", userLocalDate);
 
     if (deleteError) {
-      return new Response(
-        JSON.stringify({ error: "Failed to delete old workouts", details: deleteError }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonResponse(req, { error: "Failed to delete old workouts", details: deleteError }, 500);
     }
 
     const workoutsToCreate = buildWorkoutPayload(
@@ -356,6 +393,7 @@ serve(async (req) => {
           const exercise = pe.exercises;
           return {
             workout_id: workout.id,
+            exercise_id: exercise.id,
             name: exercise.nombre,
             sets: exercise.series_sugeridas || 3,
             reps: exercise.repeticiones_sugeridas || 10,
@@ -380,41 +418,47 @@ serve(async (req) => {
     }
 
     if (createdWorkouts.length !== workoutsToCreate.length) {
-      return new Response(
-        JSON.stringify({
+      await supabase
+        .from("profiles")
+        .update({
+          onboarding_completed: true,
+          routine_assignment_status: "failed",
+          routine_assignment_error: "Failed to create all workouts",
+        })
+        .eq("id", user.id);
+
+      return jsonResponse(req, {
           error: "Failed to create all workouts",
           workouts_created: createdWorkouts.length,
           workouts_expected: workoutsToCreate.length,
-        }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+        }, 500);
     }
 
     const { error: updateError } = await supabase
       .from("profiles")
-      .update({ assigned_routine_id: selectedPlan.id, onboarding_completed: true })
+      .update({
+        assigned_routine_id: selectedPlan.id,
+        onboarding_completed: true,
+        routine_assignment_status: "assigned",
+        routine_assignment_error: null,
+      })
       .eq("id", user.id);
 
     if (updateError) {
       console.error("Error updating profile with assigned plan:", updateError);
     }
 
-    return new Response(
-      JSON.stringify({
+    return jsonResponse(req, {
         success: true,
+        status: "assigned",
         message: `Routine assigned successfully: ${selectedPlan.nombre_plan}`,
         plan: selectedPlan,
         workouts_created: createdWorkouts.length,
         training_weekdays: selectedWeekdays,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+      });
   } catch (error) {
     console.error("Error in assign-routine:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return jsonResponse(req, { error: errorMessage }, 500);
   }
 });

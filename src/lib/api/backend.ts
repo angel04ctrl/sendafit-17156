@@ -108,6 +108,11 @@ export interface PlanChangeValidation {
     pendingWorkoutsCount: number;
     willPreserveCompleted: boolean;
   };
+  planProtection?: {
+    isProtected: boolean;
+    reason: string;
+    planType: string;
+  };
   currentPlan?: {
     nombre_plan: string;
     dias_semana: number;
@@ -116,6 +121,234 @@ export interface PlanChangeValidation {
   preview: {
     message: string;
     summary: string;
+  };
+}
+
+export interface WorkoutSession {
+  id: string;
+  user_id: string;
+  workout_id: string;
+  started_at: string;
+  finished_at: string | null;
+  status: "active" | "completed" | "cancelled";
+  duration_seconds: number | null;
+  notes: string | null;
+  session_feeling: "strong" | "normal" | "tired" | "pain" | null;
+  pain_flag: boolean;
+  pain_notes: string | null;
+  overall_rpe: number | null;
+  user_notes: string | null;
+  created_at: string;
+}
+
+export interface WorkoutSessionSet {
+  id: string;
+  session_id: string;
+  workout_exercise_id: string | null;
+  exercise_id: string | null;
+  set_number: number;
+  target_reps: number | null;
+  actual_reps: number | null;
+  target_weight: number | null;
+  actual_weight: number | null;
+  rir: number | null;
+  rpe: number | null;
+  rest_seconds: number | null;
+  completed: boolean;
+  exercise_name_snapshot: string | null;
+  workout_exercise_name_snapshot: string | null;
+  created_at: string;
+}
+
+export interface ExerciseProgressSet {
+  setNumber: number;
+  reps: number | null;
+  weight: number | null;
+  rir: number | null;
+  rpe: number | null;
+  volume: number;
+}
+
+export interface ExerciseProgressSession {
+  sessionId: string;
+  workoutId: string;
+  startedAt: string;
+  finishedAt: string | null;
+  durationSeconds: number | null;
+  notes: string | null;
+  sessionFeeling: "strong" | "normal" | "tired" | "pain" | null;
+  painFlag: boolean;
+  painNotes: string | null;
+  exerciseName: string;
+  sets: ExerciseProgressSet[];
+  totalVolume: number;
+  maxWeight: number | null;
+  totalReps: number;
+}
+
+export interface ExerciseProgressPrs {
+  maxWeight: number | null;
+  maxRepsAtMaxWeight: number | null;
+  maxVolume: number;
+  bestRecentSession: ExerciseProgressSession | null;
+}
+
+export interface ExerciseProgressSummary {
+  exerciseName: string;
+  source: "exercise_id" | "snapshot";
+  sessions: ExerciseProgressSession[];
+  lastSession: ExerciseProgressSession | null;
+  prs: ExerciseProgressPrs;
+}
+
+export interface SaveProgressionSuggestionInput {
+  exercise_id?: string | null;
+  exercise_name_snapshot: string;
+  source: "exercise_id" | "snapshot";
+  workout_session_id?: string | null;
+  previous_weight?: number | null;
+  previous_reps?: number[] | null;
+  suggested_action: string;
+  suggested_weight?: number | null;
+  suggested_reps?: number | null;
+  confidence: "high" | "medium" | "low";
+  reason: string;
+  based_on_session_id?: string | null;
+}
+
+export interface ProgressionSuggestionRecord extends SaveProgressionSuggestionInput {
+  id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface SaveWorkoutSessionSetInput {
+  session_id: string;
+  workout_exercise_id?: string | null;
+  exercise_id?: string | null;
+  exercise_name_snapshot?: string | null;
+  workout_exercise_name_snapshot?: string | null;
+  set_number: number;
+  target_reps?: number | null;
+  actual_reps?: number | null;
+  target_weight?: number | null;
+  actual_weight?: number | null;
+  rir?: number | null;
+  rpe?: number | null;
+  rest_seconds?: number | null;
+  completed?: boolean;
+}
+
+export interface ExerciseProgressQuery {
+  exerciseId?: string | null;
+  exerciseName?: string | null;
+  limit?: number;
+}
+
+type RawExerciseProgressSet = WorkoutSessionSet & {
+  workout_sessions?: {
+    id: string;
+    workout_id: string;
+    started_at: string;
+    finished_at: string | null;
+      duration_seconds: number | null;
+      notes: string | null;
+      session_feeling: "strong" | "normal" | "tired" | "pain" | null;
+      pain_flag: boolean;
+      pain_notes: string | null;
+    } | null;
+  workout_exercises?: {
+    id: string;
+    exercise_id: string | null;
+    name: string;
+  } | null;
+};
+
+function buildExerciseProgressSummary(
+  exerciseName: string,
+  rows: RawExerciseProgressSet[],
+  source: "exercise_id" | "snapshot" = "snapshot",
+): ExerciseProgressSummary {
+  const sessions = new Map<string, ExerciseProgressSession>();
+
+  for (const row of rows) {
+    const session = row.workout_sessions;
+    if (!session) continue;
+
+    const key = session.id;
+    const volume = (row.actual_weight || 0) * (row.actual_reps || 0);
+    const existing = sessions.get(key);
+    const setEntry: ExerciseProgressSet = {
+      setNumber: row.set_number,
+      reps: row.actual_reps,
+      weight: row.actual_weight,
+      rir: row.rir,
+      rpe: row.rpe,
+      volume,
+    };
+
+    if (existing) {
+      existing.sets.push(setEntry);
+      existing.totalVolume += volume;
+      existing.totalReps += row.actual_reps || 0;
+      existing.maxWeight = Math.max(existing.maxWeight || 0, row.actual_weight || 0) || null;
+      continue;
+    }
+
+    sessions.set(key, {
+      sessionId: session.id,
+      workoutId: session.workout_id,
+      startedAt: session.started_at,
+      finishedAt: session.finished_at,
+      durationSeconds: session.duration_seconds,
+      notes: session.notes,
+      sessionFeeling: session.session_feeling,
+      painFlag: session.pain_flag,
+      painNotes: session.pain_notes,
+      exerciseName: row.exercise_name_snapshot || row.workout_exercise_name_snapshot || row.workout_exercises?.name || exerciseName,
+      sets: [setEntry],
+      totalVolume: volume,
+      maxWeight: row.actual_weight,
+      totalReps: row.actual_reps || 0,
+    });
+  }
+
+  const sessionList = Array.from(sessions.values())
+    .map((session) => ({
+      ...session,
+      sets: [...session.sets].sort((a, b) => a.setNumber - b.setNumber),
+    }))
+    .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+
+  const allSets = sessionList.flatMap((session) => session.sets);
+  const maxWeight = allSets.reduce<number | null>((max, set) => {
+    if (set.weight === null) return max;
+    return max === null ? set.weight : Math.max(max, set.weight);
+  }, null);
+  const maxRepsAtMaxWeight = maxWeight === null
+    ? null
+    : allSets
+        .filter((set) => set.weight === maxWeight)
+        .reduce<number | null>((max, set) => {
+          if (set.reps === null) return max;
+          return max === null ? set.reps : Math.max(max, set.reps);
+        }, null);
+  const bestRecentSession = sessionList.reduce<ExerciseProgressSession | null>((best, session) => {
+    if (!best) return session;
+    return session.totalVolume > best.totalVolume ? session : best;
+  }, null);
+
+  return {
+    exerciseName,
+    source,
+    sessions: sessionList,
+    lastSession: sessionList[0] || null,
+    prs: {
+      maxWeight,
+      maxRepsAtMaxWeight,
+      maxVolume: bestRecentSession?.totalVolume || 0,
+      bestRecentSession,
+    },
   };
 }
 
@@ -280,6 +513,237 @@ export async function completeWorkout(
 
   if (error) throw error;
   return data;
+}
+
+export async function getActiveWorkoutSession(workoutId: string): Promise<WorkoutSession | null> {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  const userId = userData.user?.id;
+  if (!userId) throw new Error("Usuario no autenticado");
+
+  const { data, error } = await supabase
+    .from("workout_sessions")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("workout_id", workoutId)
+    .eq("status", "active")
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data as WorkoutSession | null;
+}
+
+export async function startWorkoutSession(workoutId: string): Promise<WorkoutSession> {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  const userId = userData.user?.id;
+  if (!userId) throw new Error("Usuario no autenticado");
+
+  const existing = await getActiveWorkoutSession(workoutId);
+  if (existing) return existing;
+
+  const { data, error } = await supabase
+    .from("workout_sessions")
+    .insert({
+      user_id: userId,
+      workout_id: workoutId,
+      status: "active",
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    const concurrentSession = await getActiveWorkoutSession(workoutId);
+    if (concurrentSession) return concurrentSession;
+    throw error;
+  }
+
+  return data as WorkoutSession;
+}
+
+export async function getWorkoutSessionSets(sessionId: string): Promise<WorkoutSessionSet[]> {
+  const { data, error } = await supabase
+    .from("workout_session_sets")
+    .select("*")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return (data || []) as WorkoutSessionSet[];
+}
+
+export async function getExerciseProgressSummary(params: ExerciseProgressQuery): Promise<ExerciseProgressSummary> {
+  const exerciseId = params.exerciseId?.trim() || "";
+  const normalizedName = params.exerciseName?.trim() || "";
+  const limit = params.limit || 60;
+
+  if (!exerciseId && !normalizedName) {
+    return buildExerciseProgressSummary("", [], "snapshot");
+  }
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  const userId = userData.user?.id;
+  if (!userId) throw new Error("Usuario no autenticado");
+
+  const selectClause = `
+    *,
+    workout_sessions!inner (
+      id,
+      user_id,
+      workout_id,
+      started_at,
+      finished_at,
+      duration_seconds,
+      notes,
+      session_feeling,
+      pain_flag,
+      pain_notes,
+      status
+    ),
+    workout_exercises (
+      id,
+      exercise_id,
+      name
+    )
+  `;
+
+  const baseQuery = supabase
+    .from("workout_session_sets")
+    .select(selectClause)
+    .eq("completed", true)
+    .eq("workout_sessions.user_id", userId)
+    .eq("workout_sessions.status", "completed")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  const { data, error } = exerciseId
+    ? await baseQuery.eq("exercise_id", exerciseId)
+    : await baseQuery.ilike("exercise_name_snapshot", normalizedName);
+
+  if (error) throw error;
+  if (data?.length || !exerciseId || !normalizedName) {
+    return buildExerciseProgressSummary(
+      normalizedName,
+      (data || []) as unknown as RawExerciseProgressSet[],
+      exerciseId ? "exercise_id" : "snapshot",
+    );
+  }
+
+  const { data: fallbackData, error: fallbackError } = await supabase
+    .from("workout_session_sets")
+    .select(selectClause)
+    .eq("completed", true)
+    .eq("workout_sessions.user_id", userId)
+    .eq("workout_sessions.status", "completed")
+    .is("exercise_id", null)
+    .ilike("exercise_name_snapshot", normalizedName)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (fallbackError) throw fallbackError;
+  return buildExerciseProgressSummary(normalizedName, (fallbackData || []) as unknown as RawExerciseProgressSet[], "snapshot");
+}
+
+export async function saveProgressionSuggestion(
+  input: SaveProgressionSuggestionInput,
+): Promise<ProgressionSuggestionRecord> {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  const userId = userData.user?.id;
+  if (!userId) throw new Error("Usuario no autenticado");
+
+  const { data, error } = await supabase
+    .from("exercise_progression_suggestions")
+    .upsert({
+      ...input,
+      user_id: userId,
+    }, {
+      onConflict: "user_id,exercise_key,workout_session_id,suggested_action",
+    })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data as ProgressionSuggestionRecord;
+}
+
+export async function saveWorkoutSessionSet(input: SaveWorkoutSessionSetInput): Promise<WorkoutSessionSet> {
+  const { data, error } = await supabase
+    .from("workout_session_sets")
+    .upsert(
+      {
+        ...input,
+        completed: input.completed ?? true,
+      },
+      { onConflict: "session_id,workout_exercise_id,set_number" },
+    )
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data as WorkoutSessionSet;
+}
+
+export async function finishWorkoutSession(params: {
+  sessionId: string;
+  workoutId: string;
+  startedAt: string;
+  notes?: string;
+  sessionFeeling?: "strong" | "normal" | "tired" | "pain" | null;
+  painNotes?: string | null;
+  overallRpe?: number | null;
+  userNotes?: string | null;
+}): Promise<{ success: boolean; session: WorkoutSession; workout: unknown }> {
+  const finishedAt = new Date();
+  const durationSeconds = Math.max(
+    0,
+    Math.round((finishedAt.getTime() - new Date(params.startedAt).getTime()) / 1000),
+  );
+
+  const { data: session, error: sessionError } = await supabase
+    .from("workout_sessions")
+    .update({
+      status: "completed",
+      finished_at: finishedAt.toISOString(),
+      duration_seconds: durationSeconds,
+      notes: params.notes?.trim() || null,
+      session_feeling: params.sessionFeeling || null,
+      pain_flag: params.sessionFeeling === "pain",
+      pain_notes: params.painNotes?.trim() || null,
+      overall_rpe: params.overallRpe ?? null,
+      user_notes: params.userNotes?.trim() || null,
+    })
+    .eq("id", params.sessionId)
+    .select("*")
+    .single();
+
+  if (sessionError) throw sessionError;
+
+  const completedWorkout = await completeWorkout(params.workoutId, true);
+
+  return {
+    success: true,
+    session: session as WorkoutSession,
+    workout: completedWorkout.workout,
+  };
+}
+
+export async function cancelWorkoutSession(sessionId: string): Promise<WorkoutSession> {
+  const { data, error } = await supabase
+    .from("workout_sessions")
+    .update({
+      status: "cancelled",
+      finished_at: new Date().toISOString(),
+    })
+    .eq("id", sessionId)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data as WorkoutSession;
 }
 
 /**
