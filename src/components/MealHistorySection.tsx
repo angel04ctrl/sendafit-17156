@@ -12,7 +12,7 @@ import { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronDown, Flame, Beef, Pizza, Droplet, Trash2 } from "lucide-react";
+import { ChevronDown, Flame, Beef, Pizza, Droplet, Trash2, Edit, Copy } from "lucide-react";
 import { format, startOfWeek, endOfWeek, subWeeks, addDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -31,6 +31,10 @@ interface Meal {
 interface MealHistorySectionProps {
   meals: Meal[];
   onDeleteMeal: (mealId: string) => void;
+  onEditMeal?: (meal: Meal) => void;
+  onRepeatMeal?: (meal: Meal, date: string, editBeforeSave?: boolean) => void;
+  dailyCalorieGoal?: number;
+  dailyProteinGoal?: number;
   isLoading?: boolean;
 }
 
@@ -56,6 +60,10 @@ const getMealTypeColor = (type: string): string => {
 export const MealHistorySection = ({
   meals,
   onDeleteMeal,
+  onEditMeal,
+  onRepeatMeal,
+  dailyCalorieGoal = 2000,
+  dailyProteinGoal = 150,
   isLoading = false,
 }: MealHistorySectionProps) => {
   const [selectedPeriod, setSelectedPeriod] = useState("this-week");
@@ -135,6 +143,42 @@ export const MealHistorySection = ({
     return calculateDayTotals(allMeals);
   }, [groupedMeals]);
 
+  const simpleSummary = useMemo(() => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    const sevenDaysAgo = format(addDays(new Date(), -6), "yyyy-MM-dd");
+    const todayMeals = meals.filter((meal) => meal.date === today);
+    const lastSevenMeals = meals.filter((meal) => meal.date >= sevenDaysAgo && meal.date <= today);
+    const totalsByDate = lastSevenMeals.reduce<Record<string, ReturnType<typeof calculateDayTotals>>>(
+      (acc, meal) => {
+        const existing = acc[meal.date] || { calories: 0, protein: 0, carbs: 0, fat: 0 };
+        acc[meal.date] = {
+          calories: existing.calories + meal.calories,
+          protein: existing.protein + meal.protein,
+          carbs: existing.carbs + meal.carbs,
+          fat: existing.fat + meal.fat,
+        };
+        return acc;
+      },
+      {}
+    );
+    const dayTotals = Object.values(totalsByDate);
+    const daysWithData = Math.max(dayTotals.length, 1);
+    const sevenDayTotals = calculateDayTotals(lastSevenMeals);
+    const daysWithinGoal = dayTotals.filter((total) => {
+      const lower = dailyCalorieGoal * 0.9;
+      const upper = dailyCalorieGoal * 1.1;
+      return total.calories >= lower && total.calories <= upper;
+    }).length;
+
+    return {
+      todayTotals: calculateDayTotals(todayMeals),
+      averageCalories: Math.round(sevenDayTotals.calories / daysWithData),
+      averageProtein: Math.round(sevenDayTotals.protein / daysWithData),
+      daysWithinGoal,
+      daysWithData: dayTotals.length,
+    };
+  }, [meals, dailyCalorieGoal]);
+
   const toggleDateExpanded = (date: string) => {
     const newExpanded = new Set(expandedDates);
     if (newExpanded.has(date)) {
@@ -173,6 +217,29 @@ export const MealHistorySection = ({
             <SelectItem value="last-30-days">Últimos 30 días</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+        <Card className="p-3">
+          <p className="text-xs text-muted-foreground">Hoy</p>
+          <p className="text-lg font-bold">{simpleSummary.todayTotals.calories} kcal</p>
+          <p className="text-xs text-muted-foreground">{simpleSummary.todayTotals.protein}g proteina</p>
+        </Card>
+        <Card className="p-3">
+          <p className="text-xs text-muted-foreground">Promedio 7 dias</p>
+          <p className="text-lg font-bold">{simpleSummary.averageCalories} kcal</p>
+          <p className="text-xs text-muted-foreground">{simpleSummary.daysWithData} dia(s) con datos</p>
+        </Card>
+        <Card className="p-3">
+          <p className="text-xs text-muted-foreground">Proteina promedio</p>
+          <p className="text-lg font-bold">{simpleSummary.averageProtein}g</p>
+          <p className="text-xs text-muted-foreground">Meta: {dailyProteinGoal}g</p>
+        </Card>
+        <Card className="p-3">
+          <p className="text-xs text-muted-foreground">Dias dentro de meta</p>
+          <p className="text-lg font-bold">{simpleSummary.daysWithinGoal}</p>
+          <p className="text-xs text-muted-foreground">Rango: +/-10%</p>
+        </Card>
       </div>
 
       {groupedMeals.length === 0 ? (
@@ -290,6 +357,38 @@ export const MealHistorySection = ({
                             >
                               <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                             </Button>
+                            <div className="flex flex-wrap justify-end gap-1">
+                              {onEditMeal && (
+                                <Button variant="ghost" size="sm" onClick={() => onEditMeal(meal)}>
+                                  <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                                </Button>
+                              )}
+                              {onRepeatMeal && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => onRepeatMeal(meal, format(new Date(), "yyyy-MM-dd"))}
+                                  >
+                                    <Copy className="w-3 h-3 sm:w-4 sm:h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => onRepeatMeal(meal, format(addDays(new Date(), 1), "yyyy-MM-dd"))}
+                                  >
+                                    Manana
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => onRepeatMeal(meal, format(new Date(), "yyyy-MM-dd"), true)}
+                                  >
+                                    Duplicar
+                                  </Button>
+                                </>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>

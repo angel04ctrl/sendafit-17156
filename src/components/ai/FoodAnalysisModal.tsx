@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
+import { calculateCaloriesFromMacros, validateMealInput } from "@/lib/mealValidation";
 
 type MealType = "desayuno" | "colacion_am" | "comida" | "colacion_pm" | "cena";
 type ConfidenceScore = "alta" | "media" | "baja";
@@ -118,6 +119,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [editedDishName, setEditedDishName] = useState("");
   const [editedMacros, setEditedMacros] = useState<MealMacros>(emptyMacros);
+  const [editedIngredients, setEditedIngredients] = useState<DetectedIngredient[]>([]);
   const [mealType, setMealType] = useState<MealType>("comida");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -150,6 +152,36 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
       ...current,
       [key]: toNumber(value),
     }));
+  };
+
+  const updateIngredient = (index: number, key: keyof DetectedIngredient, value: string) => {
+    setEditedIngredients((current) => {
+      const next = current.map((ingredient, ingredientIndex) => {
+        if (ingredientIndex !== index) return ingredient;
+        return {
+          ...ingredient,
+          [key]: key === "name" ? value : toNumber(value),
+        };
+      });
+
+      const macroTotals = next.reduce(
+        (acc, ingredient) => ({
+          protein: acc.protein + ingredient.protein,
+          carbohydrates: acc.carbohydrates + ingredient.carbs,
+          fats: acc.fats + ingredient.fats,
+        }),
+        { protein: 0, carbohydrates: 0, fats: 0 },
+      );
+
+      setEditedMacros({
+        calories: calculateCaloriesFromMacros(macroTotals.protein, macroTotals.carbohydrates, macroTotals.fats),
+        protein: macroTotals.protein,
+        carbohydrates: macroTotals.carbohydrates,
+        fats: macroTotals.fats,
+      });
+
+      return next;
+    });
   };
 
   const analyzeImage = async () => {
@@ -191,6 +223,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
       setAnalysis(normalized);
       setEditedDishName(normalized.dishName);
       setEditedMacros(normalized.macros);
+      setEditedIngredients(normalized.detectedIngredients);
       setStep("results");
     } catch (error) {
       console.error("Analysis error:", error);
@@ -205,6 +238,24 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
     setIsSaving(true);
 
     try {
+      const validation = validateMealInput({
+        meal_type: mealType,
+        name: editedDishName || "Comida analizada con IA",
+        calories: editedMacros.calories,
+        protein: editedMacros.protein,
+        carbs: editedMacros.carbohydrates,
+        fat: editedMacros.fats,
+        date: format(new Date(), "yyyy-MM-dd"),
+      });
+
+      if (!validation.meal) {
+        toast.error(validation.errors[0] || "Revisa los macros antes de guardar.");
+        setIsSaving(false);
+        return;
+      }
+
+      validation.warnings.forEach((warning) => toast.warning(warning));
+
       let imagePath = "";
       if (imageFile) {
         const extension = imageFile.name.split(".").pop() || "jpg";
@@ -220,21 +271,22 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
 
       const today = format(new Date(), "yyyy-MM-dd");
       const adjustedMacros = {
-        calories: editedMacros.calories,
-        protein: editedMacros.protein,
-        carbs: editedMacros.carbohydrates,
-        fat: editedMacros.fats,
+        calories: validation.meal.calories,
+        protein: validation.meal.protein,
+        carbs: validation.meal.carbs,
+        fat: validation.meal.fat,
       };
 
       await supabase.from("food_analysis_logs").insert({
         user_id: user.id,
         image_url: imagePath,
-        detected_foods: analysis.detectedIngredients,
+        detected_foods: editedIngredients,
         estimated_macros: analysis.macros,
         adjusted_macros: {
           ...adjustedMacros,
-          dishName: editedDishName,
+          dishName: validation.meal.name,
           mealType,
+          editedIngredients,
         },
         saved_to_daily: true,
         analysis_date: today,
@@ -243,7 +295,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
       await supabase.from("meals").insert({
         user_id: user.id,
         meal_type: mealType,
-        name: editedDishName || "Comida analizada con IA",
+        name: validation.meal.name,
         calories: adjustedMacros.calories,
         protein: adjustedMacros.protein,
         carbs: adjustedMacros.carbs,
@@ -270,6 +322,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
     setAnalysis(null);
     setEditedDishName("");
     setEditedMacros(emptyMacros);
+    setEditedIngredients([]);
     setMealType("comida");
   };
 
@@ -407,6 +460,12 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
               </Card>
             </div>
 
+            <Card className="border-amber-200 bg-amber-50 p-3">
+              <p className="text-sm text-amber-900">
+                Esto es una estimacion: confirma porciones, ingredientes y macros antes de guardar.
+              </p>
+            </Card>
+
             <div className="flex flex-col gap-2">
               <Label>Momento del dia</Label>
               <Select value={mealType} onValueChange={(value) => setMealType(value as MealType)}>
@@ -478,20 +537,62 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
 
             <div className="flex flex-col gap-3">
               <h3 className="font-semibold">Ingredientes detectados</h3>
-              {analysis.detectedIngredients.length === 0 ? (
+              {editedIngredients.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No se detectaron ingredientes con suficiente claridad.</p>
               ) : (
-                analysis.detectedIngredients.map((ingredient, index) => (
+                editedIngredients.map((ingredient, index) => (
                   <Card key={`${ingredient.name}-${index}`} className="p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium">{ingredient.name}</p>
-                        <p className="text-xs text-muted-foreground">{ingredient.estimatedWeightGrams} g estimados</p>
+                    <div className="grid gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-2">
+                        <div className="flex flex-col gap-1">
+                          <Label>Ingrediente</Label>
+                          <Input
+                            value={ingredient.name}
+                            onChange={(event) => updateIngredient(index, "name", event.target.value)}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Label>Porcion (g)</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            inputMode="numeric"
+                            value={ingredient.estimatedWeightGrams}
+                            onChange={(event) => updateIngredient(index, "estimatedWeightGrams", event.target.value)}
+                          />
+                        </div>
                       </div>
-                      <div className="flex flex-wrap justify-end gap-2 text-xs">
-                        <span className="rounded-full bg-muted px-2 py-1">{ingredient.protein}g prot</span>
-                        <span className="rounded-full bg-muted px-2 py-1">{ingredient.carbs}g carbs</span>
-                        <span className="rounded-full bg-muted px-2 py-1">{ingredient.fats}g grasa</span>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="flex flex-col gap-1">
+                          <Label>Prot</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            inputMode="numeric"
+                            value={ingredient.protein}
+                            onChange={(event) => updateIngredient(index, "protein", event.target.value)}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Label>Carbs</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            inputMode="numeric"
+                            value={ingredient.carbs}
+                            onChange={(event) => updateIngredient(index, "carbs", event.target.value)}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Label>Grasa</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            inputMode="numeric"
+                            value={ingredient.fats}
+                            onChange={(event) => updateIngredient(index, "fats", event.target.value)}
+                          />
+                        </div>
                       </div>
                     </div>
                   </Card>
