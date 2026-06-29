@@ -158,6 +158,18 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
     setEditedIngredients((current) => {
       const next = current.map((ingredient, ingredientIndex) => {
         if (ingredientIndex !== index) return ingredient;
+        if (key === "estimatedWeightGrams") {
+          const nextWeight = toNumber(value);
+          const previousWeight = ingredient.estimatedWeightGrams || 1;
+          const factor = previousWeight > 0 ? nextWeight / previousWeight : 1;
+          return {
+            ...ingredient,
+            estimatedWeightGrams: nextWeight,
+            protein: toNumber(ingredient.protein * factor),
+            carbs: toNumber(ingredient.carbs * factor),
+            fats: toNumber(ingredient.fats * factor),
+          };
+        }
         return {
           ...ingredient,
           [key]: key === "name" ? value : toNumber(value),
@@ -292,7 +304,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
         analysis_date: today,
       });
 
-      await supabase.from("meals").insert({
+      const { data: savedMeal, error: mealInsertError } = await supabase.from("meals").insert({
         user_id: user.id,
         meal_type: mealType,
         name: validation.meal.name,
@@ -301,7 +313,34 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
         carbs: adjustedMacros.carbs,
         fat: adjustedMacros.fat,
         date: today,
-      });
+      }).select("id").single();
+
+      if (mealInsertError) throw mealInsertError;
+
+      if (savedMeal?.id && editedIngredients.length > 0) {
+        await supabase.from("meal_ingredients" as any).insert(
+          editedIngredients.map((ingredient) => ({
+            meal_id: savedMeal.id,
+            user_id: user.id,
+            ingredient_name: ingredient.name,
+            source: "ai_estimated",
+            is_verified: false,
+            quantity: ingredient.estimatedWeightGrams,
+            unit: "g",
+            grams: ingredient.estimatedWeightGrams,
+            calories: calculateCaloriesFromMacros(ingredient.protein, ingredient.carbs, ingredient.fats),
+            protein: ingredient.protein,
+            carbs: ingredient.carbs,
+            fat: ingredient.fats,
+            metadata: {
+              confidenceScore: analysis.confidenceScore,
+              foodBaseLinked: false,
+            },
+          })),
+        ).then(({ error: ingredientError }) => {
+          if (ingredientError) console.warn("meal_ingredients insert skipped:", ingredientError.message);
+        });
+      }
 
       toast.success("Comida registrada en tu historial");
       onOpenChange(false);
@@ -485,7 +524,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
             <Card className="border-primary/20 bg-primary/5 p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Flame className="size-5 text-primary" />
-                <h3 className="font-semibold">Macros estimados</h3>
+                <h3 className="font-semibold">Macros recalculados</h3>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-2">
@@ -496,7 +535,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
                     min={0}
                     inputMode="numeric"
                     value={editedMacros.calories}
-                    onChange={(event) => updateMacro("calories", event.target.value)}
+                    readOnly
                   />
                 </div>
                 <div className="flex flex-col gap-2">
@@ -507,7 +546,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
                     min={0}
                     inputMode="numeric"
                     value={editedMacros.protein}
-                    onChange={(event) => updateMacro("protein", event.target.value)}
+                    readOnly
                   />
                 </div>
                 <div className="flex flex-col gap-2">
@@ -518,7 +557,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
                     min={0}
                     inputMode="numeric"
                     value={editedMacros.carbohydrates}
-                    onChange={(event) => updateMacro("carbohydrates", event.target.value)}
+                    readOnly
                   />
                 </div>
                 <div className="flex flex-col gap-2">
@@ -529,7 +568,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
                     min={0}
                     inputMode="numeric"
                     value={editedMacros.fats}
-                    onChange={(event) => updateMacro("fats", event.target.value)}
+                    readOnly
                   />
                 </div>
               </div>
@@ -570,7 +609,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
                             min={0}
                             inputMode="numeric"
                             value={ingredient.protein}
-                            onChange={(event) => updateIngredient(index, "protein", event.target.value)}
+                            readOnly
                           />
                         </div>
                         <div className="flex flex-col gap-1">
@@ -580,7 +619,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
                             min={0}
                             inputMode="numeric"
                             value={ingredient.carbs}
-                            onChange={(event) => updateIngredient(index, "carbs", event.target.value)}
+                            readOnly
                           />
                         </div>
                         <div className="flex flex-col gap-1">
@@ -590,7 +629,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
                             min={0}
                             inputMode="numeric"
                             value={ingredient.fats}
-                            onChange={(event) => updateIngredient(index, "fats", event.target.value)}
+                            readOnly
                           />
                         </div>
                       </div>

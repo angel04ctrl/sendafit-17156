@@ -39,7 +39,13 @@ import { useFeatureFlags } from "@/contexts/FeatureFlagsContext";
 import { useMealsHistory } from "@/hooks/useBackendApi";
 import { MealHistorySection } from "@/components/MealHistorySection";
 import { useQueryClient } from "@tanstack/react-query";
-import { validateMealInput } from "@/lib/mealValidation";
+import { validateCalculatedMealInput, validateMealInput } from "@/lib/mealValidation";
+import {
+  calculateMacrosByGrams,
+  normalizeFoodNutrition,
+  sumMacroTotals,
+  type MacroTotals,
+} from "@/lib/nutritionCalculator";
 
 type Meal = {
   id: string;
@@ -80,7 +86,9 @@ const Macros = () => {
   const [searchQuery, setSearchQuery] = useState("");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedFood, setSelectedFood] = useState<any>(null);
-  const [portion, setPortion] = useState("1");
+  const [foodGrams, setFoodGrams] = useState("100");
+  const [customServings, setCustomServings] = useState("1");
+  const [customGramsPerServing, setCustomGramsPerServing] = useState("100");
   const [foodAnalysisOpen, setFoodAnalysisOpen] = useState(false);
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
   const today = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
@@ -94,6 +102,26 @@ const Macros = () => {
     fat: "",
     date: today,
   });
+
+  const selectedFoodNutrition = useMemo(() => {
+    if (!selectedFood) return null;
+    return normalizeFoodNutrition(selectedFood);
+  }, [selectedFood]);
+
+  const selectedFoodMacros = useMemo(() => {
+    if (!selectedFood) return null;
+    return calculateMacrosByGrams(selectedFood, Number(foodGrams) || 0);
+  }, [selectedFood, foodGrams]);
+
+  const customMealMacros = useMemo<MacroTotals>(() => {
+    const servings = Number(customServings) || 0;
+    return {
+      calories: Math.round((Number(formData.calories) || 0) * servings),
+      protein: Math.round((Number(formData.protein) || 0) * servings),
+      carbs: Math.round((Number(formData.carbs) || 0) * servings),
+      fat: Math.round((Number(formData.fat) || 0) * servings),
+    };
+  }, [customServings, formData.calories, formData.protein, formData.carbs, formData.fat]);
 
   const fetchFoods = useCallback(async () => {
     const { data } = await sb
@@ -140,7 +168,26 @@ const Macros = () => {
 
     if (!user) return;
 
-    const validation = validateMealInput(formData);
+    const gramsPerServing = Number(customGramsPerServing);
+    const servings = Number(customServings);
+    if (!Number.isFinite(gramsPerServing) || gramsPerServing <= 0) {
+      toast.error("Los gramos por porcion deben ser mayores a cero.");
+      return;
+    }
+    if (!Number.isFinite(servings) || servings <= 0) {
+      toast.error("La cantidad de porciones debe ser mayor a cero.");
+      return;
+    }
+
+    const validation = validateCalculatedMealInput({
+      ...formData,
+      calories: customMealMacros.calories,
+      protein: customMealMacros.protein,
+      carbs: customMealMacros.carbs,
+      fat: customMealMacros.fat,
+      ingredientCount: 1,
+      hasCalculatedMacros: customMealMacros.calories > 0,
+    });
     if (!validation.meal) {
       toast.error(validation.errors[0] || "Revisa los datos de la comida");
       return;
@@ -158,17 +205,47 @@ const Macros = () => {
       date: validation.meal.date,
     };
 
-    const { error } = editingMeal
+    const { data: savedMeal, error } = editingMeal
       ? await sb
         .from("meals")
         .update(payload)
         .eq("id", editingMeal.id)
         .eq("user_id", user.id)
-      : await sb.from("meals").insert([{ user_id: user.id, ...payload }]);
+        .select("id")
+        .single()
+      : await sb.from("meals").insert([{ user_id: user.id, ...payload }]).select("id").single();
 
     if (error) {
       toast.error(editingMeal ? "Error al actualizar comida" : "Error al registrar comida");
       return;
+    }
+
+    const mealId = savedMeal?.id || editingMeal?.id;
+    if (mealId) {
+      await sb.from("meal_ingredients" as any).delete().eq("meal_id", mealId).eq("user_id", user.id);
+      await sb.from("meal_ingredients" as any).insert([{
+        meal_id: mealId,
+        user_id: user.id,
+        ingredient_name: validation.meal.name,
+        source: "user_custom",
+        is_verified: false,
+        quantity: servings,
+        unit: "serving",
+        grams: gramsPerServing * servings,
+        calories: validation.meal.calories,
+        protein: validation.meal.protein,
+        carbs: validation.meal.carbs,
+        fat: validation.meal.fat,
+        metadata: {
+          gramsPerServing,
+          caloriesPerServing: Number(formData.calories) || 0,
+          proteinPerServing: Number(formData.protein) || 0,
+          carbsPerServing: Number(formData.carbs) || 0,
+          fatPerServing: Number(formData.fat) || 0,
+        },
+      }]).then(({ error: ingredientError }) => {
+        if (ingredientError) console.warn("meal_ingredients insert skipped:", ingredientError.message);
+      });
     }
 
     toast.success(editingMeal ? "Comida actualizada" : "Comida registrada");
@@ -184,27 +261,78 @@ const Macros = () => {
       return;
     }
 
-    const portionMultiplier = parseFloat(portion);
-    if (!Number.isFinite(portionMultiplier) || portionMultiplier <= 0) {
-      toast.error("La porcion debe ser mayor a cero.");
+    if (!user) return;
+
+    const grams = Number(foodGrams);
+    if (!Number.isFinite(grams) || grams <= 0) {
+      toast.error("Los gramos deben ser mayores a cero.");
       return;
     }
     
-    const { error } = await sb.from("meals").insert([{
-      user_id: user?.id || "",
-      meal_type: formData.meal_type as any,
-      name: `${selectedFood.nombre} (${portion} × ${selectedFood.racion}${selectedFood.unidad})`,
-      calories: Math.round(selectedFood.calorias * portionMultiplier),
-      protein: Math.round(selectedFood.proteinas * portionMultiplier),
-      carbs: Math.round(selectedFood.carbohidratos * portionMultiplier),
-      fat: Math.round(selectedFood.grasas * portionMultiplier),
+    const normalizedFood = normalizeFoodNutrition(selectedFood);
+    const calculatedMacros = calculateMacrosByGrams(selectedFood, grams);
+    const validation = validateCalculatedMealInput({
+      meal_type: formData.meal_type,
+      name: `${normalizedFood.name} (${grams} g)`,
+      calories: calculatedMacros.calories,
+      protein: calculatedMacros.protein,
+      carbs: calculatedMacros.carbs,
+      fat: calculatedMacros.fat,
       date: formData.date,
-    }]);
+      ingredientCount: 1,
+      hasCalculatedMacros: calculatedMacros.calories > 0,
+    });
+
+    if (!validation.meal) {
+      toast.error(validation.errors[0] || "No se pudo calcular esta comida.");
+      return;
+    }
+
+    validation.warnings.forEach((warning) => toast.warning(warning));
+
+    const portion = `${grams} g`;
+    const { data: savedMeal, error } = await sb.from("meals").insert([{
+      user_id: user.id,
+      meal_type: validation.meal.meal_type as any,
+      name: `${selectedFood.nombre} (${portion} × ${selectedFood.racion}${selectedFood.unidad})`,
+      calories: validation.meal.calories,
+      protein: validation.meal.protein,
+      carbs: validation.meal.carbs,
+      fat: validation.meal.fat,
+      date: validation.meal.date,
+    }]).select("id").single();
 
     if (error) {
       toast.error("Error al registrar comida");
       return;
     }
+
+    await sb.from("meal_ingredients" as any).insert([{
+      meal_id: savedMeal.id,
+      user_id: user.id,
+      food_id: selectedFood.id,
+      ingredient_name: normalizedFood.name,
+      source: selectedFood.source || "food_database",
+      is_verified: Boolean(selectedFood.is_verified),
+      quantity: grams,
+      unit: "g",
+      grams,
+      calories: validation.meal.calories,
+      protein: validation.meal.protein,
+      carbs: validation.meal.carbs,
+      fat: validation.meal.fat,
+      fiber: calculatedMacros.fiber,
+      sugar: calculatedMacros.sugar,
+      sodium_mg: calculatedMacros.sodiumMg,
+      metadata: {
+        fdcId: selectedFood.fdc_id,
+        sourceLicense: selectedFood.source_license,
+        servingUnit: normalizedFood.servingUnit,
+        gramsPerServing: normalizedFood.gramsPerServing,
+      },
+    }]).then(({ error: ingredientError }) => {
+      if (ingredientError) console.warn("meal_ingredients insert skipped:", ingredientError.message);
+    });
 
     toast.success("Comida registrada");
     resetForm();
@@ -224,7 +352,9 @@ const Macros = () => {
       date: today,
     });
     setSelectedFood(null);
-    setPortion("1");
+    setFoodGrams("100");
+    setCustomServings("1");
+    setCustomGramsPerServing("100");
     setSearchQuery("");
   };
 
@@ -232,7 +362,9 @@ const Macros = () => {
     setEditingMeal(meal);
     setSelectedFood(null);
     setSearchQuery("");
-    setPortion("1");
+    setFoodGrams("100");
+    setCustomServings("1");
+    setCustomGramsPerServing("100");
     setFormData({
       meal_type: meal.meal_type,
       name: meal.name,
@@ -250,7 +382,9 @@ const Macros = () => {
       setEditingMeal(null);
       setSelectedFood(null);
       setSearchQuery("");
-      setPortion("1");
+      setFoodGrams("100");
+      setCustomServings("1");
+      setCustomGramsPerServing("100");
       setFormData({
         meal_type: meal.meal_type,
         name: meal.name,
@@ -456,47 +590,50 @@ const Macros = () => {
                           <Card className="p-4 bg-muted">
                             <div className="space-y-3">
                               <div>
-                                <p className="font-semibold text-lg">{selectedFood.nombre}</p>
+                                <p className="font-semibold text-lg">{selectedFoodNutrition?.name}</p>
                                 <p className="text-sm text-muted-foreground">
                                   Porción base: {selectedFood.racion}{selectedFood.unidad}
                                 </p>
                               </div>
                               
                               <div className="space-y-2">
-                                <Label>Cantidad de Porciones</Label>
+                                <Label>Gramos estimados</Label>
                                 <Input
                                   type="number"
-                                  step="0.001"
-                                  min="0.001"
-                                  value={portion}
-                                  onChange={(e) => setPortion(e.target.value)}
-                                  placeholder="Ej: 1, 0.5, 0.01"
+                                  step="1"
+                                  min="1"
+                                  value={foodGrams}
+                                  onChange={(e) => setFoodGrams(e.target.value)}
+                                  placeholder="Ej: 100, 150, 250"
                                 />
+                                <p className="text-xs text-muted-foreground">
+                                  Corrige cantidades para mejorar la estimacion. Los macros se recalculan automaticamente.
+                                </p>
                               </div>
 
                               <div className="grid grid-cols-2 gap-3 pt-2 border-t">
                                 <div>
                                   <p className="text-xs text-muted-foreground">Calorías</p>
                                   <p className="text-lg font-bold">
-                                    {Math.round(selectedFood.calorias * parseFloat(portion || "1"))} kcal
+                                    {selectedFoodMacros?.calories || 0} kcal
                                   </p>
                                 </div>
                                 <div>
                                   <p className="text-xs text-muted-foreground">Proteína</p>
                                   <p className="text-lg font-bold">
-                                    {Math.round(selectedFood.proteinas * parseFloat(portion || "1"))}g
+                                    {selectedFoodMacros?.protein || 0}g
                                   </p>
                                 </div>
                                 <div>
                                   <p className="text-xs text-muted-foreground">Carbohidratos</p>
                                   <p className="text-lg font-bold">
-                                    {Math.round(selectedFood.carbohidratos * parseFloat(portion || "1"))}g
+                                    {selectedFoodMacros?.carbs || 0}g
                                   </p>
                                 </div>
                                 <div>
                                   <p className="text-xs text-muted-foreground">Grasas</p>
                                   <p className="text-lg font-bold">
-                                    {Math.round(selectedFood.grasas * parseFloat(portion || "1"))}g
+                                    {selectedFoodMacros?.fat || 0}g
                                   </p>
                                 </div>
                               </div>
@@ -522,7 +659,32 @@ const Macros = () => {
                             required
                           />
                         </div>
+                        <Card className="border-amber-200 bg-amber-50 p-3">
+                          <p className="text-sm text-amber-900">
+                            Correccion manual avanzada: captura valores por porcion. Esta correccion puede afectar la precision de tus reportes.
+                          </p>
+                        </Card>
                         <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Porciones</Label>
+                            <Input
+                              type="number"
+                              min="0.001"
+                              step="0.001"
+                              value={customServings}
+                              onChange={(e) => setCustomServings(e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Gramos por porcion</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={customGramsPerServing}
+                              onChange={(e) => setCustomGramsPerServing(e.target.value)}
+                            />
+                          </div>
                           <div className="space-y-2">
                             <Label>Calorías</Label>
                             <Input
@@ -565,6 +727,12 @@ const Macros = () => {
                             />
                           </div>
                         </div>
+                        <Card className="p-3">
+                          <p className="text-xs text-muted-foreground">Macros finales calculados</p>
+                          <p className="text-sm font-medium">
+                            {customMealMacros.calories} kcal · {customMealMacros.protein}g proteina · {customMealMacros.carbs}g carbs · {customMealMacros.fat}g grasa
+                          </p>
+                        </Card>
                         <Button type="submit" className="w-full">
                           {editingMeal ? "Guardar cambios" : "Registrar"}
                         </Button>

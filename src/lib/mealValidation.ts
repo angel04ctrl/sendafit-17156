@@ -10,6 +10,11 @@ export interface MealInput {
   date: string;
 }
 
+export interface CalculatedMealInput extends MealInput {
+  ingredientCount?: number;
+  hasCalculatedMacros?: boolean;
+}
+
 export interface NormalizedMealInput {
   name: string;
   meal_type: MealType;
@@ -94,4 +99,30 @@ export function validateMealInput(input: MealInput): {
     errors,
     warnings,
   };
+}
+
+export function validateCalculatedMealInput(input: CalculatedMealInput): {
+  meal?: NormalizedMealInput;
+  errors: string[];
+  warnings: string[];
+} {
+  const result = validateMealInput(input);
+  const errors = [...result.errors];
+  const warnings = [...result.warnings];
+
+  if (!input.ingredientCount || input.ingredientCount <= 0) {
+    errors.push("Agrega al menos un ingrediente calculable.");
+  }
+
+  if (input.hasCalculatedMacros === false) {
+    errors.push("No se pudieron calcular macros confiables para esta comida.");
+  }
+
+  if (result.meal && result.meal.calories < 0) errors.push("Las calorias calculadas no pueden ser negativas.");
+  if (result.meal && (result.meal.protein < 0 || result.meal.carbs < 0 || result.meal.fat < 0)) {
+    errors.push("Los macros calculados no pueden ser negativos.");
+  }
+
+  if (errors.length > 0) return { errors, warnings };
+  return { meal: result.meal, errors, warnings };
 }
