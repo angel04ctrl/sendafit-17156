@@ -109,7 +109,7 @@ export function GymMachineScanner({ open, onOpenChange, fitnessLevel }: GymMachi
 
       if (error) throw error;
       if (!data?.success || !data.analysis) {
-        throw new Error("No se pudo identificar la maquina.");
+        throw new Error("No se pudo identificar la máquina.");
       }
 
       setAnalysis(data.analysis);
@@ -140,7 +140,7 @@ export function GymMachineScanner({ open, onOpenChange, fitnessLevel }: GymMachi
         primary_muscles: [analysisData.primaryMuscle],
         secondary_muscles: [],
         usage_instructions: analysisData.setupSteps.join("\n"),
-        posture_tips: "Verifica el nombre de la maquina antes de usarla. Si sientes dolor, detente.",
+        posture_tips: "Verifica el nombre de la máquina antes de usarla. Si sientes dolor, detente.",
         related_exercises: relatedExercises,
       });
     } catch (error) {
@@ -179,15 +179,15 @@ export function GymMachineScanner({ open, onOpenChange, fitnessLevel }: GymMachi
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Dumbbell className="h-5 w-5 text-primary" />
-            Identificar maquina de gym
+            Identificar máquina de gym
           </DialogTitle>
         </DialogHeader>
 
         {step === "capture" && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Toma una foto clara de la maquina para recibir ajustes, tecnica y ejercicios por nivel.
-              La imagen se procesa con IA; la identificacion puede equivocarse y no sustituye la guia de un profesional.
+              Toma una foto clara de la máquina para recibir ajustes, técnica y ejercicios por nivel.
+              La imagen se procesa con IA; la identificación puede equivocarse y no sustituye la guía de un profesional.
             </p>
 
             {imagePreview ? (
@@ -208,7 +208,7 @@ export function GymMachineScanner({ open, onOpenChange, fitnessLevel }: GymMachi
                 </div>
                 <Button onClick={analyzeImage} className="w-full gap-2">
                   <Sparkles className="h-4 w-4" />
-                  Identificar maquina
+                  Identificar máquina
                 </Button>
               </div>
             ) : (
@@ -273,7 +273,7 @@ export function GymMachineScanner({ open, onOpenChange, fitnessLevel }: GymMachi
             <div className="space-y-4 pr-4">
               {imagePreview && (
                 <div className="aspect-video overflow-hidden rounded-lg bg-muted">
-                  <img src={imagePreview} alt="Maquina analizada" className="h-full w-full object-cover" />
+                  <img src={imagePreview} alt="Máquina analizada" className="h-full w-full object-cover" />
                 </div>
               )}
 
@@ -288,7 +288,7 @@ export function GymMachineScanner({ open, onOpenChange, fitnessLevel }: GymMachi
               <Card className="p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <BookOpen className="h-5 w-5 text-primary" />
-                  <h3 className="font-semibold">Ajuste y ejecucion</h3>
+                  <h3 className="font-semibold">Ajuste y ejecución</h3>
                 </div>
                 <ol className="space-y-2 text-sm">
                   {analysis.setupSteps.map((stepText, index) => (
@@ -323,7 +323,7 @@ export function GymMachineScanner({ open, onOpenChange, fitnessLevel }: GymMachi
               </Card>
 
               <Button variant="outline" className="w-full" onClick={resetState}>
-                Escanear otra maquina
+                Escanear otra máquina
               </Button>
             </div>
           </ScrollArea>

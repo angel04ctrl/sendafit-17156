@@ -11,6 +11,7 @@ export interface MacroTotals {
 export interface FoodNutritionSource {
   id?: string | number;
   name?: string;
+  display_name?: string | null;
   nombre?: string;
   servingSize?: number | null;
   servingUnit?: string | null;
@@ -103,7 +104,7 @@ export function normalizeFoodNutrition(food: FoodNutritionSource) {
 
   return {
     id: food.id,
-    name: String(food.name || food.nombre || "Alimento").trim(),
+    name: String(food.display_name || food.name || food.nombre || "Alimento").trim(),
     servingSize: toFiniteNumber(food.servingSize ?? food.serving_size ?? food.racion, 1),
     servingUnit: String(food.servingUnit || food.serving_unit || food.unidad || "g"),
     gramsPerServing: gramsPerServing > 0 ? gramsPerServing : 100,

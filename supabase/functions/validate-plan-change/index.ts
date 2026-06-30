@@ -154,13 +154,13 @@ serve(async (req) => {
     if (hasCustomAiWorkouts) {
       planProtection = {
         isProtected: true,
-        reason: 'Hay entrenamientos manuales, personalizados o creados por IA que no deben reemplazarse automaticamente.',
+        reason: 'Hay entrenamientos manuales, personalizados o creados por IA que no deben reemplazarse automáticamente.',
         planType: 'custom_or_ai',
       };
     }
 
     if (planProtection.isProtected && action !== 'none') {
-      reason = 'Cambiaste tus dias de entrenamiento. Tu plan actual puede no coincidir con tu nueva disponibilidad. Puedes mantenerlo, crear uno nuevo o adaptarlo manualmente.';
+      reason = 'Cambiaste tus días de entrenamiento. Tu plan actual puede no coincidir con tu nueva disponibilidad. Puedes mantenerlo, crear uno nuevo o adaptarlo manualmente.';
     }
 
     const response = {

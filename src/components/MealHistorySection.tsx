@@ -223,12 +223,12 @@ export const MealHistorySection = ({
         <Card className="p-3">
           <p className="text-xs text-muted-foreground">Hoy</p>
           <p className="text-lg font-bold">{simpleSummary.todayTotals.calories} kcal</p>
-          <p className="text-xs text-muted-foreground">{simpleSummary.todayTotals.protein}g proteina</p>
+          <p className="text-xs text-muted-foreground">{simpleSummary.todayTotals.protein}g proteína</p>
         </Card>
         <Card className="p-3">
-          <p className="text-xs text-muted-foreground">Promedio 7 dias</p>
+          <p className="text-xs text-muted-foreground">Promedio 7 días</p>
           <p className="text-lg font-bold">{simpleSummary.averageCalories} kcal</p>
-          <p className="text-xs text-muted-foreground">{simpleSummary.daysWithData} dia(s) con datos</p>
+          <p className="text-xs text-muted-foreground">{simpleSummary.daysWithData} día(s) con datos</p>
         </Card>
         <Card className="p-3">
           <p className="text-xs text-muted-foreground">Proteina promedio</p>
@@ -377,7 +377,7 @@ export const MealHistorySection = ({
                                     size="sm"
                                     onClick={() => onRepeatMeal(meal, format(addDays(new Date(), 1), "yyyy-MM-dd"))}
                                   >
-                                    Manana
+                                    Repetir mañana
                                   </Button>
                                   <Button
                                     variant="ghost"

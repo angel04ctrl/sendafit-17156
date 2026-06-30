@@ -53,7 +53,7 @@ interface ChatMessage {
 const initialMessage: ChatMessage = {
   id: "welcome",
   role: "assistant",
-  content: "Hola, soy SendaFit AI Coach. Puedo ayudarte con entrenamiento, tecnica, nutricion, recetas y suplementacion. Cuéntame que necesitas ajustar hoy.",
+  content: "Hola, soy SendaFit AI Coach. Puedo ayudarte con entrenamiento, técnica, nutrición, recetas y suplementación. Cuéntame qué necesitas ajustar hoy.",
 };
 
 function createMessage(role: MessageRole, content: string, metadataRoutine?: RoutineMetadata | null): ChatMessage {
@@ -92,7 +92,7 @@ function RoutinePreview({ routine }: { routine: RoutineMetadata }) {
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="secondary" className="gap-1">
           <CalendarDays className="h-3 w-3" />
-          {routine.days.length} dias
+          {routine.days.length} días
         </Badge>
         <Badge variant="outline" className="gap-1">
           <Dumbbell className="h-3 w-3" />
@@ -106,7 +106,7 @@ function RoutinePreview({ routine }: { routine: RoutineMetadata }) {
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-sm font-semibold">
-                  {day.weekday ? weekdayNames[day.weekday] || `Dia ${day.weekday}` : `Dia ${dayIndex + 1}`}: {day.day_name}
+                  {day.weekday ? weekdayNames[day.weekday] || `Día ${day.weekday}` : `Día ${dayIndex + 1}`}: {day.day_name}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {inferMuscleGroup(day)}
@@ -283,7 +283,7 @@ export default function CoachChat() {
               </div>
               <div>
                 <h1 className="text-lg font-bold">SendaFit AI Coach</h1>
-                <p className="text-xs text-muted-foreground">Entrenamiento, tecnica y nutricion</p>
+                <p className="text-xs text-muted-foreground">Entrenamiento, técnica y nutrición</p>
               </div>
               <Badge variant="secondary" className="ml-auto gap-1">
                 <MessageSquare className="h-3 w-3" />
@@ -320,9 +320,9 @@ export default function CoachChat() {
                       <div className="mt-3">
                         <RoutinePreview routine={message.metadataRoutine} />
                       </div>
-                      <p className="mt-3 text-sm font-medium">Quieres aplicar esta rutina y reemplazar tu plan actual?</p>
+                      <p className="mt-3 text-sm font-medium">¿Quieres aplicar esta rutina y reemplazar tu plan actual?</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Se eliminaran los entrenamientos automaticos previos y se insertara la rutina sugerida por el Coach.
+                        Se eliminarán los entrenamientos automáticos previos y se insertará la rutina sugerida por el Coach.
                       </p>
                       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                         <Button
@@ -332,7 +332,7 @@ export default function CoachChat() {
                           onClick={() => applyRoutineMutation.mutate(message.metadataRoutine!)}
                         >
                           {applyRoutineMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                          Si, actualizar rutina
+                          Sí, actualizar rutina
                         </Button>
                         <Button
                           size="sm"
@@ -379,7 +379,7 @@ export default function CoachChat() {
                     sendMessage();
                   }
                 }}
-                placeholder="Pregunta sobre entrenamiento, nutricion o tecnica..."
+                placeholder="Pregunta sobre entrenamiento, nutrición o técnica..."
                 disabled={chatMutation.isPending}
               />
               <Button onClick={sendMessage} disabled={!inputValue.trim() || chatMutation.isPending} size="icon">

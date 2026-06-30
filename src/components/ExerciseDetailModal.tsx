@@ -192,7 +192,7 @@ export const ExerciseDetailModal = ({ open, onOpenChange, exercise }: ExerciseDe
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Aun no hay sesiones completadas para este ejercicio.
+                  Aún no hay sesiones completadas para este ejercicio.
                 </p>
               )}
             </Card>

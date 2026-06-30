@@ -39,6 +39,8 @@ type ImportCandidate = {
   name: string;
   category: string;
   aliases?: string[];
+  preparationState?: string;
+  priority?: number;
 };
 
 let nextFoodId: number | null = null;
@@ -73,7 +75,6 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const candidates: ImportCandidate[] = [
   { query: "chicken breast cooked roasted", name: "Pechuga de pollo cocida", category: "Proteinas", aliases: ["pollo cocido", "pechuga cocida"] },
-  { query: "chicken breast raw", name: "Pechuga de pollo cruda", category: "Proteinas" },
   { query: "chicken thigh meat cooked", name: "Muslo de pollo cocido", category: "Proteinas" },
   { query: "ground beef 90% lean cooked", name: "Carne molida de res magra cocida", category: "Proteinas" },
   { query: "beef steak cooked lean", name: "Bistec de res cocido", category: "Proteinas" },
@@ -116,6 +117,7 @@ const candidates: ImportCandidate[] = [
   { query: "watermelon raw", name: "Sandia", category: "Frutas" },
   { query: "cantaloupe raw", name: "Melon", category: "Frutas" },
   { query: "strawberries raw", name: "Fresas", category: "Frutas" },
+  { query: "blueberries raw", name: "Arándanos", category: "Frutas", aliases: ["blueberries", "arandanos"] },
   { query: "grapes raw", name: "Uvas", category: "Frutas" },
   { query: "pineapple raw", name: "Pina", category: "Frutas" },
   { query: "avocado raw all commercial varieties", name: "Aguacate", category: "Frutas" },
@@ -149,6 +151,33 @@ const candidates: ImportCandidate[] = [
 function requireEnv(name: string, value: string | undefined): string {
   if (!value) throw new Error(`${name} is required.`);
   return value;
+}
+
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9ñ\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function hasRawMeatTerms(value: string): boolean {
+  const text = normalizeSearchText(value);
+  return [
+    "raw chicken",
+    "chicken raw",
+    "raw beef",
+    "beef raw",
+    "raw turkey",
+    "turkey raw",
+    "raw pork",
+    "pork raw",
+    "ground beef raw",
+    "raw meat",
+    "uncooked meat",
+  ].some((term) => text.includes(term));
 }
 
 function nutrient(food: FdcFood, names: string[]): number {
@@ -185,8 +214,9 @@ async function searchFood(candidate: ImportCandidate): Promise<FdcFood | null> {
 
   const body = await response.json() as { foods?: FdcFood[] };
   const foods = body.foods || [];
-  return foods.find((food) => food.fdcId && food.foodNutrients?.length && nutrient(food, ["Energy"]) > 0) ||
-    foods.find((food) => food.fdcId && food.foodNutrients?.length) ||
+  const usableFoods = foods.filter((food) => !hasRawMeatTerms(food.description || ""));
+  return usableFoods.find((food) => food.fdcId && food.foodNutrients?.length && nutrient(food, ["Energy"]) > 0) ||
+    usableFoods.find((food) => food.fdcId && food.foodNutrients?.length) ||
     null;
 }
 
@@ -253,10 +283,13 @@ async function upsertFood(candidate: ImportCandidate, food: FdcFood) {
   const row = {
     nombre: candidate.name,
     name: candidate.name,
+    display_name: candidate.name,
     normalized_name: candidate.name.toLowerCase(),
+    search_name: normalizeSearchText([candidate.name, candidate.query, ...(candidate.aliases || [])].join(" ")),
     category: candidate.category,
     group_name: food.foodCategory || candidate.category,
     description: food.description,
+    preparation_state: candidate.preparationState || (normalizeSearchText(candidate.name).includes("cocid") ? "cooked" : "ready_to_eat"),
     source: "USDA_FDC",
     source_license: "CC0_1_0",
     source_version: food.publishedDate || new Date().toISOString().slice(0, 10),
@@ -280,6 +313,9 @@ async function upsertFood(candidate: ImportCandidate, food: FdcFood) {
     sugar_per_100g: sugar,
     sodium_mg_per_100g: sodium,
     is_verified: true,
+    is_visible: !hasRawMeatTerms(food.description || candidate.query),
+    is_common: true,
+    visibility_priority: candidate.priority || 20,
     locale: "es-MX",
     aliases: candidate.aliases || [],
     updated_at: new Date().toISOString(),

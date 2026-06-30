@@ -52,7 +52,7 @@ export function buildProgressionSuggestion({
   const source = hasStableExerciseId ? "exercise_id" : "snapshot";
   const fallbackConfidence: ProgressionConfidence = source === "exercise_id" ? "medium" : "low";
   const confidencePrefix = source === "snapshot"
-    ? "Solo hay historial por nombre, asi que la recomendacion es conservadora. "
+    ? "Solo hay historial por nombre, así que la recomendación es conservadora. "
     : "";
 
   if (currentSessionFeeling === "pain") {
@@ -60,7 +60,7 @@ export function buildProgressionSuggestion({
       action: "blocked_pain",
       label: "No subir peso",
       confidence: "low",
-      reason: "Reportaste dolor en esta sesion; hoy no conviene aumentar carga.",
+      reason: "Reportaste dolor en esta sesión; hoy no conviene aumentar carga.",
       previousWeight: null,
       previousReps: [],
       suggestedWeight: null,
@@ -75,13 +75,13 @@ export function buildProgressionSuggestion({
     const levelHint = fitnessLevel === "principiante"
       ? " Empieza muy conservador."
       : fitnessLevel === "intermedio"
-        ? " Elige una carga comoda/moderada."
+        ? " Elige una carga cómoda/moderada."
         : fitnessLevel === "avanzado"
-          ? " Usa una primera serie de aproximacion para calibrar la carga del dia."
+          ? " Usa una primera serie de aproximación para calibrar la carga del día."
           : "";
     const reason = targetWeight
-      ? `Manten este peso por ahora y enfocate en completar las series con buena tecnica. Cuando tengamos mas historial, te sugerire si conviene subir peso o repeticiones.${levelHint}`
-      : `Aun estamos construyendo tu historial. Elige un peso con el que puedas completar las reps objetivo dejando 2-3 repeticiones en reserva.${levelHint} En las proximas sesiones podre sugerirte cuando subir la carga.`;
+      ? `Mantén este peso por ahora y enfócate en completar las series con buena técnica. Cuando tengamos más historial, te sugeriré si conviene subir peso o repeticiones.${levelHint}`
+      : `Aún estamos construyendo tu historial. Elige un peso con el que puedas completar las reps objetivo dejando 2-3 repeticiones en reserva.${levelHint} En las próximas sesiones podré sugerirte cuándo subir la carga.`;
 
     return {
       action: "no_data",
@@ -123,7 +123,7 @@ export function buildProgressionSuggestion({
       action: "blocked_pain",
       label: "No subir peso",
       confidence: fallbackConfidence,
-      reason: `${confidencePrefix}La ultima sesion marco dolor o molestia; mantener o bajar la exigencia es mas seguro.`,
+      reason: `${confidencePrefix}La última sesión marcó dolor o molestia; mantener o bajar la exigencia es más seguro.`,
       previousWeight,
       previousReps,
       suggestedWeight: previousWeight,
@@ -138,7 +138,7 @@ export function buildProgressionSuggestion({
       action: "maintain_weight",
       label: "Mantener",
       confidence: fallbackConfidence,
-      reason: `${confidencePrefix}Hubo esfuerzo limite en varias series; repite la carga antes de subir.`,
+      reason: `${confidencePrefix}Hubo esfuerzo límite en varias series; repite la carga antes de subir.`,
       previousWeight,
       previousReps,
       suggestedWeight: previousWeight,
@@ -153,7 +153,7 @@ export function buildProgressionSuggestion({
       action: belowRange ? "decrease_weight" : "maintain_weight",
       label: belowRange ? "Bajar peso" : "Mantener",
       confidence: fallbackConfidence,
-      reason: `${confidencePrefix}El volumen bajo mas de 20% frente a la sesion previa; prioriza recuperar tecnica y reps.`,
+      reason: `${confidencePrefix}El volumen bajó más de 20% frente a la sesión previa; prioriza recuperar técnica y reps.`,
       previousWeight,
       previousReps,
       suggestedWeight: previousWeight ? roundToHalf(previousWeight * (belowRange ? 0.95 : 1)) : previousWeight,
@@ -183,7 +183,7 @@ export function buildProgressionSuggestion({
       action: "maintain_weight",
       label: "Mantener",
       confidence: fallbackConfidence,
-      reason: `${confidencePrefix}Todavia no completaste el rango objetivo de reps; conserva la variante actual.`,
+      reason: `${confidencePrefix}Todavía no completaste el rango objetivo de reps; conserva la variante actual.`,
       previousWeight: null,
       previousReps,
       suggestedWeight: null,
@@ -213,7 +213,7 @@ export function buildProgressionSuggestion({
       action: "increase_weight",
       label: "Subir peso",
       confidence: "high",
-      reason: "Completaste todas las series objetivo sin dolor ni esfuerzo limite; sube la carga de forma pequena.",
+      reason: "Completaste todas las series objetivo sin dolor ni esfuerzo límite; sube la carga de forma pequeña.",
       previousWeight,
       previousReps,
       suggestedWeight: roundToHalf(previousWeight * 1.025),
@@ -228,7 +228,7 @@ export function buildProgressionSuggestion({
       action: "decrease_weight",
       label: "Bajar peso",
       confidence: "medium",
-      reason: "Quedaste por debajo del rango minimo de reps; baja un poco la carga para recuperar el volumen.",
+      reason: "Quedaste por debajo del rango mínimo de reps; baja un poco la carga para recuperar el volumen.",
       previousWeight,
       previousReps,
       suggestedWeight: roundToHalf(previousWeight * 0.95),
@@ -242,7 +242,7 @@ export function buildProgressionSuggestion({
     action: "maintain_weight",
     label: "Mantener",
     confidence: fallbackConfidence,
-    reason: `${confidencePrefix}Estas dentro del rango de trabajo, pero aun no completaste todas las series objetivo.`,
+    reason: `${confidencePrefix}Estás dentro del rango de trabajo, pero aún no completaste todas las series objetivo.`,
     previousWeight,
     previousReps,
     suggestedWeight: previousWeight,

@@ -1,5 +1,5 @@
 /**
- * analyze-food - Edge Function para analisis visual de comida.
+ * analyze-food - Edge Function para análisis visual de comida.
  *
  * Recibe una imagen en base64 o URL y devuelve alimentos detectados con
  * porciones y macros estimados. Usa el cliente IA compartido del proyecto
@@ -150,14 +150,14 @@ serve(async (req) => {
       messages: [
         {
           role: "system",
-          content: `Eres una nutriologa experta en analisis visual de comida. Devuelve SOLO JSON valido.
+          content: `Eres una nutrióloga experta en análisis visual de comida. Devuelve SOLO JSON válido.
 
 Estructura exacta:
 {
   "foods": [
     {
       "name": "nombre del alimento en espanol",
-      "portion": "porcion estimada, por ejemplo 150g, 1 taza, 2 unidades",
+      "portion": "porción estimada, por ejemplo 150g, 1 taza, 2 unidades",
       "confidence": 0.85,
       "calories": 250,
       "protein": 20,
@@ -177,7 +177,7 @@ Estructura exacta:
 Reglas:
 - Identifica todos los alimentos visibles.
 - Estima porciones realistas segun la imagen.
-- Usa gramos para macros y kcal para calorias.
+- Usa gramos para macros y kcal para calorías.
 - Redondea a numeros enteros.
 - Si no hay comida visible, devuelve foods vacio y totals en cero.
 - No incluyas markdown ni texto fuera del JSON.`,
@@ -187,7 +187,7 @@ Reglas:
           content: [
             {
               type: "text",
-              text: "Analiza la comida de esta imagen y estima alimentos, porciones, calorias y macronutrientes.",
+              text: "Analiza la comida de esta imagen y estima alimentos, porciones, calorías y macronutrientes.",
             },
             {
               type: "image_url",

@@ -1,5 +1,5 @@
 /**
- * analyze-meal - Edge Function para analisis visual de comidas.
+ * analyze-meal - Edge Function para análisis visual de comidas.
  *
  * Recibe una imagen en base64 o URL y devuelve el contrato estricto usado por
  * el modal de macros: plato, ingredientes detectados, macros y feedback.

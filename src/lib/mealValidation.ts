@@ -56,8 +56,8 @@ export function validateMealInput(input: MealInput): {
   if (!date) errors.push("Selecciona una fecha.");
 
   const numericFields = [
-    ["calorias", calories],
-    ["proteina", protein],
+    ["calorías", calories],
+    ["proteína", protein],
     ["carbohidratos", carbs],
     ["grasas", fat],
   ] as const;
@@ -67,11 +67,11 @@ export function validateMealInput(input: MealInput): {
     if (Number.isFinite(value) && value < 0) errors.push(`El valor de ${label} no puede ser negativo.`);
   });
 
-  if (Number.isFinite(calories) && calories <= 0) errors.push("Las calorias deben ser mayores a cero.");
-  if (Number.isFinite(calories) && calories > 5000) errors.push("Las calorias parecen imposibles para una sola comida.");
-  if (protein === 0 && carbs === 0 && fat === 0) errors.push("Agrega al menos un macro: proteina, carbohidratos o grasa.");
+  if (Number.isFinite(calories) && calories <= 0) errors.push("Las calorías deben ser mayores a cero.");
+  if (Number.isFinite(calories) && calories > 5000) errors.push("Las calorías parecen imposibles para una sola comida.");
+  if (protein === 0 && carbs === 0 && fat === 0) errors.push("Agrega al menos un macro: proteína, carbohidratos o grasa.");
 
-  if (protein > 180) warnings.push("La proteina parece muy alta para una sola comida.");
+  if (protein > 180) warnings.push("La proteína parece muy alta para una sola comida.");
   if (carbs > 300) warnings.push("Los carbohidratos parecen muy altos para una sola comida.");
   if (fat > 160) warnings.push("La grasa parece muy alta para una sola comida.");
 
@@ -80,7 +80,7 @@ export function validateMealInput(input: MealInput): {
     const difference = Math.abs(calories - macroCalories);
     const tolerance = Math.max(80, calories * 0.25);
     if (difference > tolerance) {
-      warnings.push("Las calorias no coinciden bien con los macros aproximados.");
+      warnings.push("Las calorías no coinciden bien con los macros aproximados.");
     }
   }
 
@@ -118,7 +118,7 @@ export function validateCalculatedMealInput(input: CalculatedMealInput): {
     errors.push("No se pudieron calcular macros confiables para esta comida.");
   }
 
-  if (result.meal && result.meal.calories < 0) errors.push("Las calorias calculadas no pueden ser negativas.");
+  if (result.meal && result.meal.calories < 0) errors.push("Las calorías calculadas no pueden ser negativas.");
   if (result.meal && (result.meal.protein < 0 || result.meal.carbs < 0 || result.meal.fat < 0)) {
     errors.push("Los macros calculados no pueden ser negativos.");
   }

@@ -83,9 +83,9 @@ export function PlanChangePreviewModal({
 
   const protectedOptions = [
     ["keep", "Mantener mi plan actual"],
-    ["adapt", "Mantener plan y ajustar manualmente despues"],
-    ["new_suggested", "Crear nuevo plan sugerido despues"],
-    ["archive_replace", "Adaptacion avanzada proximamente"],
+    ["adapt", "Mantener plan y ajustar manualmente después"],
+    ["new_suggested", "Crear nuevo plan sugerido después"],
+    ["archive_replace", "Adaptación avanzada próximamente"],
   ];
 
   return (
@@ -94,11 +94,11 @@ export function PlanChangePreviewModal({
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-warning" />
-            Confirmacion de cambios en tu plan
+            Confirmación de cambios en tu plan
           </AlertDialogTitle>
           <AlertDialogDescription className="text-base">
             {isProtected
-              ? "Cambiaste tus dias de entrenamiento. Tu plan actual puede no coincidir con tu nueva disponibilidad. Puedes mantenerlo, crear uno nuevo o adaptarlo manualmente."
+              ? "Cambiaste tus días de entrenamiento. Tu plan actual puede no coincidir con tu nueva disponibilidad. Puedes mantenerlo, crear uno nuevo o adaptarlo manualmente."
               : reason}
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -109,7 +109,7 @@ export function PlanChangePreviewModal({
               <h4 className="mb-2 text-sm font-semibold">Plan actual</h4>
               <p className="text-sm text-muted-foreground">{currentPlan.nombre_plan}</p>
               <div className="mt-2 flex gap-2">
-                <Badge variant="outline">{currentPlan.dias_semana} dias/semana</Badge>
+                <Badge variant="outline">{currentPlan.dias_semana} días/semana</Badge>
                 <Badge variant="outline">{goalLabels[currentPlan.objetivo] || currentPlan.objetivo}</Badge>
               </div>
             </div>
@@ -138,14 +138,14 @@ export function PlanChangePreviewModal({
               <div className="flex items-start gap-3 rounded-lg bg-muted/30 p-3">
                 <Dumbbell className="mt-0.5 h-5 w-5 text-primary" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium">Cantidad de dias</p>
+                  <p className="text-sm font-medium">Cantidad de días</p>
                   <div className="mt-1 flex items-center gap-2">
                     <span className="text-sm text-muted-foreground line-through">
-                      {changes.oldDaysCount} dias/semana
+                      {changes.oldDaysCount} días/semana
                     </span>
                     <span className="text-sm">a</span>
                     <span className="text-sm font-medium text-primary">
-                      {changes.newDaysCount} dias/semana
+                      {changes.newDaysCount} días/semana
                     </span>
                   </div>
                 </div>
@@ -156,7 +156,7 @@ export function PlanChangePreviewModal({
               <div className="flex items-start gap-3 rounded-lg bg-muted/30 p-3">
                 <Calendar className="mt-0.5 h-5 w-5 text-primary" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium">Dias de entrenamiento</p>
+                  <p className="text-sm font-medium">Días de entrenamiento</p>
                   <div className="mt-1 space-y-1">
                     <div className="flex flex-wrap gap-1">
                       {changes.oldWeekdays.map((day) => (
@@ -186,31 +186,31 @@ export function PlanChangePreviewModal({
             <div className="space-y-1 text-sm">
               {isProtected ? (
                 <>
-                  <p>No se reemplazara automaticamente tu plan protegido.</p>
+                  <p>No se reemplazará automáticamente tu plan protegido.</p>
                   <p>Tus entrenamientos personalizados, manuales o de IA se conservan en Entrenamientos e Historial.</p>
                 </>
               ) : (
                 <>
                   {action === "reassign_and_redistribute" && (
-                    <p>Se creara un nuevo plan sugerido y se redistribuiran tus entrenamientos pendientes.</p>
+                    <p>Se creará un nuevo plan sugerido y se redistribuirán tus entrenamientos pendientes.</p>
                   )}
                   {action === "reassign" && (
-                    <p>Se asignara un nuevo plan que se ajusta a tu nuevo objetivo.</p>
+                    <p>Se asignará un nuevo plan que se ajusta a tu nuevo objetivo.</p>
                   )}
                   {action === "redistribute" && (
-                    <p>Tus entrenamientos se redistribuiran en los nuevos dias seleccionados.</p>
+                    <p>Tus entrenamientos se redistribuirán en los nuevos días seleccionados.</p>
                   )}
                 </>
               )}
               {impact.pendingWorkoutsCount > 0 && (
                 <p>
                   {impact.pendingWorkoutsCount} entrenamientos pendientes{" "}
-                  {isProtected ? "se revisaran antes de cualquier cambio." : "seran actualizados."}
+                  {isProtected ? "se revisarán antes de cualquier cambio." : "serán actualizados."}
                 </p>
               )}
               {impact.completedWorkoutsCount > 0 && (
                 <p className="text-muted-foreground">
-                  {impact.completedWorkoutsCount} entrenamientos completados se mantendran intactos.
+                  {impact.completedWorkoutsCount} entrenamientos completados se mantendrán intactos.
                 </p>
               )}
             </div>

@@ -28,7 +28,7 @@ SendaFit no importa, copia ni reconstruye datos de SMAE, libros, PDFs o sitios p
 
 ## Limitaciones
 
-Los valores nutricionales son aproximados. Pueden variar por marca, metodo de coccion, porcion real, madurez del alimento, drenado, perdida de agua y preparacion. Para beta se priorizan alimentos genericos/no de marca y porciones en gramos para mantener trazabilidad.
+Los valores nutricionales son aproximados. Pueden variar por marca, método de cocción, porción real, madurez del alimento, drenado, pérdida de agua y preparación. Para beta se priorizan alimentos genéricos/no de marca y porciones en gramos para mantener trazabilidad.
 
 ## Importador
 

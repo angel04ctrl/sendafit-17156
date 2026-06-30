@@ -577,7 +577,7 @@ const Workouts = () => {
                               </div>
                               <p className="text-sm text-muted-foreground">
                                 {ex.series} series x {ex.repeticiones} reps
-                                {ex.peso > 0 && ` â€¢ ${ex.peso}kg`}
+                                {ex.peso > 0 && ` - ${ex.peso}kg`}
                               </p>
                               <p className="text-sm text-primary font-medium">
                                 ~{ex.estimatedCalories} kcal
@@ -645,7 +645,7 @@ const Workouts = () => {
                   "Mas de 1000+ ejercicios con videos HD",
                   "Tutoriales paso a paso",
                   "Filtros avanzados por musculo/equipo",
-                  "Guias de tecnica correcta",
+                  "Guías de técnica correcta",
                   "Ejercicios progresivos por nivel"
                 ]}
                 className="w-full sm:w-auto"
@@ -885,7 +885,7 @@ const Workouts = () => {
               {completedHistory.length === 0 ? (
                 <Card className="p-6 text-center">
                   <CheckCircle2 className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
-                  <h3 className="font-semibold">Aun no hay historial</h3>
+                  <h3 className="font-semibold">Aún no hay historial</h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     Completa tu primer entrenamiento para verlo aqui.
                   </p>

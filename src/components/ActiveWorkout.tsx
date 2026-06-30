@@ -44,9 +44,9 @@ interface ActiveWorkoutProps {
 const DEFAULT_REST_SECONDS = 60;
 
 const SESSION_FEELING_OPTIONS = [
-  { label: "Me senti fuerte", value: "strong" },
+  { label: "Me sentí fuerte", value: "strong" },
   { label: "Normal", value: "normal" },
-  { label: "Me senti cansado", value: "tired" },
+  { label: "Me sentí cansado", value: "tired" },
   { label: "Dolor/molestia", value: "pain" },
 ] as const;
 
@@ -173,10 +173,10 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
         .reduce((total, set) => total + ((set.actual_weight || 0) * (set.actual_reps || 0)), 0)
     : 0;
   const currentExerciseComparison = (() => {
-    if (!lastSession || currentExerciseVolume <= 0) return "Aun no hay una sesion anterior comparable.";
-    if (currentExerciseVolume > lastSession.totalVolume) return "Mejoro frente a la ultima sesion de este ejercicio.";
-    if (currentExerciseVolume === lastSession.totalVolume) return "Igualo la ultima sesion de este ejercicio.";
-    return "Bajo frente a la ultima sesion de este ejercicio.";
+    if (!lastSession || currentExerciseVolume <= 0) return "Aún no hay una sesión anterior comparable.";
+    if (currentExerciseVolume > lastSession.totalVolume) return "Mejoró frente a la última sesión de este ejercicio.";
+    if (currentExerciseVolume === lastSession.totalVolume) return "Igualó la última sesión de este ejercicio.";
+    return "Bajó frente a la última sesión de este ejercicio.";
   })();
 
   const resetInputsForNextSet = () => {
@@ -203,7 +203,7 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
         : await query.ilike("nombre", exercise.name.trim()).maybeSingle();
 
       if (error || !data) {
-        toast.error("No se encontro informacion de este ejercicio");
+        toast.error("No se encontró información de este ejercicio");
         return;
       }
 
@@ -497,7 +497,7 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
               <div className="grid gap-3 rounded-lg bg-muted p-3 text-sm sm:grid-cols-3">
                 <div>
                   <p className="text-muted-foreground">Última vez</p>
-                  <p className="font-medium">{lastSessionLabel || "Sin historial aun"}</p>
+                  <p className="font-medium">{lastSessionLabel || "Sin historial aún"}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Mayor peso</p>

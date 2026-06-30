@@ -3,10 +3,16 @@
 
 ALTER TABLE public.foods
   ADD COLUMN IF NOT EXISTS name text,
+  ADD COLUMN IF NOT EXISTS display_name text,
   ADD COLUMN IF NOT EXISTS normalized_name text,
+  ADD COLUMN IF NOT EXISTS search_name text,
   ADD COLUMN IF NOT EXISTS category text,
   ADD COLUMN IF NOT EXISTS group_name text,
   ADD COLUMN IF NOT EXISTS description text,
+  ADD COLUMN IF NOT EXISTS preparation_state text,
+  ADD COLUMN IF NOT EXISTS visibility_priority integer NOT NULL DEFAULT 100,
+  ADD COLUMN IF NOT EXISTS is_common boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS is_visible boolean NOT NULL DEFAULT true,
   ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'legacy_seed',
   ADD COLUMN IF NOT EXISTS source_license text,
   ADD COLUMN IF NOT EXISTS source_version text,
@@ -31,7 +37,9 @@ ALTER TABLE public.foods
 UPDATE public.foods
 SET
   name = COALESCE(name, nombre),
+  display_name = COALESCE(display_name, name, nombre),
   normalized_name = COALESCE(normalized_name, lower(nombre)),
+  search_name = COALESCE(search_name, lower(COALESCE(display_name, name, nombre))),
   serving_size = COALESCE(serving_size, racion),
   serving_unit = COALESCE(serving_unit, unidad),
   grams_per_serving = COALESCE(
@@ -59,7 +67,9 @@ SET
     CASE WHEN lower(unidad) IN ('g', 'gr', 'gramo', 'gramos') AND racion > 0 THEN grasas / racion * 100 ELSE grasas END
   )
 WHERE name IS NULL
+   OR display_name IS NULL
    OR normalized_name IS NULL
+   OR search_name IS NULL
    OR serving_size IS NULL
    OR serving_unit IS NULL
    OR grams_per_serving IS NULL
@@ -76,8 +86,14 @@ CREATE UNIQUE INDEX foods_fdc_id_unique_idx
 CREATE INDEX IF NOT EXISTS foods_normalized_name_idx
   ON public.foods (normalized_name);
 
+CREATE INDEX IF NOT EXISTS foods_search_name_idx
+  ON public.foods (search_name);
+
 CREATE INDEX IF NOT EXISTS foods_source_idx
   ON public.foods (source, is_verified);
+
+CREATE INDEX IF NOT EXISTS foods_visibility_idx
+  ON public.foods (is_visible, is_common, visibility_priority);
 
 SELECT setval(
   pg_get_serial_sequence('public.foods', 'id'),
@@ -153,3 +169,6 @@ COMMENT ON TABLE public.meal_ingredients IS 'Ingredient-level meal breakdown use
 COMMENT ON COLUMN public.foods.source IS 'Nutrition source, e.g. USDA_FDC, legacy_seed, user_custom, ai_estimated, SMAE_licensed.';
 COMMENT ON COLUMN public.foods.source_license IS 'License for nutrition data source. USDA FDC uses CC0_1_0.';
 COMMENT ON COLUMN public.foods.fdc_id IS 'USDA FoodData Central identifier when source = USDA_FDC.';
+COMMENT ON COLUMN public.foods.display_name IS 'Spanish user-facing food name for search and meal registration.';
+COMMENT ON COLUMN public.foods.search_name IS 'Normalized search text for names and aliases.';
+COMMENT ON COLUMN public.foods.is_visible IS 'Controls whether the food appears in normal user search.';

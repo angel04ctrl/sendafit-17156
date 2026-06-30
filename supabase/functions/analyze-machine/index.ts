@@ -44,7 +44,7 @@ function normalizeAnalysis(value: unknown): MachineAnalysis {
       : "Grupo muscular no identificado",
     setupSteps: Array.isArray(parsed.setupSteps)
       ? parsed.setupSteps.filter((step): step is string => typeof step === "string" && step.trim().length > 0)
-      : ["Ajusta la maquina a tu altura antes de iniciar.", "Usa un peso controlable.", "Deten el ejercicio si sientes dolor articular."],
+      : ["Ajusta la máquina a tu altura antes de iniciar.", "Usa un peso controlable.", "Detén el ejercicio si sientes dolor articular."],
     exercises: {
       principiante: Array.isArray(exercises.principiante)
         ? exercises.principiante.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
@@ -111,22 +111,22 @@ serve(async (req) => {
       const retryAfter = String(rateLimit?.retryAfterSeconds || 3600);
       return respond(
         req,
-        { error: "Limite de analisis alcanzado. Intenta mas tarde.", limit: rateLimit?.limit || "hour" },
+        { error: "Límite de análisis alcanzado. Intenta más tarde.", limit: rateLimit?.limit || "hour" },
         429,
         { "Retry-After": retryAfter },
       );
     }
 
-    const systemPrompt = `Eres un experto en biomecanica y maquinas de gimnasio. Responde unicamente con JSON valido, sin markdown ni texto extra.
+    const systemPrompt = `Eres un experto en biomecánica y máquinas de gimnasio. Responde únicamente con JSON válido, sin markdown ni texto extra.
 El JSON debe tener exactamente esta estructura:
 {
-  "machineName": "Nombre comercial de la maquina",
+  "machineName": "Nombre comercial de la máquina",
   "primaryMuscle": "Grupo muscular principal",
   "setupSteps": ["Paso breve 1", "Paso breve 2", "Paso breve 3"],
   "exercises": {
     "principiante": ["Ejercicio basico 1", "Ejercicio basico 2"],
     "intermedio": ["Variacion intermedia 1", "Variacion intermedia 2"],
-    "avanzado": ["Variacion avanzada o tecnica de intensidad"]
+    "avanzado": ["Variación avanzada o técnica de intensidad"]
   }
 }
 Usa espanol claro. Prioriza seguridad. Adapta las sugerencias al nivel del usuario: ${fitness_level || "principiante"}.`;
@@ -141,7 +141,7 @@ Usa espanol claro. Prioriza seguridad. Adapta las sugerencias al nivel del usuar
         {
           role: "user",
           content: [
-            { type: "text", text: "Analiza esta maquina de gimnasio." },
+            { type: "text", text: "Analiza esta máquina de gimnasio." },
             { type: "image_url", image_url: { url: imageUrl } },
           ],
         },

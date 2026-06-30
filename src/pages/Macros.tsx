@@ -59,6 +59,33 @@ type Meal = {
   fat: number;
 };
 
+const normalizeSearchText = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9ñ\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const getFoodDisplayName = (food: any) => food.display_name || food.name || food.nombre;
+
+const foodMatchesSearch = (food: any, query: string) => {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return true;
+  const aliases = Array.isArray(food.aliases) ? food.aliases.join(" ") : "";
+  const searchable = [
+    food.display_name,
+    food.search_name,
+    food.name,
+    food.nombre,
+    food.category,
+    food.group_name,
+    aliases,
+  ].filter(Boolean).join(" ");
+  return normalizeSearchText(searchable).includes(normalizedQuery);
+};
+
 const mealTypes = [
   { value: "desayuno", label: "Desayuno" },
   { value: "colacion_am", label: "Colación AM" },
@@ -127,7 +154,10 @@ const Macros = () => {
     const { data } = await sb
       .from("foods")
       .select("*")
-      .order("nombre", { ascending: true });
+      .eq("is_visible" as any, true)
+      .order("is_common" as any, { ascending: false })
+      .order("visibility_priority" as any, { ascending: true })
+      .order("display_name" as any, { ascending: true });
     
     setFoods(data || []);
   }, [sb]);
@@ -171,7 +201,7 @@ const Macros = () => {
     const gramsPerServing = Number(customGramsPerServing);
     const servings = Number(customServings);
     if (!Number.isFinite(gramsPerServing) || gramsPerServing <= 0) {
-      toast.error("Los gramos por porcion deben ser mayores a cero.");
+      toast.error("Los gramos por porción deben ser mayores a cero.");
       return;
     }
     if (!Number.isFinite(servings) || servings <= 0) {
@@ -290,11 +320,10 @@ const Macros = () => {
 
     validation.warnings.forEach((warning) => toast.warning(warning));
 
-    const portion = `${grams} g`;
     const { data: savedMeal, error } = await sb.from("meals").insert([{
       user_id: user.id,
       meal_type: validation.meal.meal_type as any,
-      name: `${selectedFood.nombre} (${portion} × ${selectedFood.racion}${selectedFood.unidad})`,
+      name: validation.meal.name,
       calories: validation.meal.calories,
       protein: validation.meal.protein,
       carbs: validation.meal.carbs,
@@ -452,7 +481,7 @@ const Macros = () => {
         size="sm"
         onClick={() => duplicateMeal(meal, format(new Date(Date.now() + 24 * 60 * 60 * 1000), "yyyy-MM-dd"))}
       >
-        Manana
+        Repetir mañana
       </Button>
       <Button variant="ghost" size="sm" onClick={() => duplicateMeal(meal, today, true)}>
         Duplicar
@@ -560,23 +589,21 @@ const Macros = () => {
                               <CommandEmpty>No se encontraron alimentos.</CommandEmpty>
                               <CommandGroup>
                                 {foods
-                                  .filter((food) =>
-                                    food.nombre.toLowerCase().includes(searchQuery.toLowerCase())
-                                  )
+                                  .filter((food) => foodMatchesSearch(food, searchQuery))
                                   .slice(0, 10)
                                   .map((food) => (
                                     <CommandItem
                                       key={food.id}
-                                      value={food.nombre}
+                                      value={getFoodDisplayName(food)}
                                       onSelect={() => {
                                         setSelectedFood(food);
                                       }}
                                     >
                                       <div className="flex flex-col">
-                                        <span className="font-medium">{food.nombre}</span>
+                                        <span className="font-medium">{getFoodDisplayName(food)}</span>
                                         <span className="text-xs text-muted-foreground">
-                                          {food.calorias} kcal · {food.proteinas}g prot · {food.carbohidratos}g carbs · {food.grasas}g grasa
-                                          <span className="ml-2">({food.racion}{food.unidad})</span>
+                                          {food.calories_per_100g || food.calorias} kcal · {food.protein_per_100g || food.proteinas}g proteína · {food.carbs_per_100g || food.carbohidratos}g carbohidratos · {food.fat_per_100g || food.grasas}g grasa
+                                          <span className="ml-2">100 g</span>
                                         </span>
                                       </div>
                                     </CommandItem>
@@ -607,7 +634,7 @@ const Macros = () => {
                                   placeholder="Ej: 100, 150, 250"
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                  Corrige cantidades para mejorar la estimacion. Los macros se recalculan automaticamente.
+                                  Corrige cantidades para mejorar la estimación. Los macros se recalculan automáticamente.
                                 </p>
                               </div>
 
@@ -661,7 +688,7 @@ const Macros = () => {
                         </div>
                         <Card className="border-amber-200 bg-amber-50 p-3">
                           <p className="text-sm text-amber-900">
-                            Correccion manual avanzada: captura valores por porcion. Esta correccion puede afectar la precision de tus reportes.
+                            Corrección manual avanzada: captura valores por porción. Esta corrección puede afectar la precisión de tus reportes.
                           </p>
                         </Card>
                         <div className="grid grid-cols-2 gap-4">
@@ -676,7 +703,7 @@ const Macros = () => {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label>Gramos por porcion</Label>
+                            <Label>Gramos por porción</Label>
                             <Input
                               type="number"
                               min="1"
@@ -730,7 +757,7 @@ const Macros = () => {
                         <Card className="p-3">
                           <p className="text-xs text-muted-foreground">Macros finales calculados</p>
                           <p className="text-sm font-medium">
-                            {customMealMacros.calories} kcal · {customMealMacros.protein}g proteina · {customMealMacros.carbs}g carbs · {customMealMacros.fat}g grasa
+                            {customMealMacros.calories} kcal · {customMealMacros.protein}g proteína · {customMealMacros.carbs}g carbs · {customMealMacros.fat}g grasa
                           </p>
                         </Card>
                         <Button type="submit" className="w-full">

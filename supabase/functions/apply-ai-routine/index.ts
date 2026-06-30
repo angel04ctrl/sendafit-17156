@@ -108,7 +108,7 @@ serve(async (req) => {
     const { metadata_routine: rawRoutine } = await req.json() as { metadata_routine?: MetadataRoutine };
     const metadata_routine = rawRoutine ? normalizeRoutine(rawRoutine) : undefined;
     if (!metadata_routine?.days?.length) {
-      return jsonResponse(req, { error: "La rutina sugerida no contiene dias validos." }, 400);
+      return jsonResponse(req, { error: "La rutina sugerida no contiene días válidos." }, 400);
     }
 
     const { data: profile } = await supabase

@@ -91,7 +91,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       await supabase.auth.signOut();
       toast.success("Sesion cerrada correctamente");
     } catch (error) {
-      toast.error("Error al cerrar sesion");
+      toast.error("Error al cerrar sesión");
     }
   };
 

@@ -1,5 +1,5 @@
 /**
- * FoodAnalysisModal.tsx - Modal para analisis de comida con IA.
+ * FoodAnalysisModal.tsx - Modal para análisis de comida con IA.
  */
 
 import { useRef, useState } from "react";
@@ -384,8 +384,8 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
         {step === "capture" && (
           <div className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
-              Toma una foto o sube una imagen de tu comida para analizar automaticamente los macronutrientes.
-              La imagen se procesa con IA y el resultado es una estimacion que puedes corregir antes de guardar.
+              Toma una foto o sube una imagen de tu comida para analizar automáticamente los macronutrientes.
+              La imagen se procesa con IA y el resultado es una estimación que puedes corregir antes de guardar.
             </p>
 
             {imagePreview ? (
@@ -501,12 +501,12 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
 
             <Card className="border-amber-200 bg-amber-50 p-3">
               <p className="text-sm text-amber-900">
-                Esto es una estimacion: confirma porciones, ingredientes y macros antes de guardar.
+                La foto es una estimación; confirma las porciones antes de guardar.
               </p>
             </Card>
 
             <div className="flex flex-col gap-2">
-              <Label>Momento del dia</Label>
+              <Label>Momento del día</Label>
               <Select value={mealType} onValueChange={(value) => setMealType(value as MealType)}>
                 <SelectTrigger>
                   <SelectValue />

@@ -48,7 +48,7 @@ function normalizeCoachResponse(value: unknown): CoachResponse {
   return {
     message: typeof parsed.message === "string" && parsed.message.trim()
       ? parsed.message.trim()
-      : "Estoy aqui para ayudarte con tu entrenamiento, salud y nutricion.",
+      : "Estoy aquí para ayudarte con tu entrenamiento, salud y nutrición.",
     metadata_routine: parsed.metadata_routine && Array.isArray(parsed.metadata_routine.days)
       ? parsed.metadata_routine
       : null,
@@ -143,7 +143,7 @@ serve(async (req) => {
       if (!sameDays) {
         return jsonResponse(req, {
           success: true,
-          message: `Actualmente en tu perfil tienes seleccionados: ${formatWeekdays(profileWeekdays)}. Cuando dices "${user_message.trim()}", ¿te refieres a esos dias o quieres cambiarlo a ${formatWeekdays(requestedWeekdays)}? Puedo crear este plan como temporal o ayudarte a actualizar tus dias de entrenamiento en el perfil. ¿Que prefieres?`,
+          message: `Actualmente en tu perfil tienes seleccionados: ${formatWeekdays(profileWeekdays)}. Cuando dices "${user_message.trim()}", ¿te refieres a esos días o quieres cambiarlo a ${formatWeekdays(requestedWeekdays)}? Puedo crear este plan como temporal o ayudarte a actualizar tus días de entrenamiento en el perfil. ¿Qué prefieres?`,
           metadata_routine: null,
           needs_day_confirmation: true,
           profile_weekdays: profileWeekdays,
@@ -158,9 +158,9 @@ serve(async (req) => {
     }));
 
     const systemPrompt = `Eres SendaFit Coach, un entrenador personal certificado y nutricionista deportivo experto.
-Solo puedes responder preguntas relacionadas con ejercicio, rutinas, tecnicas de entrenamiento, anatomia, suplementacion, recetas y nutricion.
+Solo puedes responder preguntas relacionadas con ejercicio, rutinas, técnicas de entrenamiento, anatomía, suplementación, recetas y nutrición.
 Si el usuario pregunta sobre noticias, cultura general, programacion, entretenimiento o cualquier tema ajeno al fitness, debes ignorarlo por completo y responder de forma identica, amable y exacta a:
-"Lo siento, como tu coach de SendaFit solo puedo ayudarte con temas relacionados a tu entrenamiento, salud y nutricion. ¡Mantengamos el enfoque en tus objetivos!".
+"Lo siento, como tu coach de SendaFit solo puedo ayudarte con temas relacionados a tu entrenamiento, salud y nutrición. ¡Mantengamos el enfoque en tus objetivos!".
 
 Responde siempre en JSON valido, sin markdown y sin texto adicional, con esta forma:
 {
@@ -192,7 +192,7 @@ Restricciones para metadata_routine:
 - weekday debe ser 1=Lunes, 2=Martes, 3=Miercoles, 4=Jueves, 5=Viernes, 6=Sabado, 7=Domingo.
 - Usa solo location: casa, gimnasio o exterior.
 - reps debe ser numero entero; si recomiendas rango, usa el promedio y explica el rango en notes.
-- Ajusta el numero de dias a available_weekdays cuando exista.
+- Ajusta el número de días a available_weekdays cuando exista.
 - No inventes consejos medicos. Si hay dolor, lesion seria o condicion medica, recomienda consultar a un profesional.
 
 Contexto tecnico del usuario:
