@@ -224,7 +224,7 @@ export default function CoachChat() {
         },
       });
 
-      if (error) throw error;
+      if (error) throw new Error(await getFunctionErrorMessage(error));
       if (!data?.success) throw new Error(data?.error || "No se pudo contactar al Coach.");
       return data as {
         message: string;
