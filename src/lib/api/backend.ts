@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 
 /**
  * Backend API client for fitness app
@@ -237,6 +238,22 @@ export interface SaveWorkoutSessionSetInput {
   rpe?: number | null;
   rest_seconds?: number | null;
   completed?: boolean;
+}
+
+export interface SubstituteWorkoutExerciseInput {
+  workoutExerciseId: string;
+  newExerciseId: string;
+  reason: "machine_busy" | "pain_discomfort" | "not_available" | "preference" | "app_recommended";
+}
+
+export interface MoveWorkoutInput {
+  workoutId: string;
+  newDate: string;
+}
+
+export interface SkipWorkoutInput {
+  workoutId: string;
+  reason: "no_time" | "tired" | "pain" | "travel" | "other";
 }
 
 export interface ExerciseProgressQuery {
@@ -685,6 +702,37 @@ export async function saveWorkoutSessionSet(input: SaveWorkoutSessionSetInput): 
 
   if (error) throw error;
   return data as WorkoutSessionSet;
+}
+
+export async function substituteWorkoutExercise(input: SubstituteWorkoutExerciseInput): Promise<Tables<"workout_exercises">> {
+  const { data, error } = await supabase.rpc("substitute_workout_exercise", {
+    _workout_exercise_id: input.workoutExerciseId,
+    _new_exercise_id: input.newExerciseId,
+    _reason: input.reason,
+  });
+
+  if (error) throw error;
+  return data as Tables<"workout_exercises">;
+}
+
+export async function moveWorkoutToDate(input: MoveWorkoutInput): Promise<Tables<"workouts">> {
+  const { data, error } = await supabase.rpc("move_workout_to_date", {
+    _workout_id: input.workoutId,
+    _new_date: input.newDate,
+  });
+
+  if (error) throw error;
+  return data as Tables<"workouts">;
+}
+
+export async function skipWorkout(input: SkipWorkoutInput): Promise<Tables<"workouts">> {
+  const { data, error } = await supabase.rpc("skip_workout", {
+    _workout_id: input.workoutId,
+    _reason: input.reason,
+  });
+
+  if (error) throw error;
+  return data as Tables<"workouts">;
 }
 
 export async function finishWorkoutSession(params: {

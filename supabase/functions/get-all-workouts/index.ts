@@ -94,7 +94,8 @@ serve(async (req) => {
     const stats = {
       total: workouts?.length || 0,
       completed: workouts?.filter(w => w.completed).length || 0,
-      pending: workouts?.filter(w => !w.completed).length || 0,
+      skipped: workouts?.filter(w => w.skipped).length || 0,
+      pending: workouts?.filter(w => !w.completed && !w.skipped).length || 0,
       automaticos: workouts?.filter(w => w.tipo === 'automatico').length || 0,
       manuales: workouts?.filter(w => w.tipo === 'manual').length || 0,
       totalCalories: workouts?.reduce((sum, w) => sum + (w.estimated_calories || 0), 0) || 0,

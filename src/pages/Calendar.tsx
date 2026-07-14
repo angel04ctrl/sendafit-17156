@@ -15,7 +15,7 @@ import { Navbar } from "@/components/Navbar";
 import { Card } from "@/components/ui/card";
 import { format, startOfWeek, addDays, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, Forward } from "lucide-react";
 import { DashboardMobileCarousel } from "@/components/DashboardMobileCarousel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useGenerateWeeklyWorkouts, useWeeklyCalendarWorkouts } from "@/hooks/useBackendApi";
@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { dayMap } from "@/lib/dayMapping";
+import { AdaptiveWorkoutActions } from "@/components/AdaptiveWorkoutActions";
 
 const Calendar = () => {
   // Hook para detectar si es móvil
@@ -135,7 +136,7 @@ const Calendar = () => {
     });
     
 
-    return matches;
+    return matches.filter((w) => w.scheduled_date === compareDateStr);
   };
 
   // Función para verificar si un día tiene entrenamientos programados según available_weekdays
@@ -144,6 +145,19 @@ const Calendar = () => {
     const weekdayNumber = jsDay === 0 ? 7 : jsDay; // Convertir a 1=Lun, 2=Mar, ..., 7=Dom
     return availableWeekdayNumbers.includes(weekdayNumber);
   };
+  const currentWeekWorkouts = workouts.filter((workout) =>
+    workout.scheduled_date >= format(weekDays[0], 'yyyy-MM-dd')
+    && workout.scheduled_date <= format(weekDays[6], 'yyyy-MM-dd'),
+  );
+  const weeklyStats = {
+    planned: currentWeekWorkouts.length,
+    completed: currentWeekWorkouts.filter((workout) => workout.completed).length,
+    skipped: currentWeekWorkouts.filter((workout) => workout.skipped).length,
+    pending: currentWeekWorkouts.filter((workout) => !workout.completed && !workout.skipped).length,
+  };
+  const weeklyCompletion = weeklyStats.planned > 0
+    ? Math.round((weeklyStats.completed / weeklyStats.planned) * 100)
+    : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -156,6 +170,35 @@ const Calendar = () => {
               Visualiza tu planificación de entrenamientos
             </p>
           </div>
+
+          {weeklyStats.planned > 0 && (
+            <Card className="p-3 sm:p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="font-semibold">Progreso semanal</h2>
+                  <p className="text-sm text-muted-foreground">{weeklyCompletion}% completado</p>
+                </div>
+                <div className="grid grid-cols-4 gap-2 text-center text-xs sm:min-w-[420px]">
+                  <div className="rounded-lg bg-muted p-2">
+                    <p className="text-muted-foreground">Plan</p>
+                    <p className="text-lg font-bold">{weeklyStats.planned}</p>
+                  </div>
+                  <div className="rounded-lg bg-primary/10 p-2">
+                    <p className="text-muted-foreground">Listos</p>
+                    <p className="text-lg font-bold text-primary">{weeklyStats.completed}</p>
+                  </div>
+                  <div className="rounded-lg bg-amber-50 p-2">
+                    <p className="text-muted-foreground">Saltados</p>
+                    <p className="text-lg font-bold text-amber-700">{weeklyStats.skipped}</p>
+                  </div>
+                  <div className="rounded-lg bg-muted p-2">
+                    <p className="text-muted-foreground">Pendientes</p>
+                    <p className="text-lg font-bold">{weeklyStats.pending}</p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
 
           {hasCalendarError && (
             <Card className="p-4 bg-amber-50 border-amber-200">
@@ -242,7 +285,7 @@ const Calendar = () => {
                       Entrenamientos Pendientes
                     </h3>
                     {(() => {
-                      const pendingWorkouts = getWorkoutsForDate(selectedDate).filter(w => !w.completed);
+                      const pendingWorkouts = getWorkoutsForDate(selectedDate).filter(w => !w.completed && !w.skipped);
                       const hasMoreThan3 = pendingWorkouts.length > 3;
                       const displayedWorkouts = showAllPending ? pendingWorkouts : pendingWorkouts.slice(0, 3);
                       
@@ -267,6 +310,13 @@ const Calendar = () => {
                                   <span>{workout.duration_minutes} min</span>
                                   <span>~{workout.estimated_calories} kcal</span>
                                   <span className="capitalize">{workout.location}</span>
+                                </div>
+                                <div className="mt-3">
+                                  <AdaptiveWorkoutActions
+                                    workout={workout}
+                                    weekWorkouts={workouts}
+                                    showStart={false}
+                                  />
                                 </div>
                               </div>
                             ))}
@@ -370,12 +420,17 @@ const Calendar = () => {
                               className={`text-xs p-2 rounded ${
                                 workout.completed
                                   ? "bg-primary/20 text-primary"
+                                  : workout.skipped
+                                  ? "bg-amber-50 text-amber-700"
                                   : "bg-muted"
                               }`}
                             >
                               <div className="flex items-center gap-1">
                                 {workout.completed && (
                                   <CheckCircle2 className="w-3 h-3" />
+                                )}
+                                {workout.skipped && (
+                                  <Forward className="w-3 h-3" />
                                 )}
                                 <span className="truncate">{workout.name}</span>
                               </div>
@@ -398,7 +453,7 @@ const Calendar = () => {
                     {format(selectedDate, "EEEE, d 'de' MMMM", { locale: es })}
                   </p>
                   {(() => {
-                    const pendingWorkouts = getWorkoutsForDate(selectedDate).filter(w => !w.completed);
+                    const pendingWorkouts = getWorkoutsForDate(selectedDate).filter(w => !w.completed && !w.skipped);
                     
                     if (pendingWorkouts.length === 0) {
                       return (
@@ -425,6 +480,13 @@ const Calendar = () => {
                               <span>{workout.duration_minutes} min</span>
                               <span>~{workout.estimated_calories} kcal</span>
                               <span className="capitalize">{workout.location}</span>
+                            </div>
+                            <div className="mt-3">
+                              <AdaptiveWorkoutActions
+                                workout={workout}
+                                weekWorkouts={workouts}
+                                showStart={false}
+                              />
                             </div>
                           </div>
                         ))}

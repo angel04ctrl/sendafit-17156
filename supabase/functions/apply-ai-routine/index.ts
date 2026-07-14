@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { handleCors, isAllowedRequestOrigin, jsonResponse } from "../_shared/cors.ts";
+import { canAutomaticPlannerReplaceWorkout } from "../_shared/planIdentity.ts";
 
 interface RoutineExercise {
   name: string;
@@ -9,6 +10,19 @@ interface RoutineExercise {
   notes?: string;
   duration_minutes?: number;
 }
+
+type CatalogExercise = {
+  id: string;
+  nombre: string;
+  aliases?: string[] | string | null;
+  nivel_minimo?: string | null;
+  nivel?: string | null;
+  estado_calidad?: string | null;
+  tipo_entrenamiento?: string | null;
+  descanso_segundos_min?: number | null;
+  descanso_segundos_max?: number | null;
+  rir_recomendado?: number | null;
+};
 
 interface RoutineDay {
   day_name: string;
@@ -55,6 +69,63 @@ function normalizeLocation(value: unknown): "casa" | "gimnasio" | "exterior" {
   const normalized = String(value || "").toLowerCase().trim();
   return normalized === "casa" || normalized === "gimnasio" || normalized === "exterior" ? normalized : "gimnasio";
 }
+
+function normalizeText(value: unknown): string {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function toArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
+    } catch {
+      return value.split(",").map((item) => item.trim()).filter(Boolean);
+    }
+  }
+  return [];
+}
+
+function levelRank(level: unknown): number {
+  const normalized = normalizeText(level);
+  if (["avanzado", "p", "profesional"].includes(normalized)) return 3;
+  if (["intermedio", "i"].includes(normalized)) return 2;
+  return 1;
+}
+
+function resolveExerciseByName(name: string, catalog: CatalogExercise[]) {
+  const wanted = normalizeText(name);
+  const matches = catalog.filter((exercise) => {
+    const names = [exercise.nombre, ...toArray(exercise.aliases)].map(normalizeText);
+    return names.includes(wanted);
+  });
+
+  return matches;
+}
+
+const deleteWorkoutTree = async (supabase: any, workoutIds: string[]) => {
+  if (workoutIds.length === 0) return null;
+
+  const { error: exercisesError } = await supabase
+    .from("workout_exercises")
+    .delete()
+    .in("workout_id", workoutIds);
+
+  if (exercisesError) return exercisesError;
+
+  const { error: workoutsError } = await supabase
+    .from("workouts")
+    .delete()
+    .in("id", workoutIds);
+
+  return workoutsError || null;
+};
 
 function normalizeRoutine(metadataRoutine: MetadataRoutine): MetadataRoutine {
   return {
@@ -105,17 +176,92 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY")!,
     );
 
-    const { metadata_routine: rawRoutine } = await req.json() as { metadata_routine?: MetadataRoutine };
+    const { metadata_routine: rawRoutine, coach_action_id } = await req.json() as {
+      metadata_routine?: MetadataRoutine;
+      coach_action_id?: string;
+    };
     const metadata_routine = rawRoutine ? normalizeRoutine(rawRoutine) : undefined;
     if (!metadata_routine?.days?.length) {
       return jsonResponse(req, { error: "La rutina sugerida no contiene días válidos." }, 400);
     }
 
+    if (coach_action_id) {
+      const { data: action, error: actionError } = await supabase
+        .from("coach_actions")
+        .select("id,status,action_type,user_id")
+        .eq("id", coach_action_id)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (actionError) throw actionError;
+      if (!action) return jsonResponse(req, { error: "coach_action_not_found" }, 404);
+      if (action.action_type !== "modify_routine") {
+        return jsonResponse(req, { error: "invalid_coach_action_type" }, 400);
+      }
+      if (action.status !== "pending" && action.status !== "confirmed") {
+        return jsonResponse(req, { error: "coach_action_not_pending" }, 409);
+      }
+
+      const { error: confirmError } = await supabase
+        .from("coach_actions")
+        .update({ status: "confirmed", confirmed_at: new Date().toISOString() })
+        .eq("id", coach_action_id)
+        .eq("user_id", user.id);
+
+      if (confirmError) throw confirmError;
+    }
+
     const { data: profile } = await supabase
       .from("profiles")
-      .select("available_weekdays, assigned_routine_id")
+      .select("available_weekdays, assigned_routine_id, fitness_level")
       .eq("id", user.id)
       .maybeSingle();
+
+    const { data: exerciseCatalog, error: catalogError } = await supabase
+      .from("exercises")
+      .select("id,nombre,aliases,nivel,nivel_minimo,estado_calidad,tipo_entrenamiento,descanso_segundos_min,descanso_segundos_max,rir_recomendado");
+
+    if (catalogError || !exerciseCatalog?.length) {
+      return jsonResponse(req, { error: "No se pudo validar la biblioteca de ejercicios." }, 500);
+    }
+
+    const unresolved: string[] = [];
+    const ambiguous: Record<string, string[]> = {};
+    const incompatible: string[] = [];
+    const resolvedByKey = new Map<string, CatalogExercise>();
+
+    metadata_routine.days.forEach((day, dayIndex) => {
+      day.exercises.forEach((exercise, exerciseIndex) => {
+        const key = `${dayIndex}:${exerciseIndex}`;
+        const matches = resolveExerciseByName(exercise.name, exerciseCatalog as CatalogExercise[]);
+        if (matches.length === 0) {
+          unresolved.push(exercise.name);
+          return;
+        }
+        if (matches.length > 1) {
+          ambiguous[exercise.name] = matches.map((match) => `${match.id}:${match.nombre}`);
+          return;
+        }
+
+        const resolved = matches[0];
+        const quality = normalizeText(resolved.estado_calidad || "curado");
+        if (quality === "deprecado" || quality === "revisar" || levelRank(resolved.nivel_minimo || resolved.nivel) > levelRank(profile?.fitness_level)) {
+          incompatible.push(`${exercise.name} -> ${resolved.nombre}`);
+          return;
+        }
+
+        resolvedByKey.set(key, resolved);
+      });
+    });
+
+    if (unresolved.length || Object.keys(ambiguous).length || incompatible.length) {
+      return jsonResponse(req, {
+        error: "ai_routine_unresolved_exercises",
+        unresolved,
+        ambiguous,
+        incompatible,
+      }, 409);
+    }
 
     const fallbackWeekdays = (profile?.available_weekdays || [])
       .map((day: string) => normalizeWeekday(day, 0))
@@ -124,7 +270,8 @@ serve(async (req) => {
     const workoutRows = metadata_routine.days.map((day, index) => {
       const fallback = fallbackWeekdays[index] || ((index % 7) + 1);
       const weekday = normalizeWeekday(day.weekday, fallback);
-      const hasAssignedPlan = Boolean(profile?.assigned_routine_id);
+      const assignedRoutineId = profile?.assigned_routine_id || null;
+      const hasAssignedPlan = Boolean(assignedRoutineId);
 
       return {
         user_id: user.id,
@@ -132,7 +279,9 @@ serve(async (req) => {
         description: metadata_routine.routine_name || "Rutina personalizada por SendaFit AI Coach",
         location: day.location || "gimnasio",
         tipo: hasAssignedPlan ? "automatico" as const : "manual" as const,
-        plan_id: hasAssignedPlan ? profile.assigned_routine_id : null,
+        plan_id: hasAssignedPlan ? assignedRoutineId : null,
+        plan_source: "ai_coach",
+        is_protected: true,
         scheduled_date: dateForWeekday(weekday),
         weekday,
         duration_minutes: day.duration_minutes,
@@ -151,14 +300,22 @@ serve(async (req) => {
     const exerciseRows = insertedWorkouts.flatMap((workout, workoutIndex) => {
       const day = metadata_routine.days[workoutIndex];
       return (day.exercises || [])
-        .map((exercise) => ({
+        .map((exercise, exerciseIndex) => {
+          const resolved = resolvedByKey.get(`${workoutIndex}:${exerciseIndex}`)!;
+          const type = normalizeText(resolved.tipo_entrenamiento);
+          return {
           workout_id: workout.id,
+          exercise_id: resolved.id,
           name: exercise.name,
           sets: exercise.sets,
           reps: exercise.reps,
+          rest_seconds: resolved.descanso_segundos_max || resolved.descanso_segundos_min || null,
+          target_rir: type.includes("cardio") ? null : resolved.rir_recomendado ?? 2,
+          order_index: exerciseIndex + 1,
           duration_minutes: exercise.duration_minutes || null,
           notes: exercise.notes || null,
-        }));
+        };
+      });
     });
 
     if (exerciseRows.length > 0) {
@@ -176,26 +333,52 @@ serve(async (req) => {
 
     const { data: oldWorkouts, error: oldError } = await supabase
       .from("workouts")
-      .select("id")
+      .select("id, tipo, plan_source, is_protected, completed")
       .eq("user_id", user.id)
       .eq("tipo", "automatico")
       .not("id", "in", `(${insertedWorkouts.map((workout) => workout.id).join(",")})`);
 
     if (oldError) throw oldError;
 
-    const oldIds = oldWorkouts?.map((workout) => workout.id) || [];
-    if (oldIds.length > 0) {
-      const { error: deleteExercisesError } = await supabase
-        .from("workout_exercises")
-        .delete()
-        .in("workout_id", oldIds);
-      if (deleteExercisesError) throw deleteExercisesError;
+    const blockedOldIds = (oldWorkouts || [])
+      .filter((workout) => !canAutomaticPlannerReplaceWorkout(workout))
+      .map((workout) => workout.id);
+    const oldIds = (oldWorkouts || [])
+      .filter((workout) => canAutomaticPlannerReplaceWorkout(workout))
+      .map((workout) => workout.id);
 
-      const { error: deleteWorkoutsError } = await supabase
-        .from("workouts")
-        .delete()
-        .in("id", oldIds);
-      if (deleteWorkoutsError) throw deleteWorkoutsError;
+    if (blockedOldIds.length > 0) {
+      const cleanupError = await deleteWorkoutTree(supabase, insertedWorkouts.map((workout) => workout.id));
+      if (cleanupError) throw cleanupError;
+      return jsonResponse(req, {
+        error: "protected_plan_replacement_blocked",
+        message: "La rutina IA no reemplazo entrenamientos protegidos o historicos.",
+        blocked_workout_ids: blockedOldIds,
+      }, 409);
+    }
+
+    if (oldIds.length > 0) {
+      const cleanupOldError = await deleteWorkoutTree(supabase, oldIds);
+      if (cleanupOldError) throw cleanupOldError;
+    }
+
+    if (coach_action_id) {
+      const { error: actionUpdateError } = await supabase
+        .from("coach_actions")
+        .update({
+          status: "applied",
+          applied_at: new Date().toISOString(),
+          validation_result: {
+            applied: true,
+            workouts_created: insertedWorkouts.length,
+            exercises_created: exerciseRows.length,
+            workouts_deleted: oldIds.length,
+          },
+        })
+        .eq("id", coach_action_id)
+        .eq("user_id", user.id);
+
+      if (actionUpdateError) throw actionUpdateError;
     }
 
     return jsonResponse(req, {

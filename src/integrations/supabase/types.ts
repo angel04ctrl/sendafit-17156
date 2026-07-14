@@ -16,36 +16,54 @@ export type Database = {
     Tables: {
       ai_trainer_conversations: {
         Row: {
+          assistant_message: string | null
           conversation_type: string
+          context_used: Json
           created_at: string
           generated_content: Json | null
           id: string
+          intent_type: string | null
           messages: Json | null
+          model_used: string | null
           saved_to_app: boolean | null
+          safety_flags: string[]
           title: string | null
           updated_at: string
+          user_message: string | null
           user_id: string
         }
         Insert: {
+          assistant_message?: string | null
           conversation_type: string
+          context_used?: Json
           created_at?: string
           generated_content?: Json | null
           id?: string
+          intent_type?: string | null
           messages?: Json | null
+          model_used?: string | null
           saved_to_app?: boolean | null
+          safety_flags?: string[]
           title?: string | null
           updated_at?: string
+          user_message?: string | null
           user_id: string
         }
         Update: {
+          assistant_message?: string | null
           conversation_type?: string
+          context_used?: Json
           created_at?: string
           generated_content?: Json | null
           id?: string
+          intent_type?: string | null
           messages?: Json | null
+          model_used?: string | null
           saved_to_app?: boolean | null
+          safety_flags?: string[]
           title?: string | null
           updated_at?: string
+          user_message?: string | null
           user_id?: string
         }
         Relationships: [
@@ -79,61 +97,178 @@ export type Database = {
         }
         Relationships: []
       }
+      coach_actions: {
+        Row: {
+          action_type: string
+          applied_at: string | null
+          confirmed_at: string | null
+          conversation_id: string | null
+          created_at: string
+          id: string
+          payload: Json
+          preview: Json
+          rejected_at: string | null
+          status: string
+          title: string
+          user_id: string
+          validation_result: Json
+        }
+        Insert: {
+          action_type: string
+          applied_at?: string | null
+          confirmed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          payload?: Json
+          preview?: Json
+          rejected_at?: string | null
+          status?: string
+          title: string
+          user_id: string
+          validation_result?: Json
+        }
+        Update: {
+          action_type?: string
+          applied_at?: string | null
+          confirmed_at?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          payload?: Json
+          preview?: Json
+          rejected_at?: string | null
+          status?: string
+          title?: string
+          user_id?: string
+          validation_result?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_actions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_trainer_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coach_actions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exercises: {
         Row: {
+          aliases: string[]
           calorias_por_repeticion: number | null
+          contraindicaciones: string[]
           created_at: string
           descripcion: string
           duracion_promedio_segundos: number | null
+          equipo_requerido: string[]
+          errores_comunes: string[]
+          estado_calidad: string
           equipamiento: string | null
           grupo_muscular: string
           id: string
           imagen: string | null
+          instrucciones: string[]
           lugar: string | null
           maquina_gym: string | null
+          musculo_principal: string | null
+          musculos_secundarios: string[]
           nivel: string
+          nivel_minimo: string | null
           nombre: string
           objetivo: string | null
+          patron_movimiento: string | null
+          progresiones: string[]
           repeticiones_sugeridas: number | null
+          descanso_segundos_max: number | null
+          descanso_segundos_min: number | null
+          rango_reps_max: number | null
+          rango_reps_min: number | null
+          regresiones: string[]
+          rir_recomendado: number | null
           series_sugeridas: number | null
+          sustituciones: string[]
           tipo_entrenamiento: string
           video: string | null
         }
         Insert: {
+          aliases?: string[]
           calorias_por_repeticion?: number | null
+          contraindicaciones?: string[]
           created_at?: string
           descripcion: string
           duracion_promedio_segundos?: number | null
+          equipo_requerido?: string[]
+          errores_comunes?: string[]
+          estado_calidad?: string
           equipamiento?: string | null
           grupo_muscular: string
           id: string
           imagen?: string | null
+          instrucciones?: string[]
           lugar?: string | null
           maquina_gym?: string | null
+          musculo_principal?: string | null
+          musculos_secundarios?: string[]
           nivel: string
+          nivel_minimo?: string | null
           nombre: string
           objetivo?: string | null
+          patron_movimiento?: string | null
+          progresiones?: string[]
           repeticiones_sugeridas?: number | null
+          descanso_segundos_max?: number | null
+          descanso_segundos_min?: number | null
+          rango_reps_max?: number | null
+          rango_reps_min?: number | null
+          regresiones?: string[]
+          rir_recomendado?: number | null
           series_sugeridas?: number | null
+          sustituciones?: string[]
           tipo_entrenamiento: string
           video?: string | null
         }
         Update: {
+          aliases?: string[]
           calorias_por_repeticion?: number | null
+          contraindicaciones?: string[]
           created_at?: string
           descripcion?: string
           duracion_promedio_segundos?: number | null
+          equipo_requerido?: string[]
+          errores_comunes?: string[]
+          estado_calidad?: string
           equipamiento?: string | null
           grupo_muscular?: string
           id?: string
           imagen?: string | null
+          instrucciones?: string[]
           lugar?: string | null
           maquina_gym?: string | null
+          musculo_principal?: string | null
+          musculos_secundarios?: string[]
           nivel?: string
+          nivel_minimo?: string | null
           nombre?: string
           objetivo?: string | null
+          patron_movimiento?: string | null
+          progresiones?: string[]
           repeticiones_sugeridas?: number | null
+          descanso_segundos_max?: number | null
+          descanso_segundos_min?: number | null
+          rango_reps_max?: number | null
+          rango_reps_min?: number | null
+          regresiones?: string[]
+          rir_recomendado?: number | null
           series_sugeridas?: number | null
+          sustituciones?: string[]
           tipo_entrenamiento?: string
           video?: string | null
         }
@@ -1058,8 +1193,16 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          order_index: number | null
+          original_exercise_id: string | null
+          original_name: string | null
           reps: number | null
+          rest_seconds: number | null
           sets: number | null
+          substituted_at: string | null
+          substitution_count: number
+          substitution_reason: string | null
+          target_rir: number | null
           workout_id: string
         }
         Insert: {
@@ -1069,8 +1212,16 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          order_index?: number | null
+          original_exercise_id?: string | null
+          original_name?: string | null
           reps?: number | null
+          rest_seconds?: number | null
           sets?: number | null
+          substituted_at?: string | null
+          substitution_count?: number
+          substitution_reason?: string | null
+          target_rir?: number | null
           workout_id: string
         }
         Update: {
@@ -1080,8 +1231,16 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
+          order_index?: number | null
+          original_exercise_id?: string | null
+          original_name?: string | null
           reps?: number | null
+          rest_seconds?: number | null
           sets?: number | null
+          substituted_at?: string | null
+          substitution_count?: number
+          substitution_reason?: string | null
+          target_rir?: number | null
           workout_id?: string
         }
         Relationships: [
@@ -1101,6 +1260,81 @@ export type Database = {
           },
         ]
       }
+      workout_exercise_substitutions: {
+        Row: {
+          created_at: string
+          id: string
+          new_exercise_id: string
+          new_name: string
+          original_exercise_id: string | null
+          original_name: string
+          reason: string
+          user_id: string
+          workout_exercise_id: string
+          workout_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          new_exercise_id: string
+          new_name: string
+          original_exercise_id?: string | null
+          original_name: string
+          reason: string
+          user_id: string
+          workout_exercise_id: string
+          workout_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          new_exercise_id?: string
+          new_name?: string
+          original_exercise_id?: string | null
+          original_name?: string
+          reason?: string
+          user_id?: string
+          workout_exercise_id?: string
+          workout_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_exercise_substitutions_new_exercise_id_fkey"
+            columns: ["new_exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_exercise_substitutions_original_exercise_id_fkey"
+            columns: ["original_exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_exercise_substitutions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_exercise_substitutions_workout_exercise_id_fkey"
+            columns: ["workout_exercise_id"]
+            isOneToOne: false
+            referencedRelation: "workout_exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_exercise_substitutions_workout_id_fkey"
+            columns: ["workout_id"]
+            isOneToOne: false
+            referencedRelation: "workouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workouts: {
         Row: {
           completed: boolean | null
@@ -1110,10 +1344,17 @@ export type Database = {
           duration_minutes: number | null
           estimated_calories: number | null
           id: string
+          is_protected: boolean
           location: Database["public"]["Enums"]["workout_location"]
           name: string
           plan_id: string | null
+          plan_source: string
+          rescheduled_at: string | null
+          rescheduled_from: string | null
           scheduled_date: string
+          skipped: boolean
+          skipped_at: string | null
+          skip_reason: string | null
           tipo: Database["public"]["Enums"]["workout_type"] | null
           user_id: string
           weekday: number | null
@@ -1126,10 +1367,17 @@ export type Database = {
           duration_minutes?: number | null
           estimated_calories?: number | null
           id?: string
+          is_protected?: boolean
           location?: Database["public"]["Enums"]["workout_location"]
           name: string
           plan_id?: string | null
+          plan_source?: string
+          rescheduled_at?: string | null
+          rescheduled_from?: string | null
           scheduled_date: string
+          skipped?: boolean
+          skipped_at?: string | null
+          skip_reason?: string | null
           tipo?: Database["public"]["Enums"]["workout_type"] | null
           user_id: string
           weekday?: number | null
@@ -1142,10 +1390,17 @@ export type Database = {
           duration_minutes?: number | null
           estimated_calories?: number | null
           id?: string
+          is_protected?: boolean
           location?: Database["public"]["Enums"]["workout_location"]
           name?: string
           plan_id?: string | null
+          plan_source?: string
+          rescheduled_at?: string | null
+          rescheduled_from?: string | null
           scheduled_date?: string
+          skipped?: boolean
+          skipped_at?: string | null
+          skip_reason?: string | null
           tipo?: Database["public"]["Enums"]["workout_type"] | null
           user_id?: string
           weekday?: number | null
@@ -1163,6 +1418,54 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workout_calendar_events: {
+        Row: {
+          action: string
+          created_at: string
+          from_date: string | null
+          id: string
+          reason: string | null
+          to_date: string | null
+          user_id: string
+          workout_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          from_date?: string | null
+          id?: string
+          reason?: string | null
+          to_date?: string | null
+          user_id: string
+          workout_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          from_date?: string | null
+          id?: string
+          reason?: string | null
+          to_date?: string | null
+          user_id?: string
+          workout_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_calendar_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_calendar_events_workout_id_fkey"
+            columns: ["workout_id"]
+            isOneToOne: false
+            referencedRelation: "workouts"
             referencedColumns: ["id"]
           },
         ]
@@ -1189,6 +1492,32 @@ export type Database = {
         Returns: boolean
       }
       is_user_pro: { Args: { _user_id: string }; Returns: boolean }
+      move_workout_to_date: {
+        Args: {
+          _new_date: string
+          _workout_id: string
+        }
+        Returns: Database["public"]["Tables"]["workouts"]["Row"]
+      }
+      skip_workout: {
+        Args: {
+          _reason: string
+          _workout_id: string
+        }
+        Returns: Database["public"]["Tables"]["workouts"]["Row"]
+      }
+      sprint9_isodow: {
+        Args: { _date: string }
+        Returns: number
+      }
+      substitute_workout_exercise: {
+        Args: {
+          _new_exercise_id: string
+          _reason: string
+          _workout_exercise_id: string
+        }
+        Returns: Database["public"]["Tables"]["workout_exercises"]["Row"]
+      }
     }
     Enums: {
       app_role: "user" | "pro"

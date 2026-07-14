@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, Circle, Clock, HelpCircle, Plus, SkipForward, Timer, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Clock, HelpCircle, Plus, Repeat, SkipForward, Timer, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { ExerciseDetailModal } from "@/components/ExerciseDetailModal";
+import { ExerciseSubstitutionDialog } from "@/components/ExerciseSubstitutionDialog";
 import {
   useCancelWorkoutSession,
   useExerciseProgressSummary,
@@ -27,6 +28,13 @@ interface WorkoutExercise {
   name: string;
   sets: number | null;
   reps: number | null;
+  rest_seconds?: number | null;
+  target_rir?: number | null;
+  original_exercise_id?: string | null;
+  original_name?: string | null;
+  substitution_reason?: string | null;
+  substituted_at?: string | null;
+  substitution_count?: number | null;
   notes?: string | null;
 }
 
@@ -34,6 +42,7 @@ interface ActiveWorkoutProps {
   workout: {
     id: string;
     name: string;
+    location?: string | null;
     duration_minutes?: number | null;
     workout_exercises?: WorkoutExercise[] | null;
   };
@@ -64,7 +73,7 @@ function formatDuration(seconds: number) {
 }
 
 export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps) {
-  const exercises = workout.workout_exercises || [];
+  const [localExercises, setLocalExercises] = useState<WorkoutExercise[]>(() => workout.workout_exercises || []);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [currentSetNumber, setCurrentSetNumber] = useState(1);
   const [actualReps, setActualReps] = useState("");
@@ -77,6 +86,8 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
   const [weightEdited, setWeightEdited] = useState(false);
   const [restSeconds, setRestSeconds] = useState(0);
   const [exerciseDetailOpen, setExerciseDetailOpen] = useState(false);
+  const [substitutionOpen, setSubstitutionOpen] = useState(false);
+  const [exerciseToSubstitute, setExerciseToSubstitute] = useState<WorkoutExercise | null>(null);
   const [selectedExerciseDetail, setSelectedExerciseDetail] = useState<any | null>(null);
   const [summary, setSummary] = useState<null | {
     durationSeconds: number;
@@ -88,10 +99,19 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
     notes: string;
   }>(null);
 
+  useEffect(() => {
+    setLocalExercises(workout.workout_exercises || []);
+    setCurrentExerciseIndex(0);
+    setCurrentSetNumber(1);
+  }, [workout.id, workout.workout_exercises]);
+
+  const exercises = localExercises;
   const currentExercise = exercises[currentExerciseIndex];
   const targetSets = Math.max(1, currentExercise?.sets || 1);
   const targetReps = currentExercise?.reps || 10;
   const targetWeight = extractTargetWeight(currentExercise?.notes);
+  const prescribedRestSeconds = currentExercise?.rest_seconds || DEFAULT_REST_SECONDS;
+  const prescribedTargetRir = currentExercise?.target_rir ?? null;
 
   const saveSetMutation = useSaveWorkoutSessionSet();
   const saveProgressionSuggestionMutation = useSaveProgressionSuggestion();
@@ -132,6 +152,10 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
       )
     : 1;
   const currentExerciseDone = currentExercise ? currentExerciseCompletedSets.length >= targetSets : false;
+  const currentExerciseHasLoggedSets = currentExercise ? currentExerciseCompletedSets.length > 0 : false;
+  const substituteExerciseCompletedSets = exerciseToSubstitute
+    ? completedSets.filter((set) => set.workout_exercise_id === exerciseToSubstitute.id && set.completed).length
+    : 0;
   const activeSetNumber = currentExerciseDone
     ? targetSets
     : Math.min(targetSets, Math.max(currentSetNumber, nextIncompleteSetNumber || currentSetNumber));
@@ -185,6 +209,19 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
     setWeightEdited(false);
     setRir("");
     setRpe("");
+  };
+
+  const openSubstitution = (exercise: WorkoutExercise) => {
+    setExerciseToSubstitute(exercise);
+    setSubstitutionOpen(true);
+  };
+
+  const applyLocalSubstitution = (updatedExercise: WorkoutExercise) => {
+    setLocalExercises((items) =>
+      items.map((item) => item.id === updatedExercise.id ? { ...item, ...updatedExercise } : item),
+    );
+    setSelectedExerciseDetail(null);
+    resetInputsForNextSet();
   };
 
   const openExerciseDetails = async (exercise: WorkoutExercise) => {
@@ -250,7 +287,7 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
         actual_weight: weight,
         rir: rir ? Number(rir) : null,
         rpe: rpe ? Number(rpe) : null,
-        rest_seconds: DEFAULT_REST_SECONDS,
+        rest_seconds: prescribedRestSeconds,
         completed: true,
       });
 
@@ -272,7 +309,7 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
       }
 
       toast.success(`Serie ${activeSetNumber} guardada`);
-      setRestSeconds(DEFAULT_REST_SECONDS);
+      setRestSeconds(prescribedRestSeconds);
 
       if (activeSetNumber < targetSets) setCurrentSetNumber(activeSetNumber + 1);
       resetInputsForNextSet();
@@ -397,6 +434,18 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
         onOpenChange={setExerciseDetailOpen}
         exercise={selectedExerciseDetail}
       />
+      <ExerciseSubstitutionDialog
+        open={substitutionOpen}
+        onOpenChange={setSubstitutionOpen}
+        workoutExercise={exerciseToSubstitute}
+        workoutLocation={workout.location}
+        disabledReason={
+          substituteExerciseCompletedSets > 0
+            ? "Este ejercicio ya tiene series guardadas en la sesion actual. Termina la sesion o sustituye antes de registrar series para conservar el historial limpio."
+            : null
+        }
+        onSubstituted={(updatedExercise) => applyLocalSubstitution(updatedExercise as WorkoutExercise)}
+      />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -435,17 +484,35 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
               ).length;
 
               return (
-                <button
+                <div
                   key={exercise.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   className={`w-full rounded-lg border p-3 text-left transition-colors ${
                     index === currentExerciseIndex ? "border-primary bg-primary/5" : "hover:bg-muted"
                   }`}
                   onClick={() => goToExercise(index)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      goToExercise(index);
+                    }
+                  }}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-sm font-medium">{exercise.name}</span>
                     <span className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        className="rounded-full p-0.5 text-muted-foreground hover:bg-muted-foreground/10 hover:text-primary"
+                        aria-label={`Sustituir ${exercise.name}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openSubstitution(exercise);
+                        }}
+                      >
+                        <Repeat className="h-4 w-4" />
+                      </button>
                       <button
                         type="button"
                         className="rounded-full p-0.5 text-muted-foreground hover:bg-muted-foreground/10 hover:text-primary"
@@ -465,7 +532,7 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">{done}/{exerciseSets} series</p>
-                </button>
+                </div>
               );
             })}
           </CardContent>
@@ -488,6 +555,11 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
                     <HelpCircle className="h-4 w-4" />
                   </Button>
                 </span>
+                {(currentExercise.original_name || (currentExercise.substitution_count || 0) > 0) && (
+                  <Badge variant="secondary" className="w-fit">
+                    Sustituto de {currentExercise.original_name || "ejercicio original"}
+                  </Badge>
+                )}
                 <span className="text-sm font-normal text-muted-foreground">
                   {currentExerciseDone ? "Ejercicio completado" : `Serie ${activeSetNumber} de ${targetSets} - objetivo ${targetReps} reps`}
                 </span>
@@ -575,8 +647,13 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
                     max={10}
                     value={rir}
                     onChange={(event) => setRir(event.target.value)}
-                    placeholder="Opcional"
+                    placeholder={prescribedTargetRir !== null ? String(prescribedTargetRir) : "Opcional"}
                   />
+                  {prescribedTargetRir !== null && (
+                    <p className="text-xs text-muted-foreground">
+                      Objetivo: deja aproximadamente {prescribedTargetRir} repeticiones en reserva.
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>RPE</Label>
@@ -592,6 +669,14 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  variant="outline"
+                  onClick={() => openSubstitution(currentExercise)}
+                  disabled={currentExerciseDone || currentExerciseHasLoggedSets}
+                >
+                  <Repeat className="mr-2 h-4 w-4" />
+                  Sustituir
+                </Button>
                 <Button
                   className="flex-1"
                   onClick={handleCompleteSet}
@@ -616,7 +701,7 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
                 </div>
                 <div>
                   <p className="font-semibold">{restSeconds > 0 ? formatDuration(restSeconds) : "Descanso listo"}</p>
-                  <p className="text-sm text-muted-foreground">Descanso recomendado: {DEFAULT_REST_SECONDS}s</p>
+                  <p className="text-sm text-muted-foreground">Descanso recomendado: {prescribedRestSeconds}s</p>
                 </div>
               </div>
               <div className="flex gap-2">

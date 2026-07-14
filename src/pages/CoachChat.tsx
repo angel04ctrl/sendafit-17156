@@ -47,6 +47,7 @@ interface ChatMessage {
   role: MessageRole;
   content: string;
   metadataRoutine?: RoutineMetadata | null;
+  coachActionId?: string | null;
   routineDismissed?: boolean;
 }
 
@@ -56,12 +57,18 @@ const initialMessage: ChatMessage = {
   content: "Hola, soy SendaFit AI Coach. Puedo ayudarte con entrenamiento, técnica, nutrición, recetas y suplementación. Cuéntame qué necesitas ajustar hoy.",
 };
 
-function createMessage(role: MessageRole, content: string, metadataRoutine?: RoutineMetadata | null): ChatMessage {
+function createMessage(
+  role: MessageRole,
+  content: string,
+  metadataRoutine?: RoutineMetadata | null,
+  coachActionId?: string | null,
+): ChatMessage {
   return {
     id: crypto.randomUUID(),
     role,
     content,
     metadataRoutine,
+    coachActionId,
   };
 }
 
@@ -219,12 +226,16 @@ export default function CoachChat() {
 
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || "No se pudo contactar al Coach.");
-      return data as { message: string; metadata_routine?: RoutineMetadata | null };
+      return data as {
+        message: string;
+        metadata_routine?: RoutineMetadata | null;
+        coach_action_id?: string | null;
+      };
     },
     onSuccess: (data) => {
       setMessages((current) => [
         ...current,
-        createMessage("assistant", data.message, data.metadata_routine || null),
+        createMessage("assistant", data.message, data.metadata_routine || null, data.coach_action_id || null),
       ]);
     },
     onError: (error) => {
@@ -233,9 +244,9 @@ export default function CoachChat() {
   });
 
   const applyRoutineMutation = useMutation({
-    mutationFn: async (metadataRoutine: RoutineMetadata) => {
+    mutationFn: async ({ metadataRoutine, coachActionId }: { metadataRoutine: RoutineMetadata; coachActionId?: string | null }) => {
       const { data, error } = await supabase.functions.invoke("apply-ai-routine", {
-        body: { metadata_routine: metadataRoutine },
+        body: { metadata_routine: metadataRoutine, coach_action_id: coachActionId },
       });
       if (error) throw new Error(await getFunctionErrorMessage(error));
       if (!data?.success) throw new Error(data?.error || "No se pudo aplicar la rutina.");
@@ -329,7 +340,10 @@ export default function CoachChat() {
                           size="sm"
                           className="gap-2"
                           disabled={applyRoutineMutation.isPending}
-                          onClick={() => applyRoutineMutation.mutate(message.metadataRoutine!)}
+                          onClick={() => applyRoutineMutation.mutate({
+                            metadataRoutine: message.metadataRoutine!,
+                            coachActionId: message.coachActionId,
+                          })}
                         >
                           {applyRoutineMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                           Sí, actualizar rutina

@@ -1,0 +1,47 @@
+-- Sprint 6 final exercises export after specialist curation import.
+-- Read-only.
+
+SELECT
+  id,
+  created_at,
+  nombre,
+  aliases,
+  lower(regexp_replace(trim(nombre), '\s+', ' ', 'g')) AS normalized_nombre,
+  nivel,
+  nivel_minimo,
+  grupo_muscular,
+  musculo_principal,
+  musculos_secundarios,
+  equipamiento,
+  equipo_requerido,
+  tipo_entrenamiento,
+  patron_movimiento,
+  descripcion,
+  instrucciones,
+  cues_tecnicos,
+  errores_comunes,
+  contraindicaciones,
+  sustituciones,
+  progresiones,
+  regresiones,
+  lugar,
+  objetivo,
+  series_sugeridas,
+  repeticiones_sugeridas,
+  rango_reps_min,
+  rango_reps_max,
+  descanso_segundos_min,
+  descanso_segundos_max,
+  rir_recomendado,
+  duracion_promedio_segundos,
+  calorias_por_repeticion,
+  maquina_gym,
+  imagen,
+  video,
+  estado_calidad
+FROM public.exercises
+ORDER BY
+  grupo_muscular NULLS LAST,
+  musculo_principal NULLS LAST,
+  patron_movimiento NULLS LAST,
+  nombre ASC;

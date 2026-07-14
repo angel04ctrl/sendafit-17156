@@ -34,6 +34,9 @@ import {
   saveProgressionSuggestion,
   saveWorkoutSessionSet,
   startWorkoutSession,
+  substituteWorkoutExercise,
+  moveWorkoutToDate,
+  skipWorkout,
   fetchMonthlyReport,
   redistributeWorkouts,
   validatePlanChange,
@@ -41,6 +44,9 @@ import {
   type ProgressData,
   type SaveProgressionSuggestionInput,
   type SaveWorkoutSessionSetInput,
+  type SubstituteWorkoutExerciseInput,
+  type MoveWorkoutInput,
+  type SkipWorkoutInput,
 } from '@/lib/api/backend';
 
 const getLocalDateString = () => {
@@ -314,6 +320,51 @@ export const useSaveWorkoutSessionSet = () => {
   });
 };
 
+export const useSubstituteWorkoutExercise = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: SubstituteWorkoutExerciseInput) => substituteWorkoutExercise(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['weekly-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
+      queryClient.invalidateQueries({ queryKey: ['exercise-progress-summary'] });
+    },
+  });
+};
+
+const invalidateWorkoutQueries = (queryClient: ReturnType<typeof useQueryClient>) => {
+  queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
+  queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
+  queryClient.invalidateQueries({ queryKey: ['weekly-workouts'] });
+  queryClient.invalidateQueries({ queryKey: ['weekly-calendar-workouts'] });
+  queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
+};
+
+export const useMoveWorkoutToDate = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: MoveWorkoutInput) => moveWorkoutToDate(input),
+    onSuccess: () => {
+      invalidateWorkoutQueries(queryClient);
+    },
+  });
+};
+
+export const useSkipWorkout = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: SkipWorkoutInput) => skipWorkout(input),
+    onSuccess: () => {
+      invalidateWorkoutQueries(queryClient);
+    },
+  });
+};
+
 export const useSaveProgressionSuggestion = () => {
   const queryClient = useQueryClient();
 
@@ -395,11 +446,15 @@ export const useWeeklyWorkouts = (userId: string | undefined, startDate: string)
     queryKey: ['weekly-workouts', userId, startDate],
     queryFn: async () => {
       if (!userId) return [];
+      const end = new Date(`${startDate}T00:00:00`);
+      end.setDate(end.getDate() + 6);
+      const endDate = end.toISOString().slice(0, 10);
       const { data, error } = await supabase
         .from('workouts')
         .select('*, workout_exercises(*)')
         .eq('user_id', userId)
         .gte('scheduled_date', startDate)
+        .lte('scheduled_date', endDate)
         .order('scheduled_date', { ascending: true });
       if (error) throw error;
       return data || [];

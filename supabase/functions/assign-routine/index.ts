@@ -3,6 +3,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { handleCors, isAllowedRequestOrigin, jsonResponse } from "../_shared/cors.ts";
+import { buildTrainingPlan } from "../_shared/trainingPlanner.ts";
+import { canAutomaticPlannerReplaceWorkout } from "../_shared/planIdentity.ts";
 
 const dayMap: Record<string, number> = {
   L: 1,
@@ -149,14 +151,13 @@ const scorePlan = (plan: unknown, profile: unknown): number => {
 const buildWorkoutPayload = (
   userId: string,
   selectedPlan: unknown,
-  exercisesByDay: Record<number, Record<string, unknown>[]>,
-  planDays: number[],
+  plannedDays: Record<string, unknown>[],
   selectedWeekdays: number[],
   monday: Date,
   baseDate: Date,
 ) => {
   return selectedWeekdays.map((weekday, index) => {
-    const planDay = planDays[index % planDays.length];
+    const plannedDay = plannedDays[index];
     const workoutDate = new Date(monday);
     workoutDate.setUTCDate(monday.getUTCDate() + (weekday - 1));
 
@@ -164,9 +165,9 @@ const buildWorkoutPayload = (
       workoutDate.setUTCDate(workoutDate.getUTCDate() + 7);
     }
 
-    const dayExercises = exercisesByDay[planDay] || [];
+    const dayExercises = plannedDay?.exercises || [];
     const estimatedCalories = dayExercises.reduce((total: number, pe: unknown) => {
-      const exercise = pe.exercises;
+      const exercise = pe.exercises || pe;
       if (!exercise) return total;
       const caloriesPerRep = exercise.calorias_por_repeticion || 0;
       const reps = exercise.repeticiones_sugeridas || 10;
@@ -174,7 +175,7 @@ const buildWorkoutPayload = (
       return total + caloriesPerRep * reps * sets;
     }, 0);
 
-    const muscleGroup = dayExercises[0]?.exercises?.grupo_muscular || "General";
+    const muscleGroup = plannedDay?.name || dayExercises[0]?.grupo_muscular || "General";
 
     return {
       user_id: userId,
@@ -184,13 +185,70 @@ const buildWorkoutPayload = (
       weekday,
       plan_id: selectedPlan.id,
       location: normalizeLocation(selectedPlan.lugar),
-      duration_minutes: dayExercises.length * 5,
+      duration_minutes: plannedDay?.estimatedDurationMinutes || dayExercises.length * 5,
       estimated_calories: Math.round(estimatedCalories),
       completed: false,
       tipo: "automatico",
+      plan_source: "planner",
+      is_protected: false,
       exercises: dayExercises,
     };
   });
+};
+
+const findReplaceableAutomaticWorkouts = async (
+  supabase: unknown,
+  userId: string,
+  fromDate: string,
+) => {
+  const { data: oldWorkouts, error } = await supabase
+    .from("workouts")
+    .select("id, scheduled_date, tipo, plan_source, is_protected, completed")
+    .eq("user_id", userId)
+    .eq("tipo", "automatico")
+    .gte("scheduled_date", fromDate);
+
+  if (error) return { ids: [], blocked: [], error };
+
+  const protectedIds = (oldWorkouts || [])
+    .filter((workout: unknown) => !canAutomaticPlannerReplaceWorkout(workout))
+    .map((workout: unknown) => workout.id);
+  const ids = (oldWorkouts || [])
+    .filter((workout: unknown) => canAutomaticPlannerReplaceWorkout(workout))
+    .map((workout: unknown) => workout.id);
+  if (ids.length === 0) return { ids: [], blocked: [], error: null };
+
+  const { data: sessions, error: sessionsError } = await supabase
+    .from("workout_sessions")
+    .select("workout_id, status")
+    .in("workout_id", ids);
+
+  if (sessionsError) return { ids: [], blocked: [], error: sessionsError };
+
+  const blocked = [...new Set((sessions || []).map((session: unknown) => session.workout_id))];
+  return {
+    ids: ids.filter((id: string) => !blocked.includes(id)),
+    blocked: [...new Set([...protectedIds, ...blocked])],
+    error: null,
+  };
+};
+
+const deleteWorkoutTree = async (supabase: unknown, workoutIds: string[]) => {
+  if (workoutIds.length === 0) return null;
+
+  const { error: exercisesError } = await supabase
+    .from("workout_exercises")
+    .delete()
+    .in("workout_id", workoutIds);
+
+  if (exercisesError) return exercisesError;
+
+  const { error: workoutsError } = await supabase
+    .from("workouts")
+    .delete()
+    .in("id", workoutIds);
+
+  return workoutsError || null;
 };
 
 serve(async (req) => {
@@ -251,6 +309,7 @@ serve(async (req) => {
         error: "No valid training weekdays configured",
       });
     }
+    const expectedTrainingDayCount = Math.min(selectedWeekdays.length, 6);
 
     const { data: plans, error: plansError } = await supabase
       .from("predesigned_plans")
@@ -301,9 +360,19 @@ serve(async (req) => {
         fallbackExercisesByDay = candidateExercisesByDay;
       }
 
-      if (candidatePlanDays.length === selectedWeekdays.length) {
+      if (candidatePlanDays.length > 0) {
         selectedPlan = plan;
         exercisesByDay = candidateExercisesByDay;
+        if (candidatePlanDays.length !== expectedTrainingDayCount) {
+          lastCoverageFailure = {
+            plan_id: plan.id,
+            plan_name: plan.nombre_plan,
+            selected_weekdays_count: selectedWeekdays.length,
+            expected_training_day_count: expectedTrainingDayCount,
+            available_plan_days: candidatePlanDays,
+            planner_remapped_split: true,
+          };
+        }
         break;
       }
 
@@ -350,29 +419,60 @@ serve(async (req) => {
         });
     }
 
-    const { error: deleteError } = await supabase
-      .from("workouts")
-      .delete()
-      .eq("user_id", user.id)
-      .eq("tipo", "automatico")
-      .eq("completed", false)
-      .gte("scheduled_date", userLocalDate);
+    const { data: exerciseCatalog, error: exerciseCatalogError } = await supabase
+      .from("exercises")
+      .select("*")
+      .in("estado_calidad", ["curado", "revisar"]);
 
-    if (deleteError) {
-      return jsonResponse(req, { error: "Failed to delete old workouts", details: deleteError }, 500);
+    if (exerciseCatalogError || !exerciseCatalog?.length) {
+      return jsonResponse(req, {
+          error: "No exercise catalog available for planner",
+          details: exerciseCatalogError,
+        }, 500);
+    }
+
+    const professionalPlan = buildTrainingPlan({
+      profile,
+      selectedWeekdays,
+      exercises: exerciseCatalog,
+    });
+    const trainingWeekdays = professionalPlan.trainingWeekdays;
+    const insufficientPlan = professionalPlan.warnings.some((warning: string) =>
+      warning.includes("planner_insufficient_compatible_exercises")
+    ) || professionalPlan.days.some((day: unknown) => !day.exercises?.length);
+
+    if (insufficientPlan) {
+      return jsonResponse(req, {
+          error: "planner_insufficient_compatible_exercises",
+          warnings: professionalPlan.warnings,
+          message: "No se pudo construir una semana completa sin relajar restricciones criticas de seguridad, nivel o equipo.",
+        }, 409);
+    }
+
+    const replaceable = await findReplaceableAutomaticWorkouts(supabase, user.id, userLocalDate);
+    if (replaceable.error) {
+      return jsonResponse(req, { error: "Failed to inspect old automatic workouts", details: replaceable.error }, 500);
+    }
+    if (replaceable.blocked.length > 0) {
+      return jsonResponse(req, {
+          error: "active_or_historical_sessions_block_assignment",
+          message: "Hay sesiones registradas en entrenamientos que se intentaban reemplazar. No se borro historial ni sesiones activas.",
+          blocked_workout_ids: replaceable.blocked,
+        }, 409);
     }
 
     const workoutsToCreate = buildWorkoutPayload(
       user.id,
       selectedPlan,
-      exercisesByDay,
-      Object.keys(exercisesByDay).map(Number).sort((a, b) => a - b),
-      selectedWeekdays,
+      professionalPlan.days,
+      trainingWeekdays,
       monday,
       baseDate,
     );
 
     const createdWorkouts = [];
+    let lastError: unknown = null;
+    let createdExerciseRows = 0;
     for (const workoutData of workoutsToCreate) {
       const { exercises, ...workoutInsertData } = workoutData;
 
@@ -383,20 +483,26 @@ serve(async (req) => {
         .single();
 
       if (workoutError) {
+        lastError = workoutError;
         console.error("Error creating workout:", workoutError);
         continue;
       }
 
       const workoutExercises = exercises
-        .filter((pe: unknown) => pe.exercises?.nombre)
-        .map((pe: unknown) => {
-          const exercise = pe.exercises;
+        .map((pe: unknown) => pe.exercises || pe)
+        .filter((exercise: unknown) => exercise?.nombre)
+        .map((pe: unknown, index: number) => {
+          const exercise = pe;
+          const exerciseType = String(exercise.tipo_entrenamiento || "").toLowerCase();
           return {
             workout_id: workout.id,
             exercise_id: exercise.id,
             name: exercise.nombre,
             sets: exercise.series_sugeridas || 3,
             reps: exercise.repeticiones_sugeridas || 10,
+            rest_seconds: exercise.descanso_segundos_max || exercise.descanso_segundos_min || null,
+            target_rir: exerciseType.includes("cardio") ? null : exercise.rir_recomendado ?? 2,
+            order_index: index + 1,
             notes: `${exercise.grupo_muscular || "General"} - ${exercise.nivel || "B"}`,
             duration_minutes: exercise.duracion_promedio_segundos
               ? Math.ceil(exercise.duracion_promedio_segundos / 60)
@@ -410,14 +516,18 @@ serve(async (req) => {
           .insert(workoutExercises);
 
         if (exercisesError) {
+          lastError = exercisesError;
           console.error("Error adding exercises to workout:", workout.id, exercisesError);
+          break;
         }
+        createdExerciseRows += workoutExercises.length;
       }
 
       createdWorkouts.push(workout);
     }
 
-    if (createdWorkouts.length !== workoutsToCreate.length) {
+    if (createdWorkouts.length !== workoutsToCreate.length || createdExerciseRows === 0) {
+      const cleanupError = await deleteWorkoutTree(supabase, createdWorkouts.map((workout: unknown) => workout.id));
       await supabase
         .from("profiles")
         .update({
@@ -429,9 +539,17 @@ serve(async (req) => {
 
       return jsonResponse(req, {
           error: "Failed to create all workouts",
+          details: lastError,
+          cleanup_error: cleanupError,
           workouts_created: createdWorkouts.length,
           workouts_expected: workoutsToCreate.length,
         }, 500);
+    }
+
+    const deleteError = await deleteWorkoutTree(supabase, replaceable.ids);
+    if (deleteError) {
+      await deleteWorkoutTree(supabase, createdWorkouts.map((workout: unknown) => workout.id));
+      return jsonResponse(req, { error: "Failed to replace old automatic workouts", details: deleteError }, 500);
     }
 
     const { error: updateError } = await supabase
@@ -454,7 +572,17 @@ serve(async (req) => {
         message: `Routine assigned successfully: ${selectedPlan.nombre_plan}`,
         plan: selectedPlan,
         workouts_created: createdWorkouts.length,
-        training_weekdays: selectedWeekdays,
+        workouts_deleted: replaceable.ids.length,
+        training_weekdays: trainingWeekdays,
+        planner: {
+          split: professionalPlan.split,
+          rest_day: professionalPlan.restDay,
+          target_duration_minutes: professionalPlan.targetDurationMinutes,
+          equipment_mode: professionalPlan.equipmentMode,
+          muscle_stats: professionalPlan.muscleStats,
+          warnings: professionalPlan.warnings,
+          explanation: professionalPlan.explanation,
+        },
       });
   } catch (error) {
     console.error("Error in assign-routine:", error);

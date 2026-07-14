@@ -1,0 +1,45 @@
+-- Sprint 6.1.3 final exercise export.
+-- Run after applying 20260703000000_sprint6_1_3_exercise_coverage_expansion.sql.
+
+SELECT
+  id,
+  nombre,
+  aliases,
+  nivel,
+  nivel_minimo,
+  grupo_muscular,
+  musculo_principal,
+  musculos_secundarios,
+  equipamiento,
+  equipo_requerido,
+  lugar,
+  objetivo,
+  tipo_entrenamiento,
+  patron_movimiento,
+  descripcion,
+  instrucciones,
+  cues_tecnicos,
+  errores_comunes,
+  contraindicaciones,
+  sustituciones,
+  progresiones,
+  regresiones,
+  series_sugeridas,
+  repeticiones_sugeridas,
+  rango_reps_min,
+  rango_reps_max,
+  descanso_segundos_min,
+  descanso_segundos_max,
+  rir_recomendado,
+  duracion_promedio_segundos,
+  calorias_por_repeticion,
+  maquina_gym,
+  imagen,
+  video,
+  estado_calidad,
+  created_at
+FROM public.exercises
+ORDER BY
+  grupo_muscular NULLS LAST,
+  musculo_principal NULLS LAST,
+  nombre ASC;

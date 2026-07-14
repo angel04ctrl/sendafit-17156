@@ -72,6 +72,9 @@ serve(async (req: Request) => {
     const updateData: unknown = {
       completed,
       completed_at: completed ? new Date().toISOString() : null,
+      skipped: completed ? false : workout.skipped,
+      skipped_at: completed ? null : workout.skipped_at,
+      skip_reason: completed ? null : workout.skip_reason,
     };
 
     const { data: updatedWorkout, error: updateError } = await supabase

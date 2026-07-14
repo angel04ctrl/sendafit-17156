@@ -27,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, CheckCircle2, Circle, Trash2, ChevronDown, Scan, Library, HelpCircle, Dumbbell, CalendarDays, Timer, Flame, PlayCircle } from "lucide-react";
+import { Plus, CheckCircle2, Circle, Trash2, ChevronDown, Scan, Library, HelpCircle, Dumbbell, CalendarDays, Timer, Flame, PlayCircle, Repeat } from "lucide-react";
 import { toast } from "sonner";
 import { AddExerciseDialog, type ConfiguredExercise } from "@/components/AddExerciseDialog";
 import { 
@@ -43,10 +43,12 @@ import {
 } from "@/hooks/useBackendApi";
 import { ProButton } from "@/components/ProButton";
 import { ExerciseDetailModal } from "@/components/ExerciseDetailModal";
+import { ExerciseSubstitutionDialog } from "@/components/ExerciseSubstitutionDialog";
 import { GymMachineScanner } from "@/components/ai/GymMachineScanner";
 import { RoutineManager } from "@/components/RoutineManager";
 import { ActiveWorkout } from "@/components/ActiveWorkout";
-import { format } from "date-fns";
+import { AdaptiveWorkoutActions } from "@/components/AdaptiveWorkoutActions";
+import { format, startOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import { getActiveWorkoutSession, type WorkoutSession } from "@/lib/api/backend";
 
@@ -65,7 +67,7 @@ const getLocationLabel = (location?: string | null) => {
   return locationLabels[location] || location;
 };
 
-const WorkoutList = ({ workouts, emptyTitle = "No hay entrenamientos", emptyActionLabel, onEmptyAction, completingWorkout, handleCompleteWorkout, handleStartWorkout, handleDeleteWorkout, handleShowExerciseDetails }: {
+const WorkoutList = ({ workouts, emptyTitle = "No hay entrenamientos", emptyActionLabel, onEmptyAction, completingWorkout, handleCompleteWorkout, handleStartWorkout, handleDeleteWorkout, handleShowExerciseDetails, handleSubstituteExercise }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   workouts: any[]; 
   emptyTitle?: string;
@@ -77,6 +79,8 @@ const WorkoutList = ({ workouts, emptyTitle = "No hay entrenamientos", emptyActi
   handleStartWorkout: (workout: any) => void;
   handleDeleteWorkout: (id: string) => void;
   handleShowExerciseDetails: (exerciseName: string) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  handleSubstituteExercise: (workout: any, exercise: any) => void;
 }) => (
   <div className="space-y-2 sm:space-y-3">
     {workouts.length === 0 ? (
@@ -155,6 +159,16 @@ const WorkoutList = ({ workouts, emptyTitle = "No hay entrenamientos", emptyActi
                       >
                         <HelpCircle className="h-4 w-4 text-blue-500" />
                       </button>
+                      {!workout.completed && (
+                        <button
+                          type="button"
+                          className="shrink-0 rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          aria-label={`Sustituir ${exercise.name}`}
+                          onClick={() => handleSubstituteExercise(workout, exercise)}
+                        >
+                          <Repeat className="h-4 w-4" />
+                        </button>
+                      )}
                     </span>
                     <span className="text-muted-foreground font-medium shrink-0 bg-background px-2 py-0.5 rounded shadow-sm border">
                       {exercise.sets} x {exercise.reps}
@@ -196,8 +210,9 @@ const Workouts = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   
   const todayDateString = getTodayDate();
+  const weekStartDateString = format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
   const { data: profile } = useUserProfile(user?.id);
-  const { data: upcomingWorkouts = [] } = useWeeklyWorkouts(user?.id, todayDateString);
+  const { data: upcomingWorkouts = [] } = useWeeklyWorkouts(user?.id, weekStartDateString);
   const { data: allWorkoutsData } = useAllWorkouts({ include_completed: true });
   const { data: todaysData } = useTodaysWorkouts();
   
@@ -213,8 +228,12 @@ const Workouts = () => {
   const [addExerciseOpen, setAddExerciseOpen] = useState(false);
   const [exerciseDetailOpen, setExerciseDetailOpen] = useState(false);
   const [machineScannerOpen, setMachineScannerOpen] = useState(false);
+  const [substitutionOpen, setSubstitutionOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [selectedExercise, setSelectedExercise] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [workoutExerciseToSubstitute, setWorkoutExerciseToSubstitute] = useState<any | null>(null);
+  const [substitutionWorkoutLocation, setSubstitutionWorkoutLocation] = useState<string | null>(null);
   const [otherDaysOpen, setOtherDaysOpen] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -273,6 +292,13 @@ const Workouts = () => {
 
     setSelectedExercise(data);
     setExerciseDetailOpen(true);
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleSubstituteExercise = (workout: any, exercise: any) => {
+    setWorkoutExerciseToSubstitute(exercise);
+    setSubstitutionWorkoutLocation(workout.location || null);
+    setSubstitutionOpen(true);
   };
 
   const getTotalCalories = () => {
@@ -392,7 +418,7 @@ const Workouts = () => {
   const today = todayDateString;
   
   // Use backend data for today's workouts
-  const todayWorkouts = todaysData?.workouts || [];
+  const todayWorkouts = (todaysData?.workouts || []).filter((workout) => workout.skipped !== true);
 
   useEffect(() => {
     if (!user?.id || !profile?.assigned_routine_id || repairAttemptedRef.current) return;
@@ -456,6 +482,15 @@ const Workouts = () => {
     return groups;
   }, {});
   const weeklyDates = Object.keys(weeklyWorkoutsByDate).sort();
+  const weeklyStats = {
+    planned: upcomingWorkouts.length,
+    completed: upcomingWorkouts.filter((workout) => workout.completed).length,
+    skipped: upcomingWorkouts.filter((workout) => workout.skipped).length,
+    pending: upcomingWorkouts.filter((workout) => !workout.completed && !workout.skipped).length,
+  };
+  const weeklyCompletion = weeklyStats.planned > 0
+    ? Math.round((weeklyStats.completed / weeklyStats.planned) * 100)
+    : 0;
 
   if (activeWorkout && activeSession) {
     return (
@@ -666,6 +701,13 @@ const Workouts = () => {
             exercise={selectedExercise}
           />
 
+          <ExerciseSubstitutionDialog
+            open={substitutionOpen}
+            onOpenChange={setSubstitutionOpen}
+            workoutExercise={workoutExerciseToSubstitute}
+            workoutLocation={substitutionWorkoutLocation}
+          />
+
           <GymMachineScanner
             open={machineScannerOpen}
             onOpenChange={setMachineScannerOpen}
@@ -701,6 +743,7 @@ const Workouts = () => {
                     handleStartWorkout={handleStartWorkout}
                     handleDeleteWorkout={handleDeleteWorkout}
                     handleShowExerciseDetails={handleShowExerciseDetails}
+                    handleSubstituteExercise={handleSubstituteExercise}
                   />
                 </TabsContent>
                 <TabsContent value="casa" className="mt-3 sm:mt-4">
@@ -714,6 +757,7 @@ const Workouts = () => {
                     handleStartWorkout={handleStartWorkout}
                     handleDeleteWorkout={handleDeleteWorkout}
                     handleShowExerciseDetails={handleShowExerciseDetails}
+                    handleSubstituteExercise={handleSubstituteExercise}
                   />
                 </TabsContent>
                 <TabsContent value="gimnasio" className="mt-3 sm:mt-4">
@@ -727,6 +771,7 @@ const Workouts = () => {
                     handleStartWorkout={handleStartWorkout}
                     handleDeleteWorkout={handleDeleteWorkout}
                     handleShowExerciseDetails={handleShowExerciseDetails}
+                    handleSubstituteExercise={handleSubstituteExercise}
                   />
                 </TabsContent>
                 <TabsContent value="calistenia" className="mt-3 sm:mt-4">
@@ -740,6 +785,7 @@ const Workouts = () => {
                     handleStartWorkout={handleStartWorkout}
                     handleDeleteWorkout={handleDeleteWorkout}
                     handleShowExerciseDetails={handleShowExerciseDetails}
+                    handleSubstituteExercise={handleSubstituteExercise}
                   />
                 </TabsContent>
               </Tabs>
@@ -821,6 +867,36 @@ const Workouts = () => {
             </TabsContent>
 
             <TabsContent value="semana" className="space-y-3">
+              {weeklyStats.planned > 0 && (
+                <Card className="p-3 sm:p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="font-semibold">Progreso semanal</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {weeklyCompletion}% completado esta semana
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 text-center text-xs sm:min-w-[420px]">
+                      <div className="rounded-lg bg-muted p-2">
+                        <p className="text-muted-foreground">Plan</p>
+                        <p className="text-lg font-bold">{weeklyStats.planned}</p>
+                      </div>
+                      <div className="rounded-lg bg-primary/10 p-2">
+                        <p className="text-muted-foreground">Listos</p>
+                        <p className="text-lg font-bold text-primary">{weeklyStats.completed}</p>
+                      </div>
+                      <div className="rounded-lg bg-amber-50 p-2">
+                        <p className="text-muted-foreground">Saltados</p>
+                        <p className="text-lg font-bold text-amber-700">{weeklyStats.skipped}</p>
+                      </div>
+                      <div className="rounded-lg bg-muted p-2">
+                        <p className="text-muted-foreground">Pendientes</p>
+                        <p className="text-lg font-bold">{weeklyStats.pending}</p>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
               {weeklyDates.length === 0 ? (
                 <Card className="p-6 text-center">
                   <CalendarDays className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
@@ -850,9 +926,14 @@ const Workouts = () => {
                     </div>
                     <div className="space-y-2">
                       {weeklyWorkoutsByDate[date].map((workout) => (
-                        <div key={workout.id} className="flex items-center justify-between gap-3 rounded-lg bg-muted/60 p-3">
+                        <div key={workout.id} className="flex flex-col gap-3 rounded-lg bg-muted/60 p-3 sm:flex-row sm:items-center sm:justify-between">
                           <div className="flex min-w-0 items-center gap-2">
-                            <button onClick={() => handleCompleteWorkout(workout.id, workout.completed)}>
+                            <button
+                              onClick={() => handleCompleteWorkout(workout.id, workout.completed)}
+                              disabled={workout.skipped}
+                              className="disabled:cursor-not-allowed disabled:opacity-40"
+                              aria-label={workout.completed ? "Marcar pendiente" : "Marcar completado"}
+                            >
                               {workout.completed ? (
                                 <CheckCircle2 className="w-5 h-5 text-primary" />
                               ) : (
@@ -860,15 +941,23 @@ const Workouts = () => {
                               )}
                             </button>
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-medium">{workout.name}</p>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className={`truncate text-sm font-medium ${workout.skipped ? "text-muted-foreground line-through" : ""}`}>
+                                  {workout.name}
+                                </p>
+                                {workout.skipped && <Badge variant="secondary">Saltado</Badge>}
+                                {workout.rescheduled_from && <Badge variant="outline">Movido</Badge>}
+                              </div>
                               <p className="text-xs text-muted-foreground">
                                 {workout.duration_minutes} min - {workout.estimated_calories} kcal - {getLocationLabel(workout.location)}
                               </p>
                             </div>
                           </div>
-                          <Button variant="ghost" size="sm" onClick={() => handleStartWorkout(workout)}>
-                            Abrir
-                          </Button>
+                          <AdaptiveWorkoutActions
+                            workout={workout}
+                            weekWorkouts={upcomingWorkouts}
+                            onStartWorkout={() => handleStartWorkout(workout)}
+                          />
                         </div>
                       ))}
                     </div>

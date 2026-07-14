@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { buildTrainingPlan } from "../_shared/trainingPlanner.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -86,7 +87,26 @@ serve(async (req) => {
       );
     }
 
-    // Get the exercises for the plan
+    const selectedDays = profile.available_weekdays as string[] || [];
+    const selectedWeekdays = selectedDays
+      .map((dayCode) => dayMap[dayCode])
+      .filter((weekday) => Number.isInteger(weekday))
+      .sort((a, b) => a - b);
+    const { data: exerciseCatalog, error: exerciseCatalogError } = await supabase
+      .from('exercises')
+      .select('*')
+      .in('estado_calidad', ['curado', 'revisar']);
+
+    const professionalPlan = !exerciseCatalogError && exerciseCatalog?.length
+      ? buildTrainingPlan({
+          profile,
+          selectedWeekdays,
+          exercises: exerciseCatalog,
+        })
+      : null;
+    const trainingWeekdays = professionalPlan?.trainingWeekdays || selectedWeekdays.slice(0, 6);
+
+    // Get the exercises for the plan as a compatibility fallback
     const { data: planExercises, error: exercisesError } = await supabase
       .from('plan_ejercicios')
       .select('*, exercises:ejercicio_id(*)')
@@ -112,17 +132,12 @@ serve(async (req) => {
     });
 
     // Map ordered plan slots to ordered user selected weekdays without modulo rotation.
-    const selectedDays = profile.available_weekdays as string[] || [];
     const planDays = Object.keys(exercisesByPlanDay).map(Number).sort((a, b) => a - b);
-    const selectedWeekdays = selectedDays
-      .map((dayCode) => dayMap[dayCode])
-      .filter((weekday) => Number.isInteger(weekday))
-      .sort((a, b) => a - b);
     
     // Create mapping: actual weekday number -> exercises
     const mappedDays: { [key: number]: Record<string, unknown>[] } = {};
     const missingPlanDays: number[] = [];
-    selectedWeekdays.forEach((weekday, index) => {
+    trainingWeekdays.forEach((weekday, index) => {
       const planDay = planDays[index];
 
       if (planDay && exercisesByPlanDay[planDay]?.length) {
@@ -132,12 +147,34 @@ serve(async (req) => {
       }
     });
 
+    const professionalMappedDays: { [key: number]: Record<string, unknown>[] } = {};
+    professionalPlan?.days.forEach((day) => {
+      professionalMappedDays[day.weekday] = day.exercises;
+    });
+
     // Structure the routine object with mapped days
     const routine = {
       ...plan,
-      days: mappedDays,
+      days: Object.keys(professionalMappedDays).length > 0 ? professionalMappedDays : mappedDays,
       missing_plan_days: missingPlanDays,
       available_plan_days: planDays,
+      planner: professionalPlan ? {
+        split: professionalPlan.split,
+        goal: professionalPlan.goal,
+        rest_day: professionalPlan.restDay,
+        target_duration_minutes: professionalPlan.targetDurationMinutes,
+        equipment_mode: professionalPlan.equipmentMode,
+        muscle_stats: professionalPlan.muscleStats,
+        warnings: professionalPlan.warnings,
+        explanation: professionalPlan.explanation,
+        day_summaries: professionalPlan.days.map((day) => ({
+          weekday: day.weekday,
+          name: day.name,
+          focus: day.focus,
+          estimated_duration_minutes: day.estimatedDurationMinutes,
+          exercise_count: day.exercises.length,
+        })),
+      } : null,
     };
 
     console.log(`Retrieved routine '${plan.nombre_plan}' for user ${user.id}`);
@@ -148,6 +185,8 @@ serve(async (req) => {
         profile: {
           fitness_level: profile.fitness_level,
           fitness_goal: profile.fitness_goal,
+          session_duration_minutes: profile.session_duration_minutes,
+          training_types: profile.training_types,
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -9,22 +9,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Tables } from "@/integrations/supabase/types";
 import { HelpCircle } from "lucide-react";
 import { ExerciseDetailModal } from "@/components/ExerciseDetailModal";
+import { canAccessExerciseLevel, exerciseLevelOrder, formatExerciseLevel } from "@/lib/exerciseMetadata";
 
-interface Exercise {
-  id: string;
-  nombre: string;
-  descripcion: string;
-  grupo_muscular: string;
-  lugar: string;
-  nivel: string;
-  tipo_entrenamiento: string;
-  calorias_por_repeticion?: number;
-  video?: string | null;
-  imagen?: string | null;
-  series_sugeridas?: number | null;
-  repeticiones_sugeridas?: number | null;
-  equipamiento?: string | null;
-}
+type Exercise = Tables<"exercises">;
+
+const normalizeSearchText = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 
 export interface ConfiguredExercise {
   exercise: Exercise;
@@ -58,7 +52,7 @@ export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location 
   const [exerciseDetailOpen, setExerciseDetailOpen] = useState(false);
 
   const fetchExercises = useCallback(async () => {
-    // Traer TODOS los ejercicios sin filtrar por ubicación
+    // Traer todos los ejercicios sin filtrar por ubicación.
     const { data } = await sb
       .from("exercises")
       .select("*")
@@ -126,24 +120,20 @@ export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location 
 
   // Filtrar ejercicios basado en búsqueda y filtros
   const filteredExercises = exercises.filter((exercise) => {
-    const matchesSearch = exercise.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         exercise.descripcion.toLowerCase().includes(searchTerm.toLowerCase());
+    const normalizedSearchTerm = normalizeSearchText(searchTerm);
+    const searchableText = normalizeSearchText([
+      exercise.nombre,
+      exercise.descripcion,
+      exercise.grupo_muscular,
+      exercise.musculo_principal || "",
+      exercise.patron_movimiento || "",
+      ...(exercise.aliases || []),
+      ...(exercise.equipo_requerido || []),
+    ].join(" "));
+    const matchesSearch = normalizedSearchTerm === "" || searchableText.includes(normalizedSearchTerm);
     const matchesMuscleGroup = !muscleGroupFilter || muscleGroupFilter === "all" || exercise.grupo_muscular === muscleGroupFilter;
     
-    // Lógica de nivel: La base de datos usa nombres completos
-    // Principiante: solo ejercicios marcados como "Principiante"
-    // Intermedio: ejercicios "Principiante" + "Intermedio"
-    // Avanzado: todos los ejercicios ("Principiante" + "Intermedio" + "Avanzado")
-    let matchesLevel = true;
-    if (levelFilter && levelFilter !== "all") {
-      if (levelFilter === "Principiante") {
-        matchesLevel = exercise.nivel === "Principiante";
-      } else if (levelFilter === "Intermedio") {
-        matchesLevel = exercise.nivel === "Principiante" || exercise.nivel === "Intermedio";
-      } else if (levelFilter === "Avanzado") {
-        matchesLevel = exercise.nivel === "Principiante" || exercise.nivel === "Intermedio" || exercise.nivel === "Avanzado";
-      }
-    }
+    const matchesLevel = canAccessExerciseLevel(exercise.nivel_minimo || exercise.nivel, levelFilter);
     
     const matchesType = !typeFilter || typeFilter === "all" || exercise.tipo_entrenamiento === typeFilter;
     
@@ -152,7 +142,7 @@ export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location 
 
   // Obtener valores únicos para los filtros
   const uniqueMuscleGroups = Array.from(new Set(exercises.map(e => e.grupo_muscular))).sort();
-  const uniqueLevels = Array.from(new Set(exercises.map(e => e.nivel))).sort();
+  const uniqueLevels = exerciseLevelOrder;
   const uniqueTypes = Array.from(new Set(exercises.map(e => e.tipo_entrenamiento))).sort();
 
   const handleAdd = () => {
@@ -225,7 +215,7 @@ export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location 
                   <SelectItem value="all">Todos</SelectItem>
                   {uniqueLevels.map((level) => (
                     <SelectItem key={level} value={level}>
-                      {level}
+                      {formatExerciseLevel(level)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -281,7 +271,7 @@ export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location 
                   <button
                     type="button"
                     className="shrink-0 rounded-full p-0.5 text-blue-500 transition-colors hover:bg-blue-500/10 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                    aria-label={`Ver informacion de ${selectedExercise.nombre}`}
+                    aria-label={`Ver información de ${selectedExercise.nombre}`}
                     onClick={() => setExerciseDetailOpen(true)}
                   >
                     <HelpCircle className="h-4 w-4 text-blue-500" />
@@ -328,12 +318,12 @@ export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location 
               )}
 
               <div className="p-4 bg-primary/10 rounded-lg">
-                <p className="text-sm font-medium mb-1">Calorías Estimadas</p>
+                <p className="text-sm font-medium mb-1">Calorías estimadas</p>
                 <p className="text-2xl font-bold text-primary">{estimatedCalories} kcal</p>
               </div>
 
               <Button onClick={handleAdd} className="w-full">
-                Agregar Ejercicio
+                Agregar ejercicio
               </Button>
             </>
           )}

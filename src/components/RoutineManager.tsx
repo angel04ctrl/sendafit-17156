@@ -11,13 +11,20 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Dumbbell, TrendingUp, ChevronDown } from "lucide-react";
+import { AlertTriangle, BarChart3, Clock, Dumbbell, Info, Loader2, TrendingUp, ChevronDown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   useUserRoutine,
   useProgressStats
 } from "@/hooks/useBackendApi";
 import { planDayToName } from "@/lib/dayMapping";
+import { formatExerciseLevel } from "@/lib/exerciseMetadata";
+import {
+  formatEquipmentMode,
+  formatVolumeStatus,
+  getVolumeStatusClassName,
+  type RoutinePlannerSummary,
+} from "@/lib/trainingPlanner";
 
 export function RoutineManager() {
   // Hook para obtener la rutina asignada al usuario
@@ -25,6 +32,8 @@ export function RoutineManager() {
   
   // Hook para obtener estadísticas de progreso (últimos 30 días)
   const { data: statsData } = useProgressStats(30);
+  const planner = routineData?.routine?.planner as RoutinePlannerSummary | null | undefined;
+  const muscleStats = planner?.muscle_stats || [];
 
   // Mostrar spinner de carga mientras se obtiene la rutina
   if (isLoadingRoutine) {
@@ -104,7 +113,7 @@ export function RoutineManager() {
                 </div>
                 <div className="text-right">
                   <Badge variant="secondary" className="text-xs shrink-0 mb-1">{routineData.routine.lugar}</Badge>
-                  <Badge variant="outline" className="text-xs shrink-0 capitalize">{routineData.routine.nivel}</Badge>
+                  <Badge variant="outline" className="text-xs shrink-0">{formatExerciseLevel(routineData.routine.nivel)}</Badge>
                 </div>
               </div>
             </CardHeader>
@@ -112,7 +121,7 @@ export function RoutineManager() {
               <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm shrink-0">
                 <div>
                   <span className="text-muted-foreground">Objetivo:</span>
-                  <span className="ml-2 font-medium capitalize">{routineData.routine.objetivo?.replace('_', ' ')}</span>
+                  <span className="ml-2 font-medium capitalize">{planner?.goal || routineData.routine.objetivo?.replace('_', ' ')}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Frecuencia:</span>
@@ -121,9 +130,90 @@ export function RoutineManager() {
               </div>
 
               {/* Bloque de distribución semanal - Lista de ejercicios por día colapsables */}
+              {planner && (
+                <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <div className="flex items-start gap-2">
+                      <BarChart3 className="mt-0.5 h-4 w-4 text-primary shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">Split</p>
+                        <p className="text-sm font-medium truncate">{planner.split?.name || "Estructura personalizada"}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Clock className="mt-0.5 h-4 w-4 text-primary shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">Duracion</p>
+                        <p className="text-sm font-medium">{planner.target_duration_minutes || 60} min/sesion</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Dumbbell className="mt-0.5 h-4 w-4 text-primary shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">Equipo</p>
+                        <p className="text-sm font-medium">{formatEquipmentMode(planner.equipment_mode)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {planner.explanation && (
+                    <div className="flex items-start gap-2 text-xs sm:text-sm text-muted-foreground">
+                      <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                      <p>{planner.explanation}</p>
+                    </div>
+                  )}
+
+                  {planner.rest_day && (
+                    <div className="rounded-md border border-sky-200 bg-sky-50 p-2 text-xs sm:text-sm text-sky-900">
+                      <p className="font-medium">Dia de descanso programado: {planner.rest_day.name}</p>
+                      <p className="mt-1 text-sky-800">
+                        Seleccionaste disponibilidad toda la semana. SendaFit reservo un dia de descanso para favorecer la recuperacion entre sesiones.
+                      </p>
+                    </div>
+                  )}
+
+                  {planner.warnings && planner.warnings.length > 0 && (
+                    <div className="space-y-1">
+                      {planner.warnings.map((warning) => (
+                        <div key={warning} className="flex items-start gap-2 text-xs text-amber-700">
+                          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span>{warning}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {muscleStats.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm sm:text-base">Frecuencia y volumen semanal:</h4>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {muscleStats.slice(0, 8).map((stat) => (
+                      <div key={stat.muscle} className="rounded-md border p-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium capitalize truncate">{stat.muscle}</span>
+                          <Badge variant="outline" className={`text-[10px] ${getVolumeStatusClassName(stat.status)}`}>
+                            {formatVolumeStatus(stat.status)}
+                          </Badge>
+                        </div>
+                        <div className="mt-1 grid grid-cols-3 gap-1 text-[11px] text-muted-foreground">
+                          <span>Frec. {stat.frequency}x</span>
+                          <span>{stat.directSets} directas</span>
+                          <span>{stat.indirectSets} indirectas</span>
+                        </div>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {stat.totalSets} series equivalentes totales
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {routineData.routine.days && Object.keys(routineData.routine.days).length > 0 ? (
                 <div className="space-y-2">
-                  <h4 className="font-semibold text-sm sm:text-base shrink-0">Distribución Semanal:</h4>
+                  <h4 className="font-semibold text-sm sm:text-base shrink-0">Distribucion semanal:</h4>
                   <div className="space-y-2">
                     {/* Mapear cada día de la semana con sus ejercicios */}
                     {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}

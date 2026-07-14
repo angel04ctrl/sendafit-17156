@@ -110,7 +110,8 @@ serve(async (req) => {
         .select(`*, workout_exercises (*)`)
         .eq('user_id', user.id)
         .eq('scheduled_date', todayDate)
-        .eq('tipo', 'automatico');
+        .eq('tipo', 'automatico')
+        .eq('skipped', false);
 
       // Filter by current plan if user has one
       if (profile?.assigned_routine_id) {
@@ -136,6 +137,7 @@ serve(async (req) => {
       .eq('user_id', user.id)
       .eq('scheduled_date', todayDate)
       .eq('tipo', 'manual')
+      .eq('skipped', false)
       .order('created_at', { ascending: true });
 
     if (manualError) {
