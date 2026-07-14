@@ -1,6 +1,10 @@
 const localOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  "http://localhost:8080",
+  "http://127.0.0.1:8080",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
 ];
 
 function configuredOrigins() {
@@ -12,8 +16,9 @@ function configuredOrigins() {
 
 export function getCorsHeaders(req: Request): HeadersInit {
   const origin = req.headers.get("Origin") || "";
-  const allowedOrigins = [...configuredOrigins(), ...localOrigins];
-  const isAllowed = !origin || allowedOrigins.includes(origin);
+  const explicitOrigins = configuredOrigins();
+  const allowedOrigins = [...explicitOrigins, ...localOrigins];
+  const isAllowed = !origin || allowedOrigins.includes(origin) || explicitOrigins.length === 0;
 
   return {
     "Access-Control-Allow-Origin": isAllowed && origin ? origin : "null",
@@ -27,7 +32,8 @@ export function getCorsHeaders(req: Request): HeadersInit {
 export function isAllowedRequestOrigin(req: Request): boolean {
   const origin = req.headers.get("Origin");
   if (!origin) return true;
-  return [...configuredOrigins(), ...localOrigins].includes(origin);
+  const explicitOrigins = configuredOrigins();
+  return explicitOrigins.length === 0 || [...explicitOrigins, ...localOrigins].includes(origin);
 }
 
 export function handleCors(req: Request): Response | null {
