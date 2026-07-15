@@ -38,11 +38,31 @@ const skipReasonLabels: Record<SkipWorkoutReason, string> = {
 };
 
 function formatRpcError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error || "");
+  const raw = error as {
+    message?: string;
+    details?: string;
+    hint?: string;
+    code?: string;
+  } | null | undefined;
+  const message = [
+    raw?.message,
+    raw?.details,
+    raw?.hint,
+    raw?.code,
+    error instanceof Error ? error.message : String(error || ""),
+  ].filter(Boolean).join(" ");
+
   if (message.includes("workout_date_conflict")) return "Ya hay un entrenamiento pendiente en esa fecha.";
   if (message.includes("completed_workout_cannot_move")) return "No puedes mover un entrenamiento completado.";
   if (message.includes("completed_workout_cannot_skip")) return "No puedes saltar un entrenamiento completado.";
-  return "No se pudo actualizar el calendario.";
+  if (message.includes("function") && message.includes("does not exist")) {
+    return "Falta aplicar la migracion de calendario adaptativo en Supabase.";
+  }
+  if (message.includes("permission denied")) return "No tienes permiso para modificar este entrenamiento.";
+
+  return message.trim()
+    ? `No se pudo actualizar el calendario: ${message}`
+    : "No se pudo actualizar el calendario.";
 }
 
 export function AdaptiveWorkoutActions({

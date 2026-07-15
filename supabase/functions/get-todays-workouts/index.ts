@@ -6,6 +6,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -65,11 +72,13 @@ serve(async (req) => {
     const dayOfWeek = userDate.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
     const weekday = dayOfWeek === 0 ? 7 : dayOfWeek; // Convert to 1-7 where 1=Monday, 7=Sunday
     
-    // Format today's date in user's timezone
-    const year = userDate.getFullYear();
-    const month = String(userDate.getMonth() + 1).padStart(2, '0');
-    const day = String(userDate.getDate()).padStart(2, '0');
-    const todayDate = `${year}-${month}-${day}`;
+    const todayDate = formatLocalDate(userDate);
+    const weekStart = new Date(userDate);
+    weekStart.setDate(userDate.getDate() - weekday + 1);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    const weekStartDate = formatLocalDate(weekStart);
+    const weekEndDate = formatLocalDate(weekEnd);
 
     console.log(`Timezone: ${timezone}, Today: ${todayDate}, JS day: ${dayOfWeek}, Weekday: ${weekday}, Plan: ${profile?.assigned_routine_id || 'none'}, User days: ${profile?.available_weekdays?.join(', ') || 'none'}`);
 
@@ -109,9 +118,10 @@ serve(async (req) => {
         .from('workouts')
         .select(`*, workout_exercises (*)`)
         .eq('user_id', user.id)
-        .eq('scheduled_date', todayDate)
         .eq('tipo', 'automatico')
-        .eq('skipped', false);
+        .eq('skipped', false)
+        .gte('scheduled_date', weekStartDate)
+        .lte('scheduled_date', weekEndDate);
 
       // Filter by current plan if user has one
       if (profile?.assigned_routine_id) {
@@ -124,7 +134,9 @@ serve(async (req) => {
       if (automaticError) {
         console.error('Error fetching automatic workouts:', automaticError);
       } else {
-        automaticWorkouts = data || [];
+        automaticWorkouts = (data || []).filter((workout: Record<string, unknown>) =>
+          workout.scheduled_date === todayDate || Number(workout.weekday) === weekday
+        );
       }
     } else {
       console.log('Today is a rest day - skipping automatic workouts');

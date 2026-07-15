@@ -939,14 +939,18 @@ const Workouts = () => {
                             <button
                               onClick={() => handleCompleteWorkout(workout.id, workout.completed)}
                               disabled={workout.skipped}
-                              className="disabled:cursor-not-allowed disabled:opacity-40"
+                              className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-background hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                               aria-label={workout.completed ? "Marcar pendiente" : "Marcar completado"}
+                              title={workout.completed ? "Marcar pendiente" : "Marcar completado"}
                             >
                               {workout.completed ? (
                                 <CheckCircle2 className="w-5 h-5 text-primary" />
                               ) : (
                                 <Circle className="w-5 h-5 text-muted-foreground" />
                               )}
+                              <span className="hidden lg:inline">
+                                {workout.completed ? "Listo" : "Completar"}
+                              </span>
                             </button>
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
