@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -206,6 +207,7 @@ const WorkoutList = ({ workouts, emptyTitle = "No hay entrenamientos", emptyActi
 
 const Workouts = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const sb = supabase;
   const [searchParams, setSearchParams] = useSearchParams();
   
@@ -712,6 +714,12 @@ const Workouts = () => {
             open={machineScannerOpen}
             onOpenChange={setMachineScannerOpen}
             fitnessLevel={profile?.fitness_level}
+            todayWorkouts={todayWorkouts}
+            onWorkoutChanged={() => {
+              queryClient.invalidateQueries({ queryKey: ["todays-workouts"] });
+              queryClient.invalidateQueries({ queryKey: ["weekly-workouts"] });
+              queryClient.invalidateQueries({ queryKey: ["all-workouts"] });
+            }}
           />
 
           <Tabs value={activeMainTab} onValueChange={handleMainTabChange} className="space-y-4">

@@ -3,15 +3,34 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callAi } from "../_shared/aiClient.ts";
 import { handleCors, isAllowedRequestOrigin, jsonResponse, getCorsHeaders } from "../_shared/cors.ts";
 
+interface PossibleExercise {
+  name: string;
+  catalogExerciseId?: string | null;
+  confidence?: number;
+  reason?: string;
+}
+
 interface MachineAnalysis {
   machineName: string;
-  primaryMuscle: string;
+  confidenceScore: number;
+  uncertaintyReason: string | null;
+  primaryMuscles: string[];
+  secondaryMuscles: string[];
   setupSteps: string[];
-  exercises: {
-    principiante: string[];
-    intermedio: string[];
-    avanzado: string[];
-  };
+  executionSteps: string[];
+  commonMistakes: string[];
+  safetyWarnings: string[];
+  recommendedSets: number;
+  recommendedReps: string;
+  recommendedRestSeconds: number;
+  possibleExercises: PossibleExercise[];
+  notSureFallback: string;
+}
+
+interface CatalogExercise {
+  id: string;
+  nombre: string;
+  aliases?: string[] | string | null;
 }
 
 function respond(req: Request, body: unknown, status = 200, extraHeaders: HeadersInit = {}) {
@@ -31,31 +50,127 @@ function parseJsonObject(content: string): unknown {
   }
 }
 
+function normalizeText(value: unknown): string {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function clampNumber(value: unknown, fallback: number, min: number, max: number) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(min, Math.min(max, numeric));
+}
+
+function stringArray(value: unknown, fallback: string[] = []) {
+  if (!Array.isArray(value)) return fallback;
+  return value
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function toArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
+    } catch {
+      return value.split(",").map((item) => item.trim()).filter(Boolean);
+    }
+  }
+  return [];
+}
+
 function normalizeAnalysis(value: unknown): MachineAnalysis {
-  const parsed = value as Partial<MachineAnalysis>;
-  const exercises = (parsed.exercises || {}) as Partial<MachineAnalysis["exercises"]>;
+  const parsed = value as Partial<MachineAnalysis> & {
+    primaryMuscle?: string;
+    exercises?: Record<string, unknown>;
+  };
+
+  const confidenceScore = clampNumber(parsed.confidenceScore, 0.5, 0, 1);
+  const possibleExercisesSource = Array.isArray(parsed.possibleExercises)
+    ? parsed.possibleExercises
+    : Object.values(parsed.exercises || {}).flat();
+
+  const possibleExercises = (possibleExercisesSource as unknown[])
+    .map((item) => {
+      if (typeof item === "string") return { name: item };
+      const candidate = item as Partial<PossibleExercise>;
+      return {
+        name: String(candidate.name || "").trim(),
+        confidence: clampNumber(candidate.confidence, confidenceScore, 0, 1),
+        reason: typeof candidate.reason === "string" ? candidate.reason : undefined,
+      };
+    })
+    .filter((item) => item.name)
+    .slice(0, 8);
+
+  const machineName = typeof parsed.machineName === "string" && parsed.machineName.trim()
+    ? parsed.machineName.trim()
+    : "Maquina no identificada";
+
+  const primaryMuscles = stringArray(parsed.primaryMuscles, parsed.primaryMuscle ? [parsed.primaryMuscle] : ["grupo muscular no identificado"]);
 
   return {
-    machineName: typeof parsed.machineName === "string" && parsed.machineName.trim()
-      ? parsed.machineName.trim()
-      : "Maquina no identificada",
-    primaryMuscle: typeof parsed.primaryMuscle === "string" && parsed.primaryMuscle.trim()
-      ? parsed.primaryMuscle.trim()
-      : "Grupo muscular no identificado",
-    setupSteps: Array.isArray(parsed.setupSteps)
-      ? parsed.setupSteps.filter((step): step is string => typeof step === "string" && step.trim().length > 0)
-      : ["Ajusta la máquina a tu altura antes de iniciar.", "Usa un peso controlable.", "Detén el ejercicio si sientes dolor articular."],
-    exercises: {
-      principiante: Array.isArray(exercises.principiante)
-        ? exercises.principiante.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-        : [],
-      intermedio: Array.isArray(exercises.intermedio)
-        ? exercises.intermedio.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-        : [],
-      avanzado: Array.isArray(exercises.avanzado)
-        ? exercises.avanzado.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-        : [],
-    },
+    machineName,
+    confidenceScore,
+    uncertaintyReason: typeof parsed.uncertaintyReason === "string" && parsed.uncertaintyReason.trim()
+      ? parsed.uncertaintyReason.trim()
+      : confidenceScore < 0.7 ? "La imagen no permite confirmar con certeza el modelo de la maquina." : null,
+    primaryMuscles,
+    secondaryMuscles: stringArray(parsed.secondaryMuscles, []),
+    setupSteps: stringArray(parsed.setupSteps, [
+      "Verifica el nombre de la maquina en la etiqueta.",
+      "Ajusta asiento, respaldo y topes antes de cargar peso.",
+      "Usa un peso que puedas controlar sin dolor.",
+    ]),
+    executionSteps: stringArray(parsed.executionSteps, [
+      "Haz una repeticion lenta de prueba.",
+      "Mantén el tronco estable durante todo el recorrido.",
+      "Regresa con control y sin soltar la carga.",
+    ]),
+    commonMistakes: stringArray(parsed.commonMistakes, [
+      "Usar demasiado peso.",
+      "Recortar el rango de movimiento.",
+      "Perder postura al final de la serie.",
+    ]),
+    safetyWarnings: stringArray(parsed.safetyWarnings, [
+      "Verifica el nombre de la maquina antes de usarla.",
+      "Si sientes dolor, detente.",
+    ]),
+    recommendedSets: Math.round(clampNumber(parsed.recommendedSets, 3, 1, 6)),
+    recommendedReps: typeof parsed.recommendedReps === "string" && parsed.recommendedReps.trim()
+      ? parsed.recommendedReps.trim()
+      : "10-12",
+    recommendedRestSeconds: Math.round(clampNumber(parsed.recommendedRestSeconds, 90, 30, 240)),
+    possibleExercises,
+    notSureFallback: typeof parsed.notSureFallback === "string" && parsed.notSureFallback.trim()
+      ? parsed.notSureFallback.trim()
+      : "No estoy completamente seguro. Toma otra foto donde se vea la etiqueta, el asiento y la trayectoria de movimiento.",
+  };
+}
+
+function attachCatalogMatches(analysis: MachineAnalysis, catalog: CatalogExercise[]) {
+  return {
+    ...analysis,
+    possibleExercises: analysis.possibleExercises.map((exercise) => {
+      const wanted = normalizeText(exercise.name);
+      const match = catalog.find((candidate) => {
+        const names = [candidate.nombre, ...toArray(candidate.aliases)].map(normalizeText);
+        return names.includes(wanted) || names.some((name) => wanted.includes(name) || name.includes(wanted));
+      });
+
+      return {
+        ...exercise,
+        catalogExerciseId: match?.id || null,
+        name: match?.nombre || exercise.name,
+      };
+    }),
   };
 }
 
@@ -111,45 +226,67 @@ serve(async (req) => {
       const retryAfter = String(rateLimit?.retryAfterSeconds || 3600);
       return respond(
         req,
-        { error: "Límite de análisis alcanzado. Intenta más tarde.", limit: rateLimit?.limit || "hour" },
+        { error: "Limite de analisis alcanzado. Intenta mas tarde.", limit: rateLimit?.limit || "hour" },
         429,
         { "Retry-After": retryAfter },
       );
     }
 
-    const systemPrompt = `Eres un experto en biomecánica y máquinas de gimnasio. Responde únicamente con JSON válido, sin markdown ni texto extra.
+    const systemPrompt = `Eres un experto en biomecanica y maquinas de gimnasio. Responde unicamente con JSON valido, sin markdown ni texto extra.
+Analiza la imagen con prudencia. Si no estas seguro, usa confidenceScore bajo y explica uncertaintyReason.
 El JSON debe tener exactamente esta estructura:
 {
-  "machineName": "Nombre comercial de la máquina",
-  "primaryMuscle": "Grupo muscular principal",
-  "setupSteps": ["Paso breve 1", "Paso breve 2", "Paso breve 3"],
-  "exercises": {
-    "principiante": ["Ejercicio basico 1", "Ejercicio basico 2"],
-    "intermedio": ["Variacion intermedia 1", "Variacion intermedia 2"],
-    "avanzado": ["Variación avanzada o técnica de intensidad"]
-  }
+  "machineName": "Nombre comercial probable",
+  "confidenceScore": 0.0,
+  "uncertaintyReason": "Motivo si hay duda o null",
+  "primaryMuscles": ["musculo principal"],
+  "secondaryMuscles": ["musculo secundario"],
+  "setupSteps": ["Ajuste seguro 1"],
+  "executionSteps": ["Ejecucion segura 1"],
+  "commonMistakes": ["Error comun 1"],
+  "safetyWarnings": ["Advertencia 1"],
+  "recommendedSets": 3,
+  "recommendedReps": "10-12",
+  "recommendedRestSeconds": 90,
+  "possibleExercises": [
+    { "name": "Nombre de ejercicio compatible con catalogo", "confidence": 0.8, "reason": "Por que encaja" }
+  ],
+  "notSureFallback": "Mensaje si no estas completamente seguro"
 }
-Usa espanol claro. Prioriza seguridad. Adapta las sugerencias al nivel del usuario: ${fitness_level || "principiante"}.`;
+Reglas:
+- Usa espanol claro.
+- No diagnostiques lesiones.
+- No des instrucciones agresivas si confidenceScore < 0.7.
+- Siempre incluye: "Verifica el nombre de la maquina antes de usarla" y "Si sientes dolor, detente" en safetyWarnings.
+- Adapta sets/reps al nivel del usuario: ${fitness_level || "principiante"}.`;
 
     const content = await callAi({
       task: "vision",
       jsonMode: true,
       temperature: 0.1,
-      maxTokens: 1400,
+      maxTokens: 1800,
       messages: [
         { role: "system", content: systemPrompt },
         {
           role: "user",
           content: [
-            { type: "text", text: "Analiza esta máquina de gimnasio." },
+            { type: "text", text: "Analiza esta maquina de gimnasio con el contrato indicado." },
             { type: "image_url", image_url: { url: imageUrl } },
           ],
         },
       ],
     });
 
-    const analysis = normalizeAnalysis(parseJsonObject(content));
-    console.log(`analyze-machine user=${user.id} machine=${analysis.machineName}`);
+    const { data: catalog } = await admin
+      .from("exercises")
+      .select("id,nombre,aliases")
+      .limit(250);
+
+    const analysis = attachCatalogMatches(
+      normalizeAnalysis(parseJsonObject(content)),
+      (catalog || []) as CatalogExercise[],
+    );
+    console.log(`analyze-machine user=${user.id} machine=${analysis.machineName} confidence=${analysis.confidenceScore}`);
 
     return respond(req, { success: true, analysis });
   } catch (error) {

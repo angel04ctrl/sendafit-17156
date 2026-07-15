@@ -473,47 +473,150 @@ export type Database = {
       }
       machine_scan_history: {
         Row: {
+          common_mistakes: string[]
+          confidence_score: number | null
           created_at: string
+          execution_steps: string[]
           id: string
           image_url: string
           machine_name: string | null
           machine_type: string | null
+          not_sure_fallback: string | null
           posture_tips: string | null
+          possible_exercises: Json
           primary_muscles: string[] | null
+          recommended_reps: string | null
+          recommended_rest_seconds: number | null
+          recommended_sets: number | null
           related_exercises: Json | null
           secondary_muscles: string[] | null
+          setup_steps: string[]
+          safety_warnings: string[]
+          uncertainty_reason: string | null
           usage_instructions: string | null
           user_id: string
         }
         Insert: {
+          common_mistakes?: string[]
+          confidence_score?: number | null
           created_at?: string
+          execution_steps?: string[]
           id?: string
           image_url: string
           machine_name?: string | null
           machine_type?: string | null
+          not_sure_fallback?: string | null
           posture_tips?: string | null
+          possible_exercises?: Json
           primary_muscles?: string[] | null
+          recommended_reps?: string | null
+          recommended_rest_seconds?: number | null
+          recommended_sets?: number | null
           related_exercises?: Json | null
           secondary_muscles?: string[] | null
+          setup_steps?: string[]
+          safety_warnings?: string[]
+          uncertainty_reason?: string | null
           usage_instructions?: string | null
           user_id: string
         }
         Update: {
+          common_mistakes?: string[]
+          confidence_score?: number | null
           created_at?: string
+          execution_steps?: string[]
           id?: string
           image_url?: string
           machine_name?: string | null
           machine_type?: string | null
+          not_sure_fallback?: string | null
           posture_tips?: string | null
+          possible_exercises?: Json
           primary_muscles?: string[] | null
+          recommended_reps?: string | null
+          recommended_rest_seconds?: number | null
+          recommended_sets?: number | null
           related_exercises?: Json | null
           secondary_muscles?: string[] | null
+          setup_steps?: string[]
+          safety_warnings?: string[]
+          uncertainty_reason?: string | null
           usage_instructions?: string | null
           user_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "machine_scan_history_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      machine_exercise_favorites: {
+        Row: {
+          confidence_score: number | null
+          created_at: string
+          exercise_id: string | null
+          exercise_name: string
+          id: string
+          machine_name: string
+          machine_scan_id: string | null
+          primary_muscles: string[]
+          recommended_reps: string | null
+          recommended_rest_seconds: number | null
+          recommended_sets: number | null
+          secondary_muscles: string[]
+          user_id: string
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string
+          exercise_id?: string | null
+          exercise_name: string
+          id?: string
+          machine_name: string
+          machine_scan_id?: string | null
+          primary_muscles?: string[]
+          recommended_reps?: string | null
+          recommended_rest_seconds?: number | null
+          recommended_sets?: number | null
+          secondary_muscles?: string[]
+          user_id: string
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string
+          exercise_id?: string | null
+          exercise_name?: string
+          id?: string
+          machine_name?: string
+          machine_scan_id?: string | null
+          primary_muscles?: string[]
+          recommended_reps?: string | null
+          recommended_rest_seconds?: number | null
+          recommended_sets?: number | null
+          secondary_muscles?: string[]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_exercise_favorites_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_exercise_favorites_machine_scan_id_fkey"
+            columns: ["machine_scan_id"]
+            isOneToOne: false
+            referencedRelation: "machine_scan_history"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "machine_exercise_favorites_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
