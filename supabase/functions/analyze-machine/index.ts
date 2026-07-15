@@ -33,6 +33,10 @@ interface CatalogExercise {
   aliases?: string[] | string | null;
 }
 
+function getServiceRoleKey() {
+  return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY") || "";
+}
+
 function respond(req: Request, body: unknown, status = 200, extraHeaders: HeadersInit = {}) {
   return new Response(JSON.stringify(body), {
     status,
@@ -201,7 +205,7 @@ serve(async (req) => {
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      getServiceRoleKey(),
     );
 
     const { data: limitResult, error: limitError } = await admin.rpc("check_ai_rate_limit", {
@@ -213,7 +217,11 @@ serve(async (req) => {
 
     if (limitError) {
       console.error("rate limit error:", limitError);
-      return respond(req, { error: "No se pudo validar la cuota de IA." }, 503);
+      return respond(req, {
+        error: "No se pudo validar la cuota de IA.",
+        detail: limitError.message,
+        hint: "Ejecuta la migracion Sprint 11 actualizada y confirma que SUPABASE_SERVICE_ROLE_KEY exista en los secrets de Edge Functions.",
+      }, 503);
     }
 
     const rateLimit = limitResult as {
