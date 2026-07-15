@@ -254,10 +254,38 @@ export const useCompleteWorkout = () => {
   return useMutation({
     mutationFn: ({ workoutId, completed }: { workoutId: string; completed?: boolean }) => 
       completeWorkout(workoutId, completed),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const updatedWorkout = data?.workout;
+
+      if (updatedWorkout?.id) {
+        queryClient.setQueriesData({ queryKey: ['weekly-workouts'] }, (oldData: unknown) => {
+          if (!Array.isArray(oldData)) return oldData;
+          return oldData.map((workout) =>
+            workout && typeof workout === 'object' && 'id' in workout && workout.id === updatedWorkout.id
+              ? { ...workout, ...updatedWorkout }
+              : workout,
+          );
+        });
+
+        queryClient.setQueriesData({ queryKey: ['todays-workouts'] }, (oldData: unknown) => {
+          if (!oldData || typeof oldData !== 'object' || !('workouts' in oldData)) return oldData;
+          const response = oldData as { workouts?: unknown[] };
+          return {
+            ...response,
+            workouts: (response.workouts || []).map((workout) =>
+              workout && typeof workout === 'object' && 'id' in workout && workout.id === updatedWorkout.id
+                ? { ...workout, ...updatedWorkout }
+                : workout,
+            ),
+          };
+        });
+      }
+
       // Invalidar queries de entrenamientos para refetch
       queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
       queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['weekly-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['weekly-calendar-workouts'] });
       queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
     },
   });

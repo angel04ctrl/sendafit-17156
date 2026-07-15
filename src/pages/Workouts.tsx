@@ -369,6 +369,7 @@ const Workouts = () => {
         workoutId: id,
         completed: !completed,
       });
+      toast.success(!completed ? "Entrenamiento completado" : "Entrenamiento marcado como pendiente");
     } catch (e) {
       console.error(e);
       toast.error("Error al completar entrenamiento");
