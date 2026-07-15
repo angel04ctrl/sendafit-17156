@@ -119,6 +119,14 @@ function normalizeAnalysis(value: unknown): MachineAnalysis {
     : "Maquina no identificada";
 
   const primaryMuscles = stringArray(parsed.primaryMuscles, parsed.primaryMuscle ? [parsed.primaryMuscle] : ["grupo muscular no identificado"]);
+  const safetyWarnings = stringArray(parsed.safetyWarnings, []);
+  const normalizedSafetyWarnings = safetyWarnings.map(normalizeText).join(" ");
+  if (!normalizedSafetyWarnings.includes("verifica")) {
+    safetyWarnings.unshift("Verifica el nombre de la maquina antes de usarla.");
+  }
+  if (!normalizedSafetyWarnings.includes("dolor")) {
+    safetyWarnings.push("Si sientes dolor, detente.");
+  }
 
   return {
     machineName,
@@ -143,16 +151,19 @@ function normalizeAnalysis(value: unknown): MachineAnalysis {
       "Recortar el rango de movimiento.",
       "Perder postura al final de la serie.",
     ]),
-    safetyWarnings: stringArray(parsed.safetyWarnings, [
-      "Verifica el nombre de la maquina antes de usarla.",
-      "Si sientes dolor, detente.",
-    ]),
+    safetyWarnings: safetyWarnings.slice(0, 8),
     recommendedSets: Math.round(clampNumber(parsed.recommendedSets, 3, 1, 6)),
     recommendedReps: typeof parsed.recommendedReps === "string" && parsed.recommendedReps.trim()
       ? parsed.recommendedReps.trim()
       : "10-12",
     recommendedRestSeconds: Math.round(clampNumber(parsed.recommendedRestSeconds, 90, 30, 240)),
-    possibleExercises,
+    possibleExercises: possibleExercises.length > 0
+      ? possibleExercises
+      : [{
+          name: machineName === "Maquina no identificada" ? "Ejercicio en maquina no identificado" : machineName,
+          confidence: confidenceScore,
+          reason: "Fallback conservador porque la IA no devolvio ejercicios posibles.",
+        }],
     notSureFallback: typeof parsed.notSureFallback === "string" && parsed.notSureFallback.trim()
       ? parsed.notSureFallback.trim()
       : "No estoy completamente seguro. Toma otra foto donde se vea la etiqueta, el asiento y la trayectoria de movimiento.",
