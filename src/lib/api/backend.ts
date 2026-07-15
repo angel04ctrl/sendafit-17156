@@ -60,10 +60,38 @@ export interface MonthlyReportDay {
   calories_burned: number;
   workouts_completed: number;
   workouts_scheduled: number;
+  workouts_skipped: number;
   calories_consumed: number;
   protein: number;
   carbs: number;
   fat: number;
+}
+
+export interface MonthlyReportMuscleSummary {
+  muscle: string;
+  sets: number;
+  volume: number;
+}
+
+export interface MonthlyReportExerciseTrendPoint {
+  date: string;
+  weight: number | null;
+  reps: number;
+  volume: number;
+}
+
+export interface MonthlyReportExerciseProgress {
+  exercise_id: string | null;
+  exercise_name: string;
+  muscle: string;
+  sessions: number;
+  sets: number;
+  reps: number;
+  volume: number;
+  max_weight: number | null;
+  best_volume: number;
+  last_session_date: string | null;
+  trend: MonthlyReportExerciseTrendPoint[];
 }
 
 export interface MonthlyReportResponse {
@@ -73,6 +101,7 @@ export interface MonthlyReportResponse {
     calories_burned: number;
     workouts_completed: number;
     workouts_scheduled: number;
+    workouts_skipped: number;
     calories_consumed: number;
     protein: number;
     carbs: number;
@@ -84,6 +113,15 @@ export interface MonthlyReportResponse {
     average_energy_level: number | null;
     weight_change: number | null;
   };
+  training: {
+    completed_sets: number;
+    total_volume: number;
+    muscles: MonthlyReportMuscleSummary[];
+    average_calories: number;
+    average_protein: number;
+    completed_sessions: number;
+  };
+  exercise_progress: MonthlyReportExerciseProgress[];
   generated_at: string;
 }
 

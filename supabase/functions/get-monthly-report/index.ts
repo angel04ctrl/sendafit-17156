@@ -19,10 +19,38 @@ interface ReportDay {
   calories_burned: number;
   workouts_completed: number;
   workouts_scheduled: number;
+  workouts_skipped: number;
   calories_consumed: number;
   protein: number;
   carbs: number;
   fat: number;
+}
+
+interface MuscleSummary {
+  muscle: string;
+  sets: number;
+  volume: number;
+}
+
+interface ExerciseTrendPoint {
+  date: string;
+  weight: number | null;
+  reps: number;
+  volume: number;
+}
+
+interface ExerciseSummary {
+  exercise_id: string | null;
+  exercise_name: string;
+  muscle: string;
+  sessions: number;
+  sets: number;
+  reps: number;
+  volume: number;
+  max_weight: number | null;
+  best_volume: number;
+  last_session_date: string | null;
+  trend: ExerciseTrendPoint[];
 }
 
 const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -50,6 +78,18 @@ function toNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function roundNumber(value: number, digits = 1): number {
+  return Number(value.toFixed(digits));
+}
+
+function getExerciseKey(row: Record<string, unknown>) {
+  return String(row.exercise_id || row.exercise_name_snapshot || row.workout_exercise_name_snapshot || "Ejercicio sin nombre");
+}
+
+function getExerciseName(row: Record<string, unknown>) {
+  return String(row.exercise_name_snapshot || row.workout_exercise_name_snapshot || "Ejercicio sin nombre");
 }
 
 serve(async (req) => {
@@ -117,6 +157,7 @@ serve(async (req) => {
           calories_burned: 0,
           workouts_completed: 0,
           workouts_scheduled: 0,
+          workouts_skipped: 0,
           calories_consumed: 0,
           protein: 0,
           carbs: 0,
@@ -130,13 +171,14 @@ serve(async (req) => {
       progressLogsResult,
       progressTrackingResult,
       mealsResult,
+      sessionsResult,
     ] = await Promise.all([
       supabase
         .from("workouts")
-        .select("id, scheduled_date, estimated_calories, completed, completed_at")
+        .select("id, scheduled_date, estimated_calories, completed, completed_at, skipped, skipped_at")
         .eq("user_id", user.id)
         .or(
-          `and(scheduled_date.gte.${startDate},scheduled_date.lte.${endDate}),and(completed_at.gte.${startDate}T00:00:00.000Z,completed_at.lte.${endDate}T23:59:59.999Z)`,
+          `and(scheduled_date.gte.${startDate},scheduled_date.lte.${endDate}),and(completed_at.gte.${startDate}T00:00:00.000Z,completed_at.lte.${endDate}T23:59:59.999Z),and(skipped_at.gte.${startDate}T00:00:00.000Z,skipped_at.lte.${endDate}T23:59:59.999Z)`,
         ),
       supabase
         .from("progress_logs")
@@ -158,17 +200,61 @@ serve(async (req) => {
         .eq("user_id", user.id)
         .gte("date", startDate)
         .lte("date", endDate),
+      supabase
+        .from("workout_sessions")
+        .select("id, workout_id, started_at, finished_at, status, duration_seconds")
+        .eq("user_id", user.id)
+        .eq("status", "completed")
+        .gte("started_at", `${startDate}T00:00:00.000Z`)
+        .lte("started_at", `${endDate}T23:59:59.999Z`),
     ]);
 
     if (workoutsResult.error) throw workoutsResult.error;
     if (progressLogsResult.error) throw progressLogsResult.error;
     if (progressTrackingResult.error) throw progressTrackingResult.error;
     if (mealsResult.error) throw mealsResult.error;
+    if (sessionsResult.error) throw sessionsResult.error;
+
+    const sessions = sessionsResult.data || [];
+    const sessionIds = sessions.map((session) => session.id as string);
+    const sessionById = new Map(sessions.map((session) => [session.id as string, session]));
+
+    const setsResult = sessionIds.length > 0
+      ? await supabase
+          .from("workout_session_sets")
+          .select("session_id, exercise_id, exercise_name_snapshot, workout_exercise_name_snapshot, set_number, actual_reps, target_reps, actual_weight, completed")
+          .in("session_id", sessionIds)
+          .eq("completed", true)
+      : { data: [], error: null };
+
+    if (setsResult.error) throw setsResult.error;
+
+    const sets = setsResult.data || [];
+    const exerciseIds = [...new Set(sets.map((set) => set.exercise_id).filter(Boolean))] as string[];
+    const exerciseCatalogResult = exerciseIds.length > 0
+      ? await supabase
+          .from("exercises")
+          .select("id, nombre, grupo_muscular, musculo_principal")
+          .in("id", exerciseIds)
+      : { data: [], error: null };
+
+    if (exerciseCatalogResult.error) throw exerciseCatalogResult.error;
+    const exerciseCatalog = new Map((exerciseCatalogResult.data || []).map((exercise) => [exercise.id as string, exercise]));
 
     for (const workout of workoutsResult.data || []) {
       const scheduledDate = workout.scheduled_date as string | null;
       if (scheduledDate && reportByDate.has(scheduledDate)) {
         reportByDate.get(scheduledDate)!.workouts_scheduled += 1;
+      }
+
+      if (workout.skipped) {
+        const skippedDate = workout.skipped_at
+          ? String(workout.skipped_at).slice(0, 10)
+          : scheduledDate;
+
+        if (skippedDate && reportByDate.has(skippedDate)) {
+          reportByDate.get(skippedDate)!.workouts_skipped += 1;
+        }
       }
 
       if (workout.completed) {
@@ -224,6 +310,7 @@ serve(async (req) => {
         acc.calories_burned += day.calories_burned;
         acc.workouts_completed += day.workouts_completed;
         acc.workouts_scheduled += day.workouts_scheduled;
+        acc.workouts_skipped += day.workouts_skipped;
         acc.calories_consumed += day.calories_consumed;
         acc.protein += day.protein;
         acc.carbs += day.carbs;
@@ -234,12 +321,114 @@ serve(async (req) => {
         calories_burned: 0,
         workouts_completed: 0,
         workouts_scheduled: 0,
+        workouts_skipped: 0,
         calories_consumed: 0,
         protein: 0,
         carbs: 0,
         fat: 0,
       },
     );
+
+    const exerciseMap = new Map<string, ExerciseSummary & { sessionKeys: Set<string> }>();
+    const muscleMap = new Map<string, MuscleSummary>();
+
+    for (const set of sets) {
+      const session = sessionById.get(set.session_id as string);
+      if (!session) continue;
+
+      const sessionDate = String(session.started_at).slice(0, 10);
+      const actualReps = Number(set.actual_reps || set.target_reps || 0);
+      const actualWeight = toNumber(set.actual_weight);
+      const volume = actualWeight !== null ? actualWeight * actualReps : 0;
+      const exerciseId = (set.exercise_id as string | null) || null;
+      const catalogExercise = exerciseId ? exerciseCatalog.get(exerciseId) : null;
+      const exerciseName = catalogExercise?.nombre || getExerciseName(set);
+      const muscle = String(catalogExercise?.musculo_principal || catalogExercise?.grupo_muscular || "Sin clasificar");
+      const key = exerciseId || getExerciseKey(set);
+      const sessionKey = `${key}:${session.id}`;
+
+      const current = exerciseMap.get(key) || {
+        exercise_id: exerciseId,
+        exercise_name: exerciseName,
+        muscle,
+        sessions: 0,
+        sets: 0,
+        reps: 0,
+        volume: 0,
+        max_weight: null,
+        best_volume: 0,
+        last_session_date: null,
+        trend: [],
+        sessionKeys: new Set<string>(),
+      };
+
+      current.sets += 1;
+      current.reps += actualReps;
+      current.volume += volume;
+      current.best_volume = Math.max(current.best_volume, volume);
+      current.last_session_date = !current.last_session_date || sessionDate > current.last_session_date
+        ? sessionDate
+        : current.last_session_date;
+      if (!current.sessionKeys.has(sessionKey)) {
+        current.sessionKeys.add(sessionKey);
+        current.sessions += 1;
+      }
+      if (actualWeight !== null) {
+        current.max_weight = current.max_weight === null ? actualWeight : Math.max(current.max_weight, actualWeight);
+      }
+
+      const trendPoint = current.trend.find((point) => point.date === sessionDate);
+      if (trendPoint) {
+        trendPoint.reps += actualReps;
+        trendPoint.volume += volume;
+        trendPoint.weight = actualWeight === null
+          ? trendPoint.weight
+          : trendPoint.weight === null
+            ? actualWeight
+            : Math.max(trendPoint.weight, actualWeight);
+      } else {
+        current.trend.push({
+          date: sessionDate,
+          weight: actualWeight,
+          reps: actualReps,
+          volume,
+        });
+      }
+
+      exerciseMap.set(key, current);
+
+      const muscleSummary = muscleMap.get(muscle) || { muscle, sets: 0, volume: 0 };
+      muscleSummary.sets += 1;
+      muscleSummary.volume += volume;
+      muscleMap.set(muscle, muscleSummary);
+    }
+
+    const allExerciseProgress = Array.from(exerciseMap.values())
+      .map(({ sessionKeys: _sessionKeys, ...exercise }) => ({
+        ...exercise,
+        volume: roundNumber(exercise.volume),
+        best_volume: roundNumber(exercise.best_volume),
+        max_weight: exercise.max_weight === null ? null : roundNumber(exercise.max_weight),
+        trend: exercise.trend
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .map((point) => ({
+            ...point,
+            weight: point.weight === null ? null : roundNumber(point.weight),
+            volume: roundNumber(point.volume),
+          })),
+      }))
+      .sort((a, b) => b.volume - a.volume);
+
+    const exerciseProgress = allExerciseProgress.slice(0, 12);
+
+    const muscleSummary = Array.from(muscleMap.values())
+      .map((muscle) => ({ ...muscle, volume: roundNumber(muscle.volume) }))
+      .sort((a, b) => b.sets - a.sets || b.volume - a.volume);
+
+    const completedSets = sets.length;
+    const totalVolume = roundNumber(allExerciseProgress.reduce((sum, exercise) => sum + exercise.volume, 0));
+    const averageCalories = days.length > 0 ? Math.round(totals.calories_consumed / days.length) : 0;
+    const averageProtein = days.length > 0 ? roundNumber(totals.protein / days.length) : 0;
 
     const weights = daily.filter((day) => day.weight !== null).map((day) => day.weight as number);
     const energyLevels = daily
@@ -265,6 +454,15 @@ serve(async (req) => {
         daily,
         totals,
         summary,
+        training: {
+          completed_sets: completedSets,
+          total_volume: totalVolume,
+          muscles: muscleSummary,
+          average_calories: averageCalories,
+          average_protein: averageProtein,
+          completed_sessions: sessions.length,
+        },
+        exercise_progress: exerciseProgress,
         generated_at: new Date().toISOString(),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },

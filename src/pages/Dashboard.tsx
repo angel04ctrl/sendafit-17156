@@ -11,11 +11,11 @@
  * - Adaptar vista móvil con carousel y vista desktop con grid
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { StatCard } from "@/components/StatCard";
-import { Flame, Activity, Target, TrendingUp, BarChart3, Dumbbell, Apple } from "lucide-react";
+import { Flame, Activity, Target, TrendingUp, BarChart3, Dumbbell, AlertCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ProButton } from "@/components/ProButton";
@@ -23,12 +23,17 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { format } from "date-fns";
+import { format, startOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import { RoutineManager } from "@/components/RoutineManager";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DashboardMobileCarousel } from "@/components/DashboardMobileCarousel";
-import { useTodaysWorkouts } from "@/hooks/useBackendApi";
+import { useTodaysWorkouts, useWeeklyWorkouts } from "@/hooks/useBackendApi";
+
+type DashboardWorkoutSummary = {
+  completed?: boolean | null;
+  skipped?: boolean | null;
+};
 
 const Dashboard = () => {
   // Hook de autenticación
@@ -43,6 +48,11 @@ const Dashboard = () => {
   
   // Hook para obtener entrenamientos del día desde backend API
   const { data: todaysData } = useTodaysWorkouts();
+  const weekStart = useMemo(
+    () => format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd"),
+    [],
+  );
+  const { data: weeklyWorkouts = [] } = useWeeklyWorkouts(user?.id, weekStart);
   const todayWorkouts = todaysData?.workouts || [];
   const completedToday = todayWorkouts.filter((workout) => workout.completed).length;
   const pendingToday = todayWorkouts.filter((workout) => !workout.completed);
@@ -143,6 +153,64 @@ const Dashboard = () => {
   const proteinProgress = profile
     ? (todayMacros.protein / profile.daily_protein_goal) * 100
     : 0;
+  const weeklyWorkoutList = weeklyWorkouts as DashboardWorkoutSummary[];
+  const plannedWeek = weeklyWorkoutList.length;
+  const completedWeek = weeklyWorkoutList.filter((workout) => workout.completed).length;
+  const skippedWeek = weeklyWorkoutList.filter((workout) => workout.skipped).length;
+  const pendingWeek = Math.max(plannedWeek - completedWeek - skippedWeek, 0);
+  const weeklyProgress = plannedWeek > 0 ? Math.round((completedWeek / plannedWeek) * 100) : 0;
+  const calorieGoal = profile?.daily_calorie_goal || 2000;
+  const proteinGoal = profile?.daily_protein_goal || 150;
+  const caloriesPending = Math.max(calorieGoal - todayMacros.calories, 0);
+  const proteinPending = Math.max(proteinGoal - todayMacros.protein, 0);
+  const proteinCompletion = proteinGoal > 0 ? todayMacros.protein / proteinGoal : 0;
+  const calorieCompletion = calorieGoal > 0 ? todayMacros.calories / calorieGoal : 0;
+  const macroPriority = proteinCompletion <= calorieCompletion
+    ? {
+        label: "Proteína pendiente",
+        value: `${Math.round(proteinPending)}g`,
+        hint: proteinPending > 0 ? "Prioriza una comida alta en proteína." : "Meta de proteína cubierta.",
+      }
+    : {
+        label: "Calorías pendientes",
+        value: `${Math.round(caloriesPending)} kcal`,
+        hint: caloriesPending > 0 ? "Ajusta tu siguiente comida sin improvisar." : "Meta calórica cubierta.",
+      };
+  const usefulAlert = nextWorkout
+    ? `Hoy toca ${nextWorkout.name}. Abre Entrenar para completar la sesión.`
+    : pendingWeek > 0
+      ? "No hay pendiente hoy, pero aún tienes sesiones esta semana."
+      : "Semana despejada. Revisa reportes o registra tu siguiente comida.";
+  const dashboardFocusCard = (
+    <Card className="p-3 sm:p-4 shadow-card">
+      <div className="grid gap-3 lg:grid-cols-[1.2fr_1fr_1fr]">
+        <div>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h3 className="text-base sm:text-lg font-semibold">Progreso semanal</h3>
+            <span className="text-sm font-bold text-primary">{weeklyProgress}%</span>
+          </div>
+          <Progress value={weeklyProgress} className="h-3" />
+          <p className="mt-2 text-xs text-muted-foreground">
+            {completedWeek} listos · {skippedWeek} saltados · {pendingWeek} pendientes
+          </p>
+        </div>
+
+        <div className="rounded-lg bg-muted/70 p-3">
+          <p className="text-xs text-muted-foreground">{macroPriority.label}</p>
+          <p className="text-xl font-bold">{macroPriority.value}</p>
+          <p className="text-xs text-muted-foreground">{macroPriority.hint}</p>
+        </div>
+
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+          <div className="mb-1 flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-primary" />
+            <p className="text-xs font-semibold">Alerta útil</p>
+          </div>
+          <p className="text-xs text-muted-foreground">{usefulAlert}</p>
+        </div>
+      </div>
+    </Card>
+  );
 
   // Secciones para el carrusel móvil
   const sections = [
@@ -201,6 +269,10 @@ const Dashboard = () => {
       </Card>
     </div>,
 
+    <div key="weekly-focus" className="space-y-4">
+      {dashboardFocusCard}
+    </div>,
+
     <Card key="next-action" className="p-4 shadow-card h-full flex flex-col justify-center">
       <h3 className="text-lg font-semibold mb-2">Próxima acción</h3>
       {nextWorkout ? (
@@ -239,20 +311,20 @@ const Dashboard = () => {
         </Badge>
       </div>
       <p className="text-sm text-muted-foreground mb-6">
-        Obtén análisis detallados de tu progreso, reportes personalizados y estadísticas avanzadas
+        Consulta progreso real. Las funciones avanzadas no implementadas se muestran como próximamente.
       </p>
       <div className="space-y-2">
         <ProButton
           icon={BarChart3}
-          label="Ver Gráficos de Progreso"
-          featureTitle="Análisis Avanzado"
-          featureDescription="Visualiza tu evolución con gráficos detallados y reportes profesionales"
+          label="Ver progreso real"
+          featureTitle="Reportes de progreso"
+          featureDescription="Visualiza datos disponibles de entrenamientos, macros, peso y progreso por ejercicio."
           features={[
-            "Gráficos de evolución de peso y medidas",
-            "Comparación de fotos antes/después",
-            "Estadísticas avanzadas de rendimiento",
-            "Exportar reportes en PDF",
-            "Análisis de tendencias con IA"
+            "Evolución de peso y energía",
+            "Adherencia semanal y mensual",
+            "Progreso por ejercicio basado en sesiones",
+            "PDF avanzado: próximamente",
+            "Análisis por fotos: próximamente"
           ]}
           variant="outline"
           className="w-full"
@@ -400,6 +472,8 @@ const Dashboard = () => {
               />
             </div>
 
+            {dashboardFocusCard}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
               <Card className="p-3 sm:p-4 shadow-card">
                 <h3 className="text-base sm:text-lg font-semibold mb-2">Progreso de Calorías</h3>
@@ -501,20 +575,20 @@ const Dashboard = () => {
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground mb-2">
-                Obtén análisis detallados de tu progreso, reportes personalizados y estadísticas avanzadas
+                Consulta progreso real. Las funciones avanzadas no implementadas se muestran como próximamente.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <ProButton
                   icon={BarChart3}
-                  label="Ver Gráficos de Progreso"
-                  featureTitle="Análisis Avanzado"
-                  featureDescription="Visualiza tu evolución con gráficos detallados y reportes profesionales"
+                  label="Ver progreso real"
+                  featureTitle="Reportes de progreso"
+                  featureDescription="Visualiza datos disponibles de entrenamientos, macros, peso y progreso por ejercicio."
                   features={[
-                    "Gráficos de evolución de peso y medidas",
-                    "Comparación de fotos antes/después",
-                    "Estadísticas avanzadas de rendimiento",
-                    "Exportar reportes en PDF",
-                    "Análisis de tendencias con IA"
+                    "Evolución de peso y energía",
+                    "Adherencia semanal y mensual",
+                    "Progreso por ejercicio basado en sesiones",
+                    "PDF avanzado: próximamente",
+                    "Análisis por fotos: próximamente"
                   ]}
                   variant="outline"
                   className="w-full"
