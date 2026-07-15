@@ -291,6 +291,21 @@ function buildFallbackResponse(intentType: string, userMessage: string, context:
   };
 }
 
+function routineValidationDetails(validation: Record<string, unknown> | null) {
+  if (!validation) return "";
+  const unresolved = Array.isArray(validation.unresolved) ? validation.unresolved : [];
+  const incompatible = Array.isArray(validation.incompatible) ? validation.incompatible : [];
+  const ambiguous = validation.ambiguous && typeof validation.ambiguous === "object"
+    ? Object.keys(validation.ambiguous as Record<string, unknown>)
+    : [];
+  const parts = [
+    unresolved.length ? `no encontrados: ${unresolved.slice(0, 4).join(", ")}` : "",
+    incompatible.length ? `incompatibles: ${incompatible.slice(0, 4).join(", ")}` : "",
+    ambiguous.length ? `ambiguos: ${ambiguous.slice(0, 4).join(", ")}` : "",
+  ].filter(Boolean);
+  return parts.length ? ` (${parts.join("; ")})` : "";
+}
+
 function resolveExerciseByName(name: string, catalog: CatalogExercise[]) {
   const wanted = normalizeText(name);
   return catalog.filter((exercise) => {
@@ -649,6 +664,7 @@ Si el usuario pide explicitamente crear una rutina nueva o cambiar su entrenamie
 }
 
 Restricciones para metadata_routine:
+- Solo incluye metadata_routine si el usuario pide crear, modificar o reemplazar una rutina. Si pregunta "que entreno hoy", "como voy" o "que me toca", responde usando today_workout y deja metadata_routine en null.
 - weekday debe ser 1=Lunes, 2=Martes, 3=Miercoles, 4=Jueves, 5=Viernes, 6=Sabado, 7=Domingo.
 - Usa solo location: casa, gimnasio o exterior.
 - reps debe ser numero entero; si recomiendas rango, usa el promedio y explica el rango en notes.
@@ -683,6 +699,10 @@ ${JSON.stringify(compactForPrompt(context))}`;
     let routineValidation: Record<string, unknown> | null = null;
     let coachActionId: string | null = null;
 
+    if (response.metadata_routine && intentType !== "rutina") {
+      response = buildFallbackResponse(intentType, userMessage, context);
+    }
+
     if (response.metadata_routine) {
       const { data: catalog } = await supabase
         .from("exercises")
@@ -690,7 +710,7 @@ ${JSON.stringify(compactForPrompt(context))}`;
 
       routineValidation = validateRoutine(response.metadata_routine, (catalog || []) as CatalogExercise[], contextProfile);
       if (!routineValidation.ok) {
-        response.message = `${response.message}\n\nNo dejare esta rutina lista para aplicar todavia porque algunos ejercicios no pasaron validacion del catalogo. Puedo ajustarla con ejercicios disponibles si me lo pides.`;
+        response.message = `Puedo ayudarte a preparar un cambio de rutina, pero todavia no hay una vista previa aplicable porque algunos ejercicios no pasaron la validacion del catalogo${routineValidationDetails(routineValidation)}. No aplique ningun cambio. Pideme que la ajuste con ejercicios disponibles y te preparo una version validada.`;
         response.metadata_routine = null;
       }
     }
