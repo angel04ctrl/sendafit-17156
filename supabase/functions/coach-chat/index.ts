@@ -186,6 +186,111 @@ function getModelUsed(): string {
   return `${provider}:${generic || providerSpecific || "default"}`;
 }
 
+function compactForPrompt(context: Record<string, any>) {
+  return {
+    profile: {
+      objective: context.objective,
+      level: context.level,
+      available_weekdays: context.profile?.available_weekdays,
+      available_days_per_week: context.profile?.available_days_per_week,
+      session_duration_minutes: context.profile?.session_duration_minutes,
+      training_types: context.profile?.training_types,
+      injuries_limitations: context.injuries_limitations,
+      sleep_stress: context.sleep_stress,
+    },
+    today_workout: (context.today_workout || []).map((workout: Record<string, any>) => ({
+      name: workout.name,
+      scheduled_date: workout.scheduled_date,
+      duration_minutes: workout.duration_minutes,
+      exercises: (workout.workout_exercises || workout.exercises || []).slice(0, 8).map((exercise: Record<string, unknown>) => ({
+        name: exercise.name,
+        sets: exercise.sets,
+        reps: exercise.reps,
+        rest_seconds: exercise.rest_seconds,
+        target_rir: exercise.target_rir,
+      })),
+    })),
+    weekly_calendar: {
+      week_start: context.weekly_calendar?.week_start,
+      week_end: context.weekly_calendar?.week_end,
+      workouts: (context.weekly_calendar?.workouts || []).map((workout: Record<string, unknown>) => ({
+        name: workout.name,
+        scheduled_date: workout.scheduled_date,
+        completed: workout.completed,
+        skipped: workout.skipped,
+      })),
+    },
+    today_macros: context.today_macros,
+    latest_loads: (context.latest_loads || []).slice(0, 8),
+    recent_sessions: (context.recent_sessions || []).slice(0, 3).map((session: Record<string, unknown>) => ({
+      started_at: session.started_at,
+      status: session.status,
+      session_feeling: session.session_feeling,
+      pain_flag: session.pain_flag,
+      overall_rpe: session.overall_rpe,
+    })),
+    recent_meals: (context.recent_meals || []).slice(0, 5),
+  };
+}
+
+function formatWorkoutList(workouts: Array<Record<string, any>>) {
+  if (!workouts.length) return "No tienes entrenamiento programado para hoy.";
+  return workouts.map((workout) => {
+    const exercises = (workout.workout_exercises || workout.exercises || [])
+      .slice(0, 6)
+      .map((exercise: Record<string, unknown>) => `${exercise.name}${exercise.sets && exercise.reps ? ` ${exercise.sets}x${exercise.reps}` : ""}`)
+      .join(", ");
+    return `${workout.name}${workout.duration_minutes ? ` (${workout.duration_minutes} min)` : ""}${exercises ? `: ${exercises}` : ""}`;
+  }).join("\n");
+}
+
+function buildFallbackResponse(intentType: string, userMessage: string, context: Record<string, any>): CoachResponse {
+  const macros = context.today_macros || {};
+  const consumed = macros.consumed || {};
+  const goals = macros.goals || {};
+  const todayWorkout = context.today_workout || [];
+
+  if (intentType === "nutricion") {
+    return {
+      message: `Hoy llevas aproximadamente ${consumed.calories || 0}/${goals.calories || "N/A"} kcal, ${consumed.protein || 0}/${goals.protein || "N/A"} g de proteina, ${consumed.carbs || 0}/${goals.carbs || "N/A"} g de carbohidratos y ${consumed.fat || 0}/${goals.fat || "N/A"} g de grasa. Usa esto como guia practica; si falta registrar comida, el balance puede cambiar.`,
+      metadata_routine: null,
+    };
+  }
+
+  if (intentType === "rutina") {
+    return {
+      message: "Puedo ayudarte a cambiar la rutina, pero ahora el proveedor de IA no devolvio una respuesta usable para crear un preview validado. No aplique ningun cambio. Intenta de nuevo en unos minutos o pideme un ajuste mas especifico, por ejemplo: cambiar piernas a 3 dias o bajar volumen de hombro.",
+      metadata_routine: null,
+    };
+  }
+
+  if (intentType === "entrenamiento") {
+    return {
+      message: `Con el contexto disponible, esto es lo mas relevante para hoy:\n${formatWorkoutList(todayWorkout)}\n\nMantén la tecnica limpia, respeta el descanso prescrito y evita forzar si aparece dolor. No hice cambios automaticos.`,
+      metadata_routine: null,
+    };
+  }
+
+  if (intentType === "motivacion") {
+    return {
+      message: "Hoy apunta a una victoria pequena y concreta: empezar el entrenamiento, completar el primer bloque y registrar tus series. La consistencia gana por acumulacion, no por perfeccion.",
+      metadata_routine: null,
+    };
+  }
+
+  if (intentType === "lesion") {
+    return {
+      message: "Si hay dolor fuerte, dolor de pecho, mareo, desmayo o una molestia nueva que empeora, detén la actividad y consulta a un profesional. Puedo ayudarte a adaptar el entrenamiento a una version suave, pero no puedo diagnosticar.",
+      metadata_routine: null,
+    };
+  }
+
+  return {
+    message: "Lo siento, como tu coach de SendaFit solo puedo ayudarte con temas relacionados a tu entrenamiento, salud y nutricion. Mantengamos el enfoque en tus objetivos!",
+    metadata_routine: null,
+  };
+}
+
 function resolveExerciseByName(name: string, catalog: CatalogExercise[]) {
   const wanted = normalizeText(name);
   return catalog.filter((exercise) => {
@@ -550,22 +655,31 @@ Restricciones para metadata_routine:
 - Ajusta dias a available_weekdays cuando exista.
 - No generes plan agresivo si hay fatiga alta, estres alto o sueño bajo.
 
-Contexto estructurado del usuario:
-${JSON.stringify(context)}`;
+Contexto estructurado resumido del usuario:
+${JSON.stringify(compactForPrompt(context))}`;
 
-    const content = await callAi({
-      task: "text",
-      jsonMode: true,
-      temperature: 0.3,
-      maxTokens: 2800,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...compactHistory,
-        { role: "user", content: userMessage },
-      ],
-    });
+    let response: CoachResponse;
+    let aiFallbackUsed = false;
 
-    const response = normalizeCoachResponse(extractJson(content));
+    try {
+      const content = await callAi({
+        task: "text",
+        jsonMode: true,
+        temperature: 0.3,
+        maxTokens: 1800,
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...compactHistory,
+          { role: "user", content: userMessage },
+        ],
+      });
+
+      response = normalizeCoachResponse(extractJson(content));
+    } catch (aiError) {
+      aiFallbackUsed = true;
+      console.warn("coach AI fallback used:", aiError);
+      response = buildFallbackResponse(intentType, userMessage, context);
+    }
     let routineValidation: Record<string, unknown> | null = null;
     let coachActionId: string | null = null;
 
@@ -610,6 +724,7 @@ ${JSON.stringify(context)}`;
       intent_type: intentType,
       safety_flags: safetyFlags,
       routine_validation: routineValidation,
+      ai_fallback_used: aiFallbackUsed,
     });
   } catch (error) {
     console.error("coach-chat error:", error);
