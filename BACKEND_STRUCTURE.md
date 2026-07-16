@@ -1,23 +1,23 @@
-# Estructura del Backend - Sistema de Entrenamientos Automáticos
+﻿# Estructura del Backend - Sistema de Entrenamientos AutomÃ¡ticos
 
-## 📋 Arquitectura General
+## ðŸ“‹ Arquitectura General
 
-Este documento describe la estructura completa del backend para el sistema de entrenamientos automáticos y prediseñados de la aplicación de fitness.
+Este documento describe la estructura completa del backend para el sistema de entrenamientos automÃ¡ticos y prediseÃ±ados de la aplicaciÃ³n de fitness.
 
-### Stack Tecnológico Backend
-- **Lovable Cloud** (basado en Supabase)
+### Stack TecnolÃ³gico Backend
+- **Supabase** (basado en Supabase)
 - **PostgreSQL** (base de datos)
 - **Edge Functions** (TypeScript serverless)
 - **Row Level Security (RLS)** para seguridad
 
 ---
 
-## 🗄️ Estructura de Base de Datos
+## ðŸ—„ï¸ Estructura de Base de Datos
 
 ### Tablas Principales
 
 #### `exercises`
-Contiene información de todos los ejercicios disponibles.
+Contiene informaciÃ³n de todos los ejercicios disponibles.
 ```sql
 - id (text, PK)
 - nombre (text)
@@ -38,7 +38,7 @@ Contiene información de todos los ejercicios disponibles.
 ```
 
 #### `predesigned_plans`
-Planes de entrenamiento prediseñados por profesionales.
+Planes de entrenamiento prediseÃ±ados por profesionales.
 ```sql
 - id (text, PK)
 - nombre_plan (text)
@@ -46,18 +46,18 @@ Planes de entrenamiento prediseñados por profesionales.
 - objetivo (text) -- 'ganar_masa', 'perder_grasa', 'tonificar'
 - nivel (text) -- 'principiante', 'intermedio', 'avanzado'
 - lugar (text) -- 'casa', 'gimnasio', 'ambos'
-- dias_semana (int) -- días por semana del plan
+- dias_semana (int) -- dÃ­as por semana del plan
 - ejercicios_ids_ordenados (jsonb)
 ```
 
 #### `plan_ejercicios`
-Relación entre planes y ejercicios con detalles de ejecución.
+RelaciÃ³n entre planes y ejercicios con detalles de ejecuciÃ³n.
 ```sql
 - id (uuid, PK)
 - plan_id (text, FK -> predesigned_plans)
 - ejercicio_id (text, FK -> exercises)
-- dia (int) -- día de la semana (1-7)
-- orden (int) -- orden del ejercicio en el día
+- dia (int) -- dÃ­a de la semana (1-7)
+- orden (int) -- orden del ejercicio en el dÃ­a
 ```
 
 #### `workouts`
@@ -77,7 +77,7 @@ Entrenamientos asignados a usuarios.
 ```
 
 #### `workout_exercises`
-Ejercicios específicos de cada workout.
+Ejercicios especÃ­ficos de cada workout.
 ```sql
 - id (uuid, PK)
 - workout_id (uuid, FK -> workouts)
@@ -90,27 +90,27 @@ Ejercicios específicos de cada workout.
 
 ---
 
-## 🔌 Endpoints (Edge Functions)
+## ðŸ”Œ Endpoints (Edge Functions)
 
 ### 1. **POST /assign-routine**
 **Archivo:** `supabase/functions/assign-routine/index.ts`
 
-**Descripción:** Asigna automáticamente un plan prediseñado a un usuario y genera entrenamientos para la semana actual.
+**DescripciÃ³n:** Asigna automÃ¡ticamente un plan prediseÃ±ado a un usuario y genera entrenamientos para la semana actual.
 
 **Flujo:**
-1. Obtiene el perfil del usuario (objetivo, nivel, días disponibles)
+1. Obtiene el perfil del usuario (objetivo, nivel, dÃ­as disponibles)
 2. Busca planes compatibles en `predesigned_plans`
 3. Calcula un score para cada plan basado en:
    - Objetivo del usuario vs objetivo del plan
    - Nivel de fitness
-   - Días disponibles por semana
+   - DÃ­as disponibles por semana
    - Tipo de entrenamiento (casa/gimnasio)
 4. Selecciona el plan con mejor score
 5. Obtiene ejercicios del plan desde `plan_ejercicios`
 6. Genera entrenamientos para la semana actual en `workouts`
 7. Inserta ejercicios correspondientes en `workout_exercises`
 
-**Input:** Automático (usa datos del perfil del usuario autenticado)
+**Input:** AutomÃ¡tico (usa datos del perfil del usuario autenticado)
 
 **Output:**
 ```json
@@ -118,12 +118,12 @@ Ejercicios específicos de cada workout.
   "success": true,
   "routine": {
     "plan_id": "plan_001",
-    "plan_name": "Tonificación Casa - Principiante",
+    "plan_name": "TonificaciÃ³n Casa - Principiante",
     "workouts_created": 3,
     "workouts": [
       {
         "id": "uuid",
-        "name": "Plan - Día 1",
+        "name": "Plan - DÃ­a 1",
         "date": "2025-10-22"
       }
     ]
@@ -131,14 +131,14 @@ Ejercicios específicos de cada workout.
 }
 ```
 
-**Autenticación:** Requerida (JWT)
+**AutenticaciÃ³n:** Requerida (JWT)
 
 ---
 
 ### 2. **GET /get-todays-workouts**
 **Archivo:** `supabase/functions/get-todays-workouts/index.ts`
 
-**Descripción:** Retorna todos los entrenamientos programados para el día actual.
+**DescripciÃ³n:** Retorna todos los entrenamientos programados para el dÃ­a actual.
 
 **Query Parameters:** Ninguno
 
@@ -169,14 +169,14 @@ Ejercicios específicos de cada workout.
 }
 ```
 
-**Autenticación:** Requerida (JWT)
+**AutenticaciÃ³n:** Requerida (JWT)
 
 ---
 
 ### 3. **GET /get-all-workouts**
 **Archivo:** `supabase/functions/get-all-workouts/index.ts`
 
-**Descripción:** Retorna todos los entrenamientos del usuario (rutina completa).
+**DescripciÃ³n:** Retorna todos los entrenamientos del usuario (rutina completa).
 
 **Query Parameters:**
 - `include_completed` (boolean, default: true) - Incluir completados
@@ -198,17 +198,17 @@ Ejercicios específicos de cada workout.
 }
 ```
 
-**Autenticación:** Requerida (JWT)
+**AutenticaciÃ³n:** Requerida (JWT)
 
 ---
 
 ### 4. **GET /get-workouts-by-date**
 **Archivo:** `supabase/functions/get-workouts-by-date/index.ts`
 
-**Descripción:** Retorna entrenamientos para una fecha específica o rango de fechas.
+**DescripciÃ³n:** Retorna entrenamientos para una fecha especÃ­fica o rango de fechas.
 
 **Query Parameters:**
-- `date` (string, YYYY-MM-DD) - Fecha específica
+- `date` (string, YYYY-MM-DD) - Fecha especÃ­fica
 - `start_date` (string, YYYY-MM-DD) - Fecha inicio de rango
 - `end_date` (string, YYYY-MM-DD) - Fecha fin de rango
 
@@ -219,14 +219,14 @@ Ejercicios específicos de cada workout.
 }
 ```
 
-**Autenticación:** Requerida (JWT)
+**AutenticaciÃ³n:** Requerida (JWT)
 
 ---
 
 ### 5. **POST /complete-workout**
 **Archivo:** `supabase/functions/complete-workout/index.ts`
 
-**Descripción:** Marca un entrenamiento como completado o incompleto.
+**DescripciÃ³n:** Marca un entrenamiento como completado o incompleto.
 
 **Input:**
 ```json
@@ -249,20 +249,20 @@ Ejercicios específicos de cada workout.
 }
 ```
 
-**Autenticación:** Requerida (JWT)
+**AutenticaciÃ³n:** Requerida (JWT)
 
 ---
 
 ### 6. **GET /get-predesigned-plans**
 **Archivo:** `supabase/functions/get-predesigned-plans/index.ts`
 
-**Descripción:** Lista todos los planes prediseñados disponibles.
+**DescripciÃ³n:** Lista todos los planes prediseÃ±ados disponibles.
 
 **Query Parameters:**
 - `objetivo` (string) - Filtrar por objetivo
 - `nivel` (string) - Filtrar por nivel
 - `lugar` (string) - Filtrar por lugar
-- `dias_semana` (int) - Filtrar por días por semana
+- `dias_semana` (int) - Filtrar por dÃ­as por semana
 
 **Output:**
 ```json
@@ -270,8 +270,8 @@ Ejercicios específicos de cada workout.
   "plans": [
     {
       "id": "plan_001",
-      "nombre_plan": "Tonificación Casa",
-      "descripcion_plan": "Plan de tonificación para hacer en casa",
+      "nombre_plan": "TonificaciÃ³n Casa",
+      "descripcion_plan": "Plan de tonificaciÃ³n para hacer en casa",
       "objetivo": "tonificar",
       "nivel": "principiante",
       "lugar": "casa",
@@ -283,13 +283,13 @@ Ejercicios específicos de cada workout.
 }
 ```
 
-**Autenticación:** No requerida
+**AutenticaciÃ³n:** No requerida
 
 ---
 
-## 🔒 Seguridad (RLS)
+## ðŸ”’ Seguridad (RLS)
 
-### Políticas de Seguridad Implementadas
+### PolÃ­ticas de Seguridad Implementadas
 
 #### Tabla `workouts`
 ```sql
@@ -315,11 +315,11 @@ USING (auth.uid() = user_id);
 ```
 
 #### Tabla `workout_exercises`
-Las políticas verifican que el workout asociado pertenezca al usuario.
+Las polÃ­ticas verifican que el workout asociado pertenezca al usuario.
 
 ---
 
-## 🔄 Flujo Completo de Asignación Automática
+## ðŸ”„ Flujo Completo de AsignaciÃ³n AutomÃ¡tica
 
 ### 1. Usuario Completa Onboarding
 Cuando `profiles.onboarding_completed` cambia a `true`, se dispara un trigger:
@@ -332,7 +332,7 @@ CREATE TRIGGER on_onboarding_completed
   EXECUTE FUNCTION auto_assign_routine_on_onboarding();
 ```
 
-### 2. Lógica de Selección de Plan
+### 2. LÃ³gica de SelecciÃ³n de Plan
 El algoritmo de scoring en `assign-routine`:
 
 ```typescript
@@ -350,7 +350,7 @@ if (plan.nivel === profile.fitness_level) {
   score += 30;
 }
 
-// 3. Días disponibles (peso: 20)
+// 3. DÃ­as disponibles (peso: 20)
 if (profile.available_days_per_week >= plan.dias_semana) {
   score += Math.max(0, 20 - daysDiff * 3);
 }
@@ -361,22 +361,22 @@ if (locationMatches) {
 }
 ```
 
-### 3. Generación de Entrenamientos Semanales
-Para cada día del plan:
+### 3. GeneraciÃ³n de Entrenamientos Semanales
+Para cada dÃ­a del plan:
 1. Calcula fecha correspondiente (inicio de semana = lunes)
-2. Obtiene ejercicios del plan para ese día
+2. Obtiene ejercicios del plan para ese dÃ­a
 3. Crea workout en tabla `workouts`
 4. Inserta ejercicios en `workout_exercises`
-5. Calcula calorías estimadas basado en ejercicios
+5. Calcula calorÃ­as estimadas basado en ejercicios
 
 ---
 
-## 📱 Integración con Frontend
+## ðŸ“± IntegraciÃ³n con Frontend
 
 ### React Query Hooks Disponibles
 
 ```typescript
-// Hook para asignar rutina automática
+// Hook para asignar rutina automÃ¡tica
 const { mutate: assignRoutine } = useAssignRoutine();
 
 // Hook para obtener entrenamientos de hoy
@@ -396,7 +396,7 @@ const { data: workoutsByDate } = useWorkoutsByDate({
 // Hook para marcar completado
 const { mutate: completeWorkout } = useCompleteWorkout();
 
-// Hook para obtener planes prediseñados
+// Hook para obtener planes prediseÃ±ados
 const { data: plans } = usePredesignedPlans({
   nivel: 'principiante',
   objetivo: 'tonificar'
@@ -406,7 +406,7 @@ const { data: plans } = usePredesignedPlans({
 ### Ejemplo de Uso en Componente
 
 ```typescript
-// Componente de entrenamientos del día
+// Componente de entrenamientos del dÃ­a
 const TodaysWorkouts = () => {
   const { data, isLoading } = useTodaysWorkouts();
   const { mutate: complete } = useCompleteWorkout();
@@ -433,32 +433,32 @@ const TodaysWorkouts = () => {
 
 ---
 
-## 🧪 Testing y Validación
+## ðŸ§ª Testing y ValidaciÃ³n
 
 ### Casos de Prueba Clave
 
 1. **Usuario nuevo completa onboarding**
-   - ✅ Se asigna plan automáticamente
-   - ✅ Se generan workouts para la semana
-   - ✅ Los workouts tienen tipo='automatico'
+   - âœ… Se asigna plan automÃ¡ticamente
+   - âœ… Se generan workouts para la semana
+   - âœ… Los workouts tienen tipo='automatico'
 
 2. **Usuario consulta entrenamientos de hoy**
-   - ✅ Solo ve workouts de la fecha actual
-   - ✅ Incluye ejercicios con series y reps
+   - âœ… Solo ve workouts de la fecha actual
+   - âœ… Incluye ejercicios con series y reps
 
 3. **Usuario marca workout completado**
-   - ✅ Campo completed se actualiza a true
-   - ✅ Se registra completed_at timestamp
-   - ✅ Se invalidan queries en cache
+   - âœ… Campo completed se actualiza a true
+   - âœ… Se registra completed_at timestamp
+   - âœ… Se invalidan queries en cache
 
 4. **Filtrado de planes**
-   - ✅ Planes se filtran por objetivo
-   - ✅ Planes se filtran por nivel
-   - ✅ Planes se filtran por lugar
+   - âœ… Planes se filtran por objetivo
+   - âœ… Planes se filtran por nivel
+   - âœ… Planes se filtran por lugar
 
 ---
 
-## 📊 Monitoreo y Logs
+## ðŸ“Š Monitoreo y Logs
 
 Todos los edge functions incluyen logging detallado:
 
@@ -471,15 +471,15 @@ console.log('User profile:', {
 console.log(`Best match: ${selectedPlan.id} (score: ${score})`);
 ```
 
-Los logs están disponibles en la sección de Edge Functions del dashboard de Lovable Cloud.
+Los logs estÃ¡n disponibles en la secciÃ³n de Edge Functions del dashboard de Supabase.
 
 ---
 
-## 🚀 Despliegue
+## ðŸš€ Despliegue
 
-Las Edge Functions se despliegan automáticamente con el código del proyecto. No requieren configuración manual adicional.
+Las Edge Functions se despliegan automÃ¡ticamente con el cÃ³digo del proyecto. No requieren configuraciÃ³n manual adicional.
 
-### Configuración en `supabase/config.toml`
+### ConfiguraciÃ³n en `supabase/config.toml`
 
 ```toml
 [functions.assign-routine]
@@ -503,22 +503,23 @@ verify_jwt = false
 
 ---
 
-## 📝 Notas Importantes
+## ðŸ“ Notas Importantes
 
-1. **Idempotencia:** La función `assign-routine` verifica que no existan workouts automáticos para la semana actual antes de crear nuevos.
+1. **Idempotencia:** La funciÃ³n `assign-routine` verifica que no existan workouts automÃ¡ticos para la semana actual antes de crear nuevos.
 
-2. **Performance:** Las queries incluyen índices en columnas frecuentemente consultadas (`user_id`, `scheduled_date`, `tipo`).
+2. **Performance:** Las queries incluyen Ã­ndices en columnas frecuentemente consultadas (`user_id`, `scheduled_date`, `tipo`).
 
-3. **Escalabilidad:** El sistema soporta múltiples planes y puede adaptarse a diferentes perfiles de usuario mediante el algoritmo de scoring.
+3. **Escalabilidad:** El sistema soporta mÃºltiples planes y puede adaptarse a diferentes perfiles de usuario mediante el algoritmo de scoring.
 
-4. **Mantenibilidad:** Código modular y bien documentado facilita futuras extensiones.
+4. **Mantenibilidad:** CÃ³digo modular y bien documentado facilita futuras extensiones.
 
 ---
 
-## 🔮 Próximas Mejoras
+## ðŸ”® PrÃ³ximas Mejoras
 
 - [ ] Sistema de notificaciones para recordar entrenamientos
-- [ ] Ajuste dinámico de planes basado en progreso
+- [ ] Ajuste dinÃ¡mico de planes basado en progreso
 - [ ] Recomendaciones de ejercicios alternativos
-- [ ] Integración con wearables para tracking automático
+- [ ] IntegraciÃ³n con wearables para tracking automÃ¡tico
 - [ ] Analytics de rendimiento por plan
+

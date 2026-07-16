@@ -10,6 +10,7 @@ import { AlertTriangle, BookOpen, Camera, Dumbbell, Loader2, Plus, Replace, Save
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { optimizeImageFile } from "@/lib/imageOptimization";
 
 interface PossibleExercise {
   name: string;
@@ -51,7 +52,8 @@ const loadingMessages = [
   "Preparando acciones...",
 ];
 
-const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+const MAX_ORIGINAL_IMAGE_BYTES = 12 * 1024 * 1024;
+const MAX_OPTIMIZED_IMAGE_BYTES = 3 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 function confidenceLabel(score: number) {
@@ -115,8 +117,9 @@ export function GymMachineScanner({
   const lowConfidence = (analysis?.confidenceScore || 0) < 0.7;
   const canReplace = Boolean(selectedWorkout && targetWorkoutExerciseId && selectedPossibleExercise?.catalogExerciseId && !lowConfidence);
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    event.target.value = "";
     if (!file) return;
 
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
@@ -124,15 +127,26 @@ export function GymMachineScanner({
       return;
     }
 
-    if (file.size > MAX_IMAGE_BYTES) {
-      toast.error("La imagen es demasiado grande. Usa una imagen menor a 6 MB.");
+    if (file.size > MAX_ORIGINAL_IMAGE_BYTES) {
+      toast.error("La imagen es demasiado grande. Usa una imagen menor a 12 MB.");
       return;
     }
 
-    setImageFile(file);
+    const optimizedFile = await optimizeImageFile(file, {
+      maxDimension: 1600,
+      quality: 0.82,
+      outputType: "image/jpeg",
+    });
+
+    if (optimizedFile.size > MAX_OPTIMIZED_IMAGE_BYTES) {
+      toast.error("No se pudo reducir la imagen lo suficiente. Prueba con otra foto.");
+      return;
+    }
+
+    setImageFile(optimizedFile);
     const reader = new FileReader();
     reader.onload = (readerEvent) => setImagePreview(readerEvent.target?.result as string);
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(optimizedFile);
   };
 
   const analyzeImage = async () => {
@@ -359,7 +373,7 @@ export function GymMachineScanner({
         if (!nextOpen) resetState();
       }}
     >
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))] sm:max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Dumbbell className="h-5 w-5 text-primary" />
@@ -433,8 +447,8 @@ export function GymMachineScanner({
         )}
 
         {step === "results" && analysis && (
-          <ScrollArea className="max-h-[70vh]">
-            <div className="space-y-4 pr-4">
+          <ScrollArea className="max-h-[calc(100dvh-8rem)] sm:max-h-[70vh]">
+            <div className="space-y-4 pr-2 sm:pr-4">
               {imagePreview && (
                 <div className="aspect-video overflow-hidden rounded-lg bg-muted">
                   <img src={imagePreview} alt="Maquina analizada" className="h-full w-full object-cover" />

@@ -1,4 +1,4 @@
-type AiProvider = "groq" | "google" | "openai" | "lovable";
+type AiProvider = "groq" | "google" | "openai";
 type AiTask = "text" | "vision";
 
 type OpenAiTextContent = { type: "text"; text: string };
@@ -39,15 +39,11 @@ const DEFAULT_MODELS: Record<AiProvider, Record<AiTask, string>> = {
     text: "gpt-4o-mini",
     vision: "gpt-4o-mini",
   },
-  lovable: {
-    text: "google/gemini-2.5-flash",
-    vision: "google/gemini-2.5-flash",
-  },
 };
 
 function getProvider(): AiProvider {
   const configured = (Deno.env.get("AI_PROVIDER") || "groq").toLowerCase();
-  if (["groq", "google", "openai", "lovable"].includes(configured)) {
+  if (["groq", "google", "openai"].includes(configured)) {
     return configured as AiProvider;
   }
   return "groq";
@@ -70,8 +66,7 @@ function getApiKey(provider: AiProvider): string {
 
 function getOpenAiCompatibleEndpoint(provider: Exclude<AiProvider, "google">): string {
   if (provider === "groq") return "https://api.groq.com/openai/v1/chat/completions";
-  if (provider === "openai") return "https://api.openai.com/v1/chat/completions";
-  return "https://ai.gateway.lovable.dev/v1/chat/completions";
+  return "https://api.openai.com/v1/chat/completions";
 }
 
 export async function callAi({ messages, task = "text", jsonMode = false, temperature = 0.2, maxTokens = 1200 }: AiRequest): Promise<string> {
@@ -86,7 +81,7 @@ async function callOpenAiCompatible(
   provider: Exclude<AiProvider, "google">,
   { messages, task, jsonMode, temperature, maxTokens }: Required<AiRequest>,
 ): Promise<string> {
-  const shouldUseResponseFormat = jsonMode && provider !== "lovable" && !(provider === "groq" && task === "vision");
+  const shouldUseResponseFormat = jsonMode && !(provider === "groq" && task === "vision");
   const response = await fetch(getOpenAiCompatibleEndpoint(provider), {
     method: "POST",
     headers: {

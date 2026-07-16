@@ -20,6 +20,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { OfflineBanner } from "./components/OfflineBanner";
 import { hydrateQueryCache, subscribeQueryCachePersistence } from "./lib/queryPersistence";
 
 const OnboardingForm = lazy(() => import("./components/onboarding/OnboardingForm"));
@@ -118,6 +119,7 @@ const App = () => {
               {/* Provider de tooltips para componentes UI */}
               <TooltipProvider>
                 {/* Componentes de notificaciones */}
+                <OfflineBanner />
                 <Toaster />
                 <Sonner />
                 

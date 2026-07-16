@@ -1,8 +1,8 @@
-# Backend API Documentation
+﻿# Backend API Documentation
 
 ## Overview
 
-This fitness app backend is built on **Lovable Cloud** with **PostgreSQL** and **Edge Functions**. It provides automatic routine assignment, progress tracking, and comprehensive fitness data management.
+This fitness app backend is built on **Supabase** with **PostgreSQL** and **Edge Functions**. It provides automatic routine assignment, progress tracking, and comprehensive fitness data management.
 
 ## Database Schema
 
@@ -546,13 +546,11 @@ VALUES ('user-uuid', 'Test Workout', CURRENT_DATE, 45, 'gimnasio');
 
 1. **401 Unauthorized**: Check that you're passing the JWT token correctly
 2. **404 Not Found**: Ensure the user has a profile created
-3. **500 Internal Server Error**: Check edge function logs in Lovable Cloud dashboard
+3. **500 Internal Server Error**: Check edge function logs in Supabase dashboard
 
 ### View Backend Logs
 
-<lov-actions>
-  <lov-open-backend>View Backend</lov-open-backend>
-</lov-actions>
+
 
 ---
 

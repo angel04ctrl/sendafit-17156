@@ -2,33 +2,39 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8083, // Fija el puerto aquí si quieres usar siempre este
-    strictPort: true, // Esto hará que Vite falle si el puerto está ocupado, en lugar de saltar al 8084
+    port: 8083, // Puerto fijo para desarrollo local.
+    strictPort: true,
   },
   plugins: [
     react(),
-    mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico"],
+      includeAssets: ["favicon.ico", "sendafit-icon.svg", "icon-192.png", "icon-512.png"],
       manifest: {
         name: "SendaFit - Tu Entrenadora Personal",
         short_name: "SendaFit",
-        description: "Aplicación móvil de fitness personalizado",
-        theme_color: "#000000",
-        background_color: "#000000",
+        description: "Aplicacion movil de fitness personalizado",
+        lang: "es",
+        theme_color: "#a855f7",
+        background_color: "#faf7ff",
         display: "standalone",
         orientation: "portrait",
+        categories: ["health", "fitness", "lifestyle"],
         scope: "/",
         start_url: "/",
         icons: [
+          {
+            src: "/sendafit-icon.svg",
+            sizes: "any",
+            type: "image/svg+xml",
+            purpose: "any",
+          },
           {
             src: "/icon-192.png",
             sizes: "192x192",
@@ -53,7 +59,7 @@ export default defineConfig(({ mode }) => ({
               cacheName: "google-fonts-cache",
               expiration: {
                 maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 año
+                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
               },
               cacheableResponse: {
                 statuses: [0, 200],
@@ -76,3 +82,4 @@ export default defineConfig(({ mode }) => ({
     setupFiles: ["./src/setupTests.ts"],
   },
 }));
+

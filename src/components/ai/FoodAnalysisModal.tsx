@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { calculateCaloriesFromMacros, validateMealInput } from "@/lib/mealValidation";
+import { optimizeImageFile } from "@/lib/imageOptimization";
 
 type MealType = "desayuno" | "colacion_am" | "comida" | "colacion_pm" | "cena";
 type ConfidenceScore = "alta" | "media" | "baja";
@@ -70,7 +71,8 @@ const confidenceLabels: Record<ConfidenceScore, string> = {
   baja: "Confianza baja",
 };
 
-const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+const MAX_ORIGINAL_IMAGE_BYTES = 12 * 1024 * 1024;
+const MAX_OPTIMIZED_IMAGE_BYTES = 3 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 function toNumber(value: unknown) {
@@ -126,25 +128,37 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) processFile(file);
+    event.target.value = "";
   };
 
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
       toast.error("Imagen invalida. Usa JPG, PNG o WebP.");
       return;
     }
 
-    if (file.size > MAX_IMAGE_BYTES) {
-      toast.error("La imagen es demasiado grande. Usa una imagen menor a 6 MB.");
+    if (file.size > MAX_ORIGINAL_IMAGE_BYTES) {
+      toast.error("La imagen es demasiado grande. Usa una imagen menor a 12 MB.");
       return;
     }
 
-    setImageFile(file);
+    const optimizedFile = await optimizeImageFile(file, {
+      maxDimension: 1600,
+      quality: 0.82,
+      outputType: "image/jpeg",
+    });
+
+    if (optimizedFile.size > MAX_OPTIMIZED_IMAGE_BYTES) {
+      toast.error("No se pudo reducir la imagen lo suficiente. Prueba con otra foto.");
+      return;
+    }
+
+    setImageFile(optimizedFile);
     const reader = new FileReader();
     reader.onload = (event) => {
       setImagePreview(event.target?.result as string);
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(optimizedFile);
   };
 
   const updateMacro = (key: keyof MealMacros, value: string) => {
@@ -373,7 +387,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
         if (!nextOpen) resetState();
       }}
     >
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))] sm:max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="size-5 text-primary" />

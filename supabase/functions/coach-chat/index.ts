@@ -180,7 +180,8 @@ function detectSafetyFlags(message: string): string[] {
 }
 
 function getModelUsed(): string {
-  const provider = (Deno.env.get("AI_PROVIDER") || "groq").toLowerCase();
+  const configuredProvider = (Deno.env.get("AI_PROVIDER") || "groq").toLowerCase();
+  const provider = ["groq", "google", "openai"].includes(configuredProvider) ? configuredProvider : "groq";
   const generic = Deno.env.get("AI_MODEL_TEXT");
   const providerSpecific = Deno.env.get(`${provider.toUpperCase()}_MODEL_TEXT`);
   return `${provider}:${generic || providerSpecific || "default"}`;

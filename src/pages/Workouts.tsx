@@ -532,7 +532,7 @@ const Workouts = () => {
                     <span className="text-sm sm:text-base">Nuevo Entrenamiento</span>
                   </Button>
                 </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto pb-[calc(1rem+env(safe-area-inset-bottom))] sm:max-h-[90vh]">
                 <DialogHeader>
                   <DialogTitle>Crear Entrenamiento</DialogTitle>
                 </DialogHeader>

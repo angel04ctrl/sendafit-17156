@@ -2,6 +2,8 @@ import { QueryClient } from "@tanstack/react-query";
 
 const CACHE_KEY = "sendafit-query-cache:v1";
 const MAX_CACHE_AGE_MS = 1000 * 60 * 60 * 24 * 14;
+const MAX_PERSISTED_QUERIES = 60;
+const MAX_CACHE_BYTES = 2_000_000;
 
 type CachedQuery = {
   queryKey: unknown[];
@@ -35,7 +37,17 @@ function writeCache(entries: CachedQuery[]) {
   if (typeof window === "undefined") return;
 
   try {
-    window.localStorage.setItem(CACHE_KEY, JSON.stringify(entries));
+    const sortedEntries = [...entries]
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, MAX_PERSISTED_QUERIES);
+    let payload = JSON.stringify(sortedEntries);
+
+    while (payload.length > MAX_CACHE_BYTES && sortedEntries.length > 10) {
+      sortedEntries.pop();
+      payload = JSON.stringify(sortedEntries);
+    }
+
+    window.localStorage.setItem(CACHE_KEY, payload);
   } catch (error) {
     console.warn("Could not persist query cache:", error);
   }
