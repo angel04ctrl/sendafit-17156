@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => ({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "sendafit-icon.svg", "icon-192.png", "icon-512.png"],
+      includeAssets: ["favicon.ico", "sendafit-icon.svg", "apple-touch-icon.png", "icon-192.png", "icon-512.png"],
       manifest: {
         name: "SendaFit - Tu Entrenadora Personal",
         short_name: "SendaFit",

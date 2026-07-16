@@ -12,6 +12,8 @@
   - `orientation: portrait`
   - iconos `192x192` y `512x512`
 - Probar instalacion desde Chrome/Android.
+- Probar instalacion desde Safari/iOS con "Agregar a pantalla de inicio".
+- Confirmar `apple-touch-icon`, `apple-mobile-web-app-title` y modo standalone en iOS.
 
 ## Offline
 
