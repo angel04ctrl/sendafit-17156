@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callAi } from "../_shared/aiClient.ts";
+import { enforceAiRateLimit, rateLimitResponse } from "../_shared/rateLimit.ts";
 import { handleCors, isAllowedRequestOrigin, jsonResponse } from "../_shared/cors.ts";
 
 interface ChatHistoryItem {
@@ -429,8 +430,6 @@ async function buildCoachContext(supabase: any, userId: string, profile: Record<
     injuries_limitations: {
       injuries_limitations: profile?.injuries_limitations,
       lesiones_activas: profile?.lesiones_activas,
-      health_conditions: profile?.health_conditions,
-      current_medications: profile?.current_medications,
     },
     sleep_stress: {
       average_sleep_hours: profile?.average_sleep_hours,
@@ -567,6 +566,14 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return jsonResponse(req, { error: "Sesion invalida." }, 401);
 
+    const limit = await enforceAiRateLimit({
+      userId: user.id,
+      functionName: "coach-chat",
+      hourlyLimit: 20,
+      dailyLimit: 80,
+    });
+    if (limit.allowed === false) return jsonResponse(req, rateLimitResponse(limit), 429);
+
     const { user_message, history = [], user_context = {} } = await req.json();
     if (typeof user_message !== "string" || !user_message.trim()) {
       return jsonResponse(req, { error: "user_message es requerido." }, 400);
@@ -578,7 +585,7 @@ serve(async (req) => {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("weight,height,fitness_goal,primary_goal,fitness_level,fase_menstrual_actual,available_weekdays,available_days_per_week,session_duration_minutes,training_types,injuries_limitations,lesiones_activas,health_conditions,current_medications,daily_calorie_goal,daily_protein_goal,daily_carbs_goal,daily_fat_goal,average_sleep_hours,stress_level,nivel_fatiga,dietary_preferences,allergies_restrictions")
+      .select("weight,height,fitness_goal,primary_goal,fitness_level,fase_menstrual_actual,available_weekdays,available_days_per_week,session_duration_minutes,training_types,injuries_limitations,lesiones_activas,daily_calorie_goal,daily_protein_goal,daily_carbs_goal,daily_fat_goal,average_sleep_hours,stress_level,nivel_fatiga,dietary_preferences,allergies_restrictions")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -633,6 +640,7 @@ Si el usuario pregunta sobre noticias, cultura general, programacion, entretenim
 
 Reglas de seguridad:
 - No diagnostiques enfermedades ni lesiones.
+- No sustituyes a medico, nutriologo ni fisioterapeuta.
 - Si hay dolor fuerte, dolor de pecho, mareo, desmayo, embarazo, enfermedad, medicamentos o trastornos alimenticios, recomienda detener actividad si aplica y consultar a un profesional.
 - No prometas resultados.
 - No apliques cambios. Solo puedes proponer previews; la app pedira confirmacion al usuario.

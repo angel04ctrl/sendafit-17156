@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { optimizeImageFile } from "@/lib/imageOptimization";
+import { AiPrivacyNotice } from "./AiPrivacyNotice";
+import { recordAiConsent } from "@/lib/aiConsent";
 
 interface PossibleExercise {
   name: string;
@@ -104,6 +106,12 @@ export function GymMachineScanner({
   const [targetWorkoutExerciseId, setTargetWorkoutExerciseId] = useState<string>("");
   const [selectedExerciseName, setSelectedExerciseName] = useState<string>("");
   const [isSavingAction, setIsSavingAction] = useState(false);
+  const [aiConsentAccepted, setAiConsentAccepted] = useState(false);
+
+  const handleAiConsentChange = (accepted: boolean) => {
+    setAiConsentAccepted(accepted);
+    if (accepted) void recordAiConsent(user?.id);
+  };
 
   const pendingTodayWorkouts = useMemo(
     () => todayWorkouts.filter((workout) => workout.completed !== true && workout.skipped !== true),
@@ -350,6 +358,7 @@ export function GymMachineScanner({
     setTargetWorkoutId("");
     setTargetWorkoutExerciseId("");
     setSelectedExerciseName("");
+    setAiConsentAccepted(false);
   };
 
   const renderList = (items: string[], empty = "Sin datos suficientes.") => (
@@ -387,6 +396,13 @@ export function GymMachineScanner({
               Toma una foto clara de la maquina. Verifica el nombre antes de usarla y detente si sientes dolor.
             </p>
 
+            <AiPrivacyNotice
+              type="machine"
+              accepted={aiConsentAccepted}
+              onAcceptedChange={handleAiConsentChange}
+              requireCheckbox
+            />
+
             {imagePreview ? (
               <div className="space-y-4">
                 <div className="relative aspect-video overflow-hidden rounded-lg bg-muted">
@@ -403,7 +419,7 @@ export function GymMachineScanner({
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
-                <Button onClick={analyzeImage} className="w-full gap-2">
+                <Button onClick={analyzeImage} className="w-full gap-2" disabled={!aiConsentAccepted}>
                   <Sparkles className="h-4 w-4" />
                   Identificar maquina
                 </Button>

@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/useBackendApi";
+import { AiPrivacyNotice } from "@/components/ai/AiPrivacyNotice";
+import { recordAiConsent } from "@/lib/aiConsent";
 
 type MessageRole = "user" | "assistant";
 
@@ -162,7 +164,17 @@ export default function CoachChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([initialMessage]);
   const [inputValue, setInputValue] = useState("");
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [aiConsentAccepted, setAiConsentAccepted] = useState(false);
   const chatStorageKey = user?.id ? `sendafit-coach-chat:${user.id}` : null;
+
+  useEffect(() => {
+    setAiConsentAccepted(Boolean((profile as any)?.ai_consent_accepted));
+  }, [profile]);
+
+  const handleAiConsentChange = (accepted: boolean) => {
+    setAiConsentAccepted(accepted);
+    if (accepted) void recordAiConsent(user?.id);
+  };
 
   useEffect(() => {
     if (!chatStorageKey) {
@@ -206,11 +218,14 @@ export default function CoachChat() {
     available_weekdays: profile?.available_weekdays,
     available_days_per_week: profile?.available_days_per_week,
     injuries_limitations: profile?.injuries_limitations,
-    health_conditions: profile?.health_conditions,
   }), [profile]);
 
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
+      if (!aiConsentAccepted) {
+        throw new Error("Debes aceptar el aviso de IA antes de enviar mensajes al coach.");
+      }
+
       const history = messages
         .filter((item) => item.id !== "welcome")
         .slice(-8)
@@ -304,6 +319,13 @@ export default function CoachChat() {
           </header>
 
           <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto py-4 pr-1">
+            <AiPrivacyNotice
+              type="coach"
+              accepted={aiConsentAccepted}
+              onAcceptedChange={handleAiConsentChange}
+              requireCheckbox
+            />
+
             {messages.map((message) => (
               <div key={message.id} className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                 {message.role === "assistant" && (
@@ -394,9 +416,9 @@ export default function CoachChat() {
                   }
                 }}
                 placeholder="Pregunta sobre entrenamiento, nutrición o técnica..."
-                disabled={chatMutation.isPending}
+                disabled={chatMutation.isPending || !aiConsentAccepted}
               />
-              <Button onClick={sendMessage} disabled={!inputValue.trim() || chatMutation.isPending} size="icon">
+              <Button onClick={sendMessage} disabled={!inputValue.trim() || chatMutation.isPending || !aiConsentAccepted} size="icon">
                 {chatMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             </div>

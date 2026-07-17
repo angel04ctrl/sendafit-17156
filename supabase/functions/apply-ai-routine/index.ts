@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { enforceAiRateLimit, rateLimitResponse } from "../_shared/rateLimit.ts";
 import { handleCors, isAllowedRequestOrigin, jsonResponse } from "../_shared/cors.ts";
 import { canAutomaticPlannerReplaceWorkout } from "../_shared/planIdentity.ts";
 
@@ -170,6 +171,14 @@ serve(async (req) => {
 
     const { data: { user }, error: authError } = await userClient.auth.getUser();
     if (authError || !user) return jsonResponse(req, { error: "Sesion invalida." }, 401);
+
+    const limit = await enforceAiRateLimit({
+      userId: user.id,
+      functionName: "apply-ai-routine",
+      hourlyLimit: 4,
+      dailyLimit: 12,
+    });
+    if (limit.allowed === false) return jsonResponse(req, rateLimitResponse(limit), 429);
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,

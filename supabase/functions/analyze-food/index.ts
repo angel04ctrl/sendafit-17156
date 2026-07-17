@@ -9,6 +9,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callAi } from "../_shared/aiClient.ts";
+import { enforceAiRateLimit, rateLimitResponse } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -132,6 +133,14 @@ serve(async (req) => {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return respond({ error: "Sesion invalida." }, 401);
+
+    const limit = await enforceAiRateLimit({
+      userId: user.id,
+      functionName: "analyze-food",
+      hourlyLimit: 8,
+      dailyLimit: 30,
+    });
+    if (limit.allowed === false) return respond(rateLimitResponse(limit), 429);
 
     const { imageBase64, imageUrl, mimeType = "image/jpeg" } = await req.json() as AnalyzeFoodBody;
     if (!imageBase64 && !imageUrl) {

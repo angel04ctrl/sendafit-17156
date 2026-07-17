@@ -16,6 +16,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { calculateCaloriesFromMacros, validateMealInput } from "@/lib/mealValidation";
 import { optimizeImageFile } from "@/lib/imageOptimization";
+import { AiPrivacyNotice } from "./AiPrivacyNotice";
+import { recordAiConsent } from "@/lib/aiConsent";
 
 type MealType = "desayuno" | "colacion_am" | "comida" | "colacion_pm" | "cena";
 type ConfidenceScore = "alta" | "media" | "baja";
@@ -124,6 +126,12 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
   const [editedIngredients, setEditedIngredients] = useState<DetectedIngredient[]>([]);
   const [mealType, setMealType] = useState<MealType>("comida");
   const [isSaving, setIsSaving] = useState(false);
+  const [aiConsentAccepted, setAiConsentAccepted] = useState(false);
+
+  const handleAiConsentChange = (accepted: boolean) => {
+    setAiConsentAccepted(accepted);
+    if (accepted) void recordAiConsent(user?.id);
+  };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -377,6 +385,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
     setEditedMacros(emptyMacros);
     setEditedIngredients([]);
     setMealType("comida");
+    setAiConsentAccepted(false);
   };
 
   return (
@@ -402,6 +411,13 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
               La imagen se procesa con IA y el resultado es una estimación que puedes corregir antes de guardar.
             </p>
 
+            <AiPrivacyNotice
+              type="food"
+              accepted={aiConsentAccepted}
+              onAcceptedChange={handleAiConsentChange}
+              requireCheckbox
+            />
+
             {imagePreview ? (
               <div className="flex flex-col gap-4">
                 <div className="relative aspect-video overflow-hidden rounded-xl bg-muted">
@@ -422,7 +438,7 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
                     <X className="size-4" />
                   </Button>
                 </div>
-                <Button onClick={analyzeImage} className="w-full gap-2">
+                <Button onClick={analyzeImage} className="w-full gap-2" disabled={!aiConsentAccepted}>
                   <Sparkles className="size-4" />
                   Analizar Comida
                 </Button>
