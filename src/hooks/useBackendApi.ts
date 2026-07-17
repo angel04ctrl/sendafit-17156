@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { logAppError } from '@/lib/appErrorLogger';
 import {
   assignRoutine,
   getUserRoutine,
@@ -632,6 +633,7 @@ export const useRedistributeWorkouts = () => {
  */
 export const useGenerateWeeklyWorkouts = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   
   return useMutation({
     mutationFn: async (options?: { reassign?: boolean; retries?: number; planChangeAction?: string }) => {
@@ -698,6 +700,12 @@ export const useGenerateWeeklyWorkouts = () => {
     },
     onError: (error: unknown) => {
       console.error('All retry attempts failed:', error);
+      void logAppError({
+        userId: user?.id,
+        source: 'routine-generation',
+        message: error instanceof Error ? error.message : 'No se pudieron generar entrenamientos.',
+        severity: 'error',
+      });
       toast.error(
         'No se pudieron generar tus entrenamientos. Por favor intenta más tarde.'
       );

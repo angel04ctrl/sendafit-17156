@@ -31,6 +31,7 @@ import { calculateMacros, validateProfileData } from "@/lib/macrosCalculator";
 import { PlanChangePreviewModal } from "@/components/PlanChangePreviewModal";
 import { PaymentModal } from "@/components/PaymentModal";
 import { PaymentSuccessModal } from "@/components/PaymentSuccessModal";
+import { BetaFeedbackDialog } from "@/components/beta/BetaFeedbackDialog";
 import type { Tables } from "@/integrations/supabase/types";
 
 const Profile = () => {
@@ -405,6 +406,16 @@ const Profile = () => {
               Configura tus datos personales y objetivos
             </p>
           </div>
+
+          <Card className="flex flex-col gap-3 p-3 shadow-card sm:flex-row sm:items-center sm:justify-between sm:p-4">
+            <div>
+              <h2 className="text-sm font-semibold">Beta cerrada</h2>
+              <p className="text-xs text-muted-foreground">
+                Reporta errores, sugerencias o pantallas confusas durante tus pruebas reales.
+              </p>
+            </div>
+            <BetaFeedbackDialog />
+          </Card>
 
            <Card className="p-3 sm:p-4 shadow-card bg-gradient-card">
             <div className="flex items-center justify-between mb-3">

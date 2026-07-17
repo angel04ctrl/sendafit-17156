@@ -18,6 +18,7 @@ import { calculateCaloriesFromMacros, validateMealInput } from "@/lib/mealValida
 import { optimizeImageFile } from "@/lib/imageOptimization";
 import { AiPrivacyNotice } from "./AiPrivacyNotice";
 import { recordAiConsent } from "@/lib/aiConsent";
+import { logAppError } from "@/lib/appErrorLogger";
 
 type MealType = "desayuno" | "colacion_am" | "comida" | "colacion_pm" | "cena";
 type ConfidenceScore = "alta" | "media" | "baja";
@@ -142,11 +143,25 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
   const processFile = async (file: File) => {
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
       toast.error("Imagen invalida. Usa JPG, PNG o WebP.");
+      void logAppError({
+        userId: user?.id,
+        source: "food-image-invalid",
+        message: "Formato de imagen invalido en analisis de comida.",
+        severity: "warning",
+        details: { type: file.type, size: file.size },
+      });
       return;
     }
 
     if (file.size > MAX_ORIGINAL_IMAGE_BYTES) {
       toast.error("La imagen es demasiado grande. Usa una imagen menor a 12 MB.");
+      void logAppError({
+        userId: user?.id,
+        source: "food-image-too-large",
+        message: "Imagen original demasiado grande en analisis de comida.",
+        severity: "warning",
+        details: { type: file.type, size: file.size },
+      });
       return;
     }
 
@@ -158,6 +173,13 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
 
     if (optimizedFile.size > MAX_OPTIMIZED_IMAGE_BYTES) {
       toast.error("No se pudo reducir la imagen lo suficiente. Prueba con otra foto.");
+      void logAppError({
+        userId: user?.id,
+        source: "food-image-compression",
+        message: "Imagen optimizada excede limite en analisis de comida.",
+        severity: "warning",
+        details: { originalSize: file.size, optimizedSize: optimizedFile.size, type: optimizedFile.type },
+      });
       return;
     }
 
@@ -262,6 +284,12 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
     } catch (error) {
       console.error("Analysis error:", error);
       toast.error(error instanceof Error ? error.message : "Error al analizar la imagen");
+      void logAppError({
+        userId: user?.id,
+        source: "food-ai-analysis",
+        message: error instanceof Error ? error.message : "Error al analizar la imagen",
+        severity: "error",
+      });
       setStep("capture");
     }
   };
@@ -371,6 +399,12 @@ export function FoodAnalysisModal({ open, onOpenChange, onSaved }: FoodAnalysisM
     } catch (error) {
       console.error("Save error:", error);
       toast.error("Error al guardar la comida");
+      void logAppError({
+        userId: user?.id,
+        source: "food-save",
+        message: error instanceof Error ? error.message : "Error al guardar la comida",
+        severity: "error",
+      });
     } finally {
       setIsSaving(false);
     }

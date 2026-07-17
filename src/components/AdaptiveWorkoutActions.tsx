@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMoveWorkoutToDate, useSkipWorkout } from "@/hooks/useBackendApi";
+import { useAuth } from "@/contexts/AuthContext";
+import { logAppError } from "@/lib/appErrorLogger";
 
 export type SkipWorkoutReason = "no_time" | "tired" | "pain" | "travel" | "other";
 
@@ -72,6 +74,7 @@ export function AdaptiveWorkoutActions({
   size = "sm",
   showStart = true,
 }: AdaptiveWorkoutActionsProps) {
+  const { user } = useAuth();
   const [moveOpen, setMoveOpen] = useState(false);
   const [skipOpen, setSkipOpen] = useState(false);
   const [targetDate, setTargetDate] = useState(workout.scheduled_date);
@@ -110,6 +113,13 @@ export function AdaptiveWorkoutActions({
     } catch (error) {
       console.error("Error moving workout:", error);
       toast.error(formatRpcError(error));
+      void logAppError({
+        userId: user?.id,
+        source: "calendar-move-workout",
+        message: error instanceof Error ? error.message : "No se pudo mover entrenamiento",
+        severity: "error",
+        details: { workoutId: workout.id, fromDate: workout.scheduled_date, toDate: targetDate },
+      });
     }
   };
 
@@ -124,6 +134,13 @@ export function AdaptiveWorkoutActions({
     } catch (error) {
       console.error("Error skipping workout:", error);
       toast.error(formatRpcError(error));
+      void logAppError({
+        userId: user?.id,
+        source: "calendar-skip-workout",
+        message: error instanceof Error ? error.message : "No se pudo saltar entrenamiento",
+        severity: "error",
+        details: { workoutId: workout.id, reason: skipReason },
+      });
     }
   };
 

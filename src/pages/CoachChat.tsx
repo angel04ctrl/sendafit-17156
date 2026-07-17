@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/useBackendApi";
 import { AiPrivacyNotice } from "@/components/ai/AiPrivacyNotice";
 import { recordAiConsent } from "@/lib/aiConsent";
+import { logAppError } from "@/lib/appErrorLogger";
 
 type MessageRole = "user" | "assistant";
 
@@ -255,6 +256,12 @@ export default function CoachChat() {
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Error en el chat");
+      void logAppError({
+        userId: user?.id,
+        source: "coach-chat",
+        message: error instanceof Error ? error.message : "Error en el chat",
+        severity: "error",
+      });
     },
   });
 
@@ -279,6 +286,12 @@ export default function CoachChat() {
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "No se pudo actualizar la rutina");
+      void logAppError({
+        userId: user?.id,
+        source: "coach-apply-routine",
+        message: error instanceof Error ? error.message : "No se pudo actualizar la rutina",
+        severity: "error",
+      });
     },
   });
 

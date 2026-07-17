@@ -21,6 +21,7 @@ import {
 } from "@/hooks/useBackendApi";
 import type { WorkoutSession } from "@/lib/api/backend";
 import { buildProgressionSuggestion } from "@/lib/progression";
+import { logAppError } from "@/lib/appErrorLogger";
 
 interface WorkoutExercise {
   id: string;
@@ -249,6 +250,12 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
     } catch (error) {
       console.error("Error loading exercise detail:", error);
       toast.error("No se pudo abrir la ayuda del ejercicio");
+      void logAppError({
+        source: "active-workout-exercise-detail",
+        message: error instanceof Error ? error.message : "No se pudo abrir la ayuda del ejercicio",
+        severity: "warning",
+        details: { workoutId: workout.id, exerciseId: exercise.exercise_id, workoutExerciseId: exercise.id },
+      });
     }
   };
 
@@ -316,6 +323,17 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
     } catch (error) {
       console.error("Error saving set:", error);
       toast.error("No se pudo guardar la serie");
+      void logAppError({
+        source: "active-workout-save-set",
+        message: error instanceof Error ? error.message : "No se pudo guardar la serie",
+        severity: "error",
+        details: {
+          workoutId: workout.id,
+          sessionId: session.id,
+          workoutExerciseId: currentExercise.id,
+          setNumber: activeSetNumber,
+        },
+      });
     }
   };
 
@@ -357,6 +375,12 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
     } catch (error) {
       console.error("Error finishing session:", error);
       toast.error("No se pudo finalizar el entrenamiento");
+      void logAppError({
+        source: "active-workout-finish",
+        message: error instanceof Error ? error.message : "No se pudo finalizar el entrenamiento",
+        severity: "error",
+        details: { workoutId: workout.id, sessionId: session.id, completedSetCount },
+      });
     }
   };
 
@@ -369,6 +393,12 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
       onClose();
     } catch (error) {
       console.error("Error cancelling session:", error);
+      void logAppError({
+        source: "active-workout-cancel",
+        message: error instanceof Error ? error.message : "No se pudo cancelar la sesion",
+        severity: "error",
+        details: { workoutId: workout.id, sessionId: session.id },
+      });
       toast.error("No se pudo cancelar la sesión");
     }
   };

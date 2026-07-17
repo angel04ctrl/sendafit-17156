@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { optimizeImageFile } from "@/lib/imageOptimization";
 import { AiPrivacyNotice } from "./AiPrivacyNotice";
 import { recordAiConsent } from "@/lib/aiConsent";
+import { logAppError } from "@/lib/appErrorLogger";
 
 interface PossibleExercise {
   name: string;
@@ -132,11 +133,25 @@ export function GymMachineScanner({
 
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
       toast.error("Imagen invalida. Usa JPG, PNG o WebP.");
+      void logAppError({
+        userId: user?.id,
+        source: "machine-image-invalid",
+        message: "Formato de imagen invalido en analisis de maquina.",
+        severity: "warning",
+        details: { type: file.type, size: file.size },
+      });
       return;
     }
 
     if (file.size > MAX_ORIGINAL_IMAGE_BYTES) {
       toast.error("La imagen es demasiado grande. Usa una imagen menor a 12 MB.");
+      void logAppError({
+        userId: user?.id,
+        source: "machine-image-too-large",
+        message: "Imagen original demasiado grande en analisis de maquina.",
+        severity: "warning",
+        details: { type: file.type, size: file.size },
+      });
       return;
     }
 
@@ -148,6 +163,13 @@ export function GymMachineScanner({
 
     if (optimizedFile.size > MAX_OPTIMIZED_IMAGE_BYTES) {
       toast.error("No se pudo reducir la imagen lo suficiente. Prueba con otra foto.");
+      void logAppError({
+        userId: user?.id,
+        source: "machine-image-compression",
+        message: "Imagen optimizada excede limite en analisis de maquina.",
+        severity: "warning",
+        details: { originalSize: file.size, optimizedSize: optimizedFile.size, type: optimizedFile.type },
+      });
       return;
     }
 
@@ -211,6 +233,12 @@ export function GymMachineScanner({
     } catch (error) {
       console.error("Machine analysis error:", error);
       toast.error(error instanceof Error ? error.message : "Error al analizar la imagen");
+      void logAppError({
+        userId: user?.id,
+        source: "machine-ai-analysis",
+        message: error instanceof Error ? error.message : "Error al analizar la imagen",
+        severity: "error",
+      });
       setStep("capture");
     } finally {
       window.clearInterval(loadingTimer);
@@ -259,6 +287,13 @@ export function GymMachineScanner({
       return data?.id || null;
     } catch (error) {
       console.error("Error saving machine scan history:", error);
+      void logAppError({
+        userId: user?.id,
+        source: "machine-scan-history-save",
+        message: error instanceof Error ? error.message : "No se pudo guardar historial de escaneo.",
+        severity: "warning",
+        details: { machineName: analysisData.machineName },
+      });
       return null;
     }
   };
@@ -290,6 +325,13 @@ export function GymMachineScanner({
       onWorkoutChanged?.();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo agregar el ejercicio.");
+      void logAppError({
+        userId: user?.id,
+        source: "machine-add-to-workout",
+        message: error instanceof Error ? error.message : "No se pudo agregar el ejercicio.",
+        severity: "error",
+        details: { scanHistoryId, workoutId: selectedWorkout.id, exerciseName: selectedPossibleExercise?.name },
+      });
     } finally {
       setIsSavingAction(false);
     }
@@ -314,6 +356,13 @@ export function GymMachineScanner({
       onWorkoutChanged?.();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo reemplazar el ejercicio.");
+      void logAppError({
+        userId: user?.id,
+        source: "machine-replace-workout-exercise",
+        message: error instanceof Error ? error.message : "No se pudo reemplazar el ejercicio.",
+        severity: "error",
+        details: { scanHistoryId, workoutExerciseId: targetWorkoutExerciseId, exerciseId: selectedPossibleExercise?.catalogExerciseId },
+      });
     } finally {
       setIsSavingAction(false);
     }
@@ -343,6 +392,13 @@ export function GymMachineScanner({
       toast.success("Maquina guardada como favorita.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo guardar favorito.");
+      void logAppError({
+        userId: user?.id,
+        source: "machine-favorite-save",
+        message: error instanceof Error ? error.message : "No se pudo guardar favorito.",
+        severity: "error",
+        details: { scanHistoryId, machineName: analysis.machineName },
+      });
     } finally {
       setIsSavingAction(false);
     }

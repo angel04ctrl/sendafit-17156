@@ -52,6 +52,7 @@ import { AdaptiveWorkoutActions } from "@/components/AdaptiveWorkoutActions";
 import { format, startOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
 import { getActiveWorkoutSession, type WorkoutSession } from "@/lib/api/backend";
+import { logAppError } from "@/lib/appErrorLogger";
 
 const getTodayDate = () => format(new Date(), "yyyy-MM-dd");
 
@@ -359,6 +360,13 @@ const Workouts = () => {
       setConfiguredExercises([]);
     } catch (err) {
       toast.error("Error al crear entrenamiento");
+      void logAppError({
+        userId: user.id,
+        source: "workout-create",
+        message: err instanceof Error ? err.message : "Error al crear entrenamiento",
+        severity: "error",
+        details: { exerciseCount: configuredExercises.length, scheduledDate: formData.scheduled_date },
+      });
     }
   };
 
@@ -373,6 +381,13 @@ const Workouts = () => {
     } catch (e) {
       console.error(e);
       toast.error("Error al completar entrenamiento");
+      void logAppError({
+        userId: user?.id,
+        source: "workout-complete",
+        message: e instanceof Error ? e.message : "Error al completar entrenamiento",
+        severity: "error",
+        details: { workoutId: id, nextCompleted: !completed },
+      });
     } finally {
       setCompletingWorkout(null);
     }
@@ -400,6 +415,13 @@ const Workouts = () => {
     } catch (error) {
       console.error("Error starting workout session:", error);
       toast.error("No se pudo iniciar el entrenamiento");
+      void logAppError({
+        userId: user?.id,
+        source: "active-workout-start",
+        message: error instanceof Error ? error.message : "No se pudo iniciar el entrenamiento",
+        severity: "error",
+        details: { workoutId: workout.id },
+      });
     }
   };
 
@@ -415,6 +437,13 @@ const Workouts = () => {
       toast.success("Entrenamiento eliminado");
     } catch (e) {
       toast.error("Error al eliminar");
+      void logAppError({
+        userId: user?.id,
+        source: "workout-delete",
+        message: e instanceof Error ? e.message : "Error al eliminar entrenamiento",
+        severity: "error",
+        details: { workoutId: id },
+      });
     }
   };
 
