@@ -39,10 +39,42 @@ const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
   apiVersion: "2024-06-20",
 });
 
-const supabase = createClient(
+const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
 );
+
+const supabaseAuth = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_ANON_KEY")!
+);
+
+const checkoutPriceConfig = {
+  mensual: {
+    amount: 9800,
+    name: "SendaFit Pro - Plan Mensual",
+    description: "Suscripcion mensual",
+    interval: "month" as const,
+  },
+  anual: {
+    amount: 105800,
+    name: "SendaFit Pro - Plan Anual",
+    description: "Suscripcion anual con 10% de descuento",
+    interval: "year" as const,
+  },
+};
+
+async function getAuthenticatedUser(req: Request) {
+  const authHeader = req.headers.get("authorization") || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+
+  if (!token) throw new Error("not_authenticated");
+
+  const { data, error } = await supabaseAuth.auth.getUser(token);
+  if (error || !data.user) throw new Error("not_authenticated");
+
+  return data.user;
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -65,6 +97,27 @@ serve(async (req) => {
      */
     if (pathname === "/payments/create-checkout-session" && req.method === "POST") {
       const { plan, userId } = await req.json();
+      const authenticatedUser = await getAuthenticatedUser(req);
+
+      if (authenticatedUser.id !== userId) {
+        return new Response(
+          JSON.stringify({ error: "No puedes crear pagos para otro usuario" }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      if (plan !== "mensual" && plan !== "anual") {
+        return new Response(
+          JSON.stringify({ error: "Plan invalido" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
 
       console.log("Creating Stripe checkout session for user:", userId, "plan:", plan);
       
@@ -87,7 +140,8 @@ serve(async (req) => {
 
       // Definir precios según el plan seleccionado (en centavos MXN para Stripe)
       // Mensual: $98 MXN = 9800 centavos | Anual: $1058 MXN = 105800 centavos (10% descuento)
-      const amount = plan === "anual" ? 105800 : 9800;
+      const selectedPrice = checkoutPriceConfig[plan as "mensual" | "anual"];
+      const amount = selectedPrice.amount;
       
       const successUrl = `${origin}/profile?payment=success`;
       const cancelUrl = `${origin}/profile?payment=canceled`;
@@ -118,7 +172,11 @@ serve(async (req) => {
         ],
         success_url: successUrl,
         cancel_url: cancelUrl,
+        customer_email: authenticatedUser.email || undefined,
         metadata: { userId, plan },
+        subscription_data: {
+          metadata: { userId, plan },
+        },
       });
 
       console.log("Stripe session created:", session.id);
@@ -163,7 +221,7 @@ serve(async (req) => {
         console.log("Webhook event ID:", event.id);
 
         if (event.type === "checkout.session.completed") {
-          const session = event.data.object as unknown;
+          const session = event.data.object as any;
           const { userId, plan } = session.metadata;
 
           console.log("=== CHECKOUT COMPLETED ===");
@@ -179,7 +237,7 @@ serve(async (req) => {
 
           // Crear o actualizar el registro de suscripción en user_subscriptions
           // upsert asegura que no haya duplicados (usa user_id como clave única)
-          const { data: subData, error: subError } = await supabase
+          const { data: subData, error: subError } = await supabaseAdmin
             .from("user_subscriptions")
             .upsert({
               user_id: userId,
@@ -210,7 +268,7 @@ serve(async (req) => {
 
           // Actualizar el rol del usuario a 'pro' para habilitar funcionalidades premium
           // Se guarda en user_roles para verificación mediante has_role() en RLS policies
-          const { data: roleData, error: roleError } = await supabase
+          const { data: roleData, error: roleError } = await supabaseAdmin
             .from("user_roles")
             .upsert({
               user_id: userId,
@@ -230,13 +288,13 @@ serve(async (req) => {
 
         // Webhook: Pago de renovación exitoso (mensual o anual)
         if (event.type === "invoice.payment_succeeded") {
-          const invoice = event.data.object as unknown;
+          const invoice = event.data.object as any;
           const subscriptionId = invoice.subscription;
 
           console.log("Payment succeeded for subscription:", subscriptionId);
 
           // Actualizar el estado de la suscripción para confirmar que sigue activa
-          const { error } = await supabase
+          const { error } = await supabaseAdmin
             .from("user_subscriptions")
             .update({ 
               status: "active",
@@ -254,12 +312,12 @@ serve(async (req) => {
 
         // Webhook: Suscripción cancelada (por el usuario o por fallo de pago)
         if (event.type === "customer.subscription.deleted") {
-          const subscription = event.data.object as unknown;
+          const subscription = event.data.object as any;
 
           console.log("Subscription deleted:", subscription.id);
 
           // Marcar la suscripción como cancelada y establecer end_date a ahora
-          const { error } = await supabase
+          const { error } = await supabaseAdmin
             .from("user_subscriptions")
             .update({ 
               status: "canceled",
@@ -331,7 +389,7 @@ serve(async (req) => {
       // Solo activar si PayPal confirma que la suscripción está ACTIVE
       if (subscriptionData.status === "ACTIVE") {
         // Crear el registro en user_subscriptions (similar al flujo de Stripe)
-        const { error } = await supabase
+        const { error } = await supabaseAdmin
           .from("user_subscriptions")
           .upsert({
             user_id: userId,
@@ -384,7 +442,7 @@ serve(async (req) => {
 
         console.log("PayPal subscription activated:", subscriptionId);
 
-        const { error } = await supabase
+        const { error } = await supabaseAdmin
           .from("user_subscriptions")
           .update({ 
             status: "active",
@@ -402,7 +460,7 @@ serve(async (req) => {
 
         console.log("PayPal subscription cancelled:", subscriptionId);
 
-        const { error } = await supabase
+        const { error } = await supabaseAdmin
           .from("user_subscriptions")
           .update({ 
             status: "canceled",
@@ -421,7 +479,7 @@ serve(async (req) => {
 
         console.log("PayPal payment completed for subscription:", subscriptionId);
 
-        const { error } = await supabase
+        const { error } = await supabaseAdmin
           .from("user_subscriptions")
           .update({ 
             status: "active",

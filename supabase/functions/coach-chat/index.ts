@@ -26,12 +26,25 @@ interface RoutineDay {
   exercises: RoutineExercise[];
 }
 
+type MealType = "desayuno" | "colacion_am" | "comida" | "colacion_pm" | "cena";
+
+interface MealEntry {
+  name: string;
+  meal_type?: MealType;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  date?: string;
+}
+
 interface CoachResponse {
   message: string;
   metadata_routine?: {
     routine_name: string;
     days: RoutineDay[];
   } | null;
+  meal_entry?: MealEntry | null;
 }
 
 interface CatalogExercise {
@@ -100,6 +113,7 @@ function extractJson(content: string): unknown {
 
 function normalizeCoachResponse(value: unknown): CoachResponse {
   const parsed = value as Partial<CoachResponse>;
+  const mealEntry = normalizeMealEntry(parsed.meal_entry);
   return {
     message: typeof parsed.message === "string" && parsed.message.trim()
       ? parsed.message.trim()
@@ -107,6 +121,7 @@ function normalizeCoachResponse(value: unknown): CoachResponse {
     metadata_routine: parsed.metadata_routine && Array.isArray(parsed.metadata_routine.days)
       ? parsed.metadata_routine
       : null,
+    meal_entry: mealEntry,
   };
 }
 
@@ -171,6 +186,53 @@ function classifyIntent(message: string): string {
   if (/entreno|ejercicio|serie|repeticion|peso|carga|tecnica|descanso/.test(text)) return "entrenamiento";
   if (/motiv|animo|disciplina|constancia|ganas/.test(text)) return "motivacion";
   return "fuera_de_alcance";
+}
+
+function isMealLoggingRequest(message: string): boolean {
+  const text = normalizeText(message);
+  return /(?:agrega|agregar|anade|anadir|añade|añadir|registra|registrar|guarda|guardar|apunta|sumame|sumar|carga)\b/.test(text)
+    && /(?:comida|alimento|batido|shake|licuado|desayuno|cena|almuerzo|colacion|colacion|snack|macro|kcal|caloria|proteina|carbo|grasa)/.test(text);
+}
+
+function inferMealType(message: string): MealType {
+  const text = normalizeText(message);
+  if (/desayuno/.test(text)) return "desayuno";
+  if (/colacion am|media manana|snack manana/.test(text)) return "colacion_am";
+  if (/colacion pm|merienda|snack tarde/.test(text)) return "colacion_pm";
+  if (/cena/.test(text)) return "cena";
+  return "comida";
+}
+
+function toMealNumber(value: unknown): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, Math.round(numeric)) : 0;
+}
+
+function normalizeMealEntry(value: unknown): MealEntry | null {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Partial<MealEntry>;
+  const name = String(source.name || "").trim();
+  const calories = toMealNumber(source.calories);
+  const protein = toMealNumber(source.protein);
+  const carbs = toMealNumber(source.carbs);
+  const fat = toMealNumber(source.fat);
+  const mealType = ["desayuno", "colacion_am", "comida", "colacion_pm", "cena"].includes(String(source.meal_type))
+    ? source.meal_type
+    : undefined;
+  const date = typeof source.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(source.date)
+    ? source.date
+    : undefined;
+
+  if (!name || calories <= 0) return null;
+  return { name, meal_type: mealType, calories, protein, carbs, fat, date };
+}
+
+function normalizeMealSavedMessage(meal: MealEntry, inserted: boolean): string {
+  if (!inserted) {
+    return "No registre la comida porque faltan datos nutricionales claros. Enviame nombre, calorias, proteina, carbohidratos y grasa, por ejemplo: agrega batido 975 kcal, 50 g proteina, 180 g carbohidratos y 6 g grasa.";
+  }
+
+  return `Comida registrada: ${meal.name}. Calorias: ${meal.calories} kcal, proteina: ${meal.protein} g, carbohidratos: ${meal.carbs} g, grasas: ${meal.fat} g. Ya quedo guardada en tu historial de hoy.`;
 }
 
 function detectSafetyFlags(message: string): string[] {
@@ -546,6 +608,63 @@ async function createRoutineAction(
   return data?.id || null;
 }
 
+async function saveMealEntry(
+  supabase: any,
+  userId: string,
+  meal: MealEntry,
+  userMessage: string,
+) {
+  const mealType = meal.meal_type || inferMealType(userMessage);
+  const today = new Date().toISOString().slice(0, 10);
+  const mealDate = meal.date || today;
+  const payload = {
+    user_id: userId,
+    meal_type: mealType,
+    name: meal.name,
+    calories: meal.calories,
+    protein: meal.protein,
+    carbs: meal.carbs,
+    fat: meal.fat,
+    date: mealDate,
+  };
+
+  const { data, error } = await supabase
+    .from("meals")
+    .insert(payload)
+    .select("id")
+    .single();
+
+  if (error) {
+    console.warn("coach meal insert failed:", error);
+    return { inserted: false, meal: { ...meal, meal_type: mealType, date: mealDate }, id: null };
+  }
+
+  if (data?.id) {
+    await supabase.from("meal_ingredients" as any).insert([{
+      meal_id: data.id,
+      user_id: userId,
+      ingredient_name: meal.name,
+      source: "coach_ai_estimated",
+      is_verified: false,
+      quantity: 1,
+      unit: "serving",
+      grams: 1,
+      calories: meal.calories,
+      protein: meal.protein,
+      carbs: meal.carbs,
+      fat: meal.fat,
+      metadata: {
+        capturedBy: "coach-chat",
+        requiresUserVerification: true,
+      },
+    }]).then(({ error: ingredientError }: { error: { message?: string } | null }) => {
+      if (ingredientError) console.warn("coach meal ingredient insert skipped:", ingredientError.message);
+    });
+  }
+
+  return { inserted: true, meal: { ...meal, meal_type: mealType, date: mealDate }, id: data?.id || null };
+}
+
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -645,11 +764,13 @@ Reglas de seguridad:
 - No prometas resultados.
 - No apliques cambios. Solo puedes proponer previews; la app pedira confirmacion al usuario.
 - Si propones rutina, usa solo ejercicios comunes que existan en el catalogo de SendaFit y respeta nivel, equipo, lesiones y calendario.
+- Excepcion controlada: si el usuario pide explicitamente agregar, registrar o guardar una comida y proporciona macros suficientes o puedes estimarlos desde datos escritos por el usuario, incluye meal_entry. No digas que una comida fue registrada si meal_entry es null.
 
 Responde siempre en JSON valido, sin markdown y sin texto adicional, con esta forma:
 {
   "message": "Respuesta visible para el chat",
-  "metadata_routine": null
+  "metadata_routine": null,
+  "meal_entry": null
 }
 
 Si el usuario pide explicitamente crear una rutina nueva o cambiar su entrenamiento actual, incluye metadata_routine:
@@ -680,11 +801,32 @@ Restricciones para metadata_routine:
 - Ajusta dias a available_weekdays cuando exista.
 - No generes plan agresivo si hay fatiga alta, estres alto o sueño bajo.
 
+Si el usuario pide registrar una comida, no uses metadata_routine. Incluye meal_entry con esta forma:
+{
+  "message": "Resumen breve. No afirmes que ya fue registrada; el sistema confirmara despues de guardar.",
+  "metadata_routine": null,
+  "meal_entry": {
+    "name": "Nombre de la comida",
+    "meal_type": "desayuno" | "colacion_am" | "comida" | "colacion_pm" | "cena",
+    "calories": 975,
+    "protein": 50,
+    "carbs": 180,
+    "fat": 6
+  }
+}
+
+Restricciones para meal_entry:
+- Solo incluye meal_entry si el usuario pidio guardar/agregar/registrar una comida.
+- Si faltan calorias o macros y no puedes estimarlos con datos concretos del usuario, deja meal_entry en null y pide los datos faltantes.
+- No inventes que quedo guardada. La confirmacion de guardado la hara el sistema despues de insertar en base de datos.
+
 Contexto estructurado resumido del usuario:
 ${JSON.stringify(compactForPrompt(context))}`;
 
     let response: CoachResponse;
     let aiFallbackUsed = false;
+    let mealSaved = false;
+    let savedMealId: string | null = null;
 
     try {
       const content = await callAi({
@@ -712,6 +854,10 @@ ${JSON.stringify(compactForPrompt(context))}`;
       response = buildFallbackResponse(intentType, userMessage, context);
     }
 
+    if (response.meal_entry && !isMealLoggingRequest(userMessage)) {
+      response.meal_entry = null;
+    }
+
     if (response.metadata_routine) {
       const { data: catalog } = await supabase
         .from("exercises")
@@ -722,6 +868,28 @@ ${JSON.stringify(compactForPrompt(context))}`;
         response.message = `Puedo ayudarte a preparar un cambio de rutina, pero todavia no hay una vista previa aplicable porque algunos ejercicios no pasaron la validacion del catalogo${routineValidationDetails(routineValidation)}. No aplique ningun cambio. Pideme que la ajuste con ejercicios disponibles y te preparo una version validada.`;
         response.metadata_routine = null;
       }
+    }
+
+    if (isMealLoggingRequest(userMessage)) {
+      if (response.meal_entry) {
+        const saveResult = await saveMealEntry(supabase, user.id, response.meal_entry, userMessage);
+        mealSaved = saveResult.inserted;
+        savedMealId = saveResult.id;
+        response.meal_entry = saveResult.meal;
+        response.message = normalizeMealSavedMessage(saveResult.meal, saveResult.inserted);
+      } else {
+        response.message = normalizeMealSavedMessage({
+          name: "",
+          meal_type: inferMealType(userMessage),
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+        }, false);
+      }
+      response.metadata_routine = null;
+    } else {
+      response.meal_entry = null;
     }
 
     const conversationId = await persistConversation(
@@ -754,6 +922,8 @@ ${JSON.stringify(compactForPrompt(context))}`;
       safety_flags: safetyFlags,
       routine_validation: routineValidation,
       ai_fallback_used: aiFallbackUsed,
+      meal_saved: mealSaved,
+      saved_meal_id: savedMealId,
     });
   } catch (error) {
     console.error("coach-chat error:", error);

@@ -471,7 +471,7 @@ const Profile = () => {
                   }}
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Actualizar a PRO - $4.99/mes
+                  Actualizar a PRO - $98 MXN/mes
                 </Button>
                 
                 <p className="text-xs text-center text-muted-foreground">

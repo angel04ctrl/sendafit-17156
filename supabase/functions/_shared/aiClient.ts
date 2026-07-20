@@ -29,7 +29,7 @@ interface GooglePart {
 const DEFAULT_MODELS: Record<AiProvider, Record<AiTask, string>> = {
   groq: {
     text: "llama-3.3-70b-versatile",
-    vision: "meta-llama/llama-4-scout-17b-16e-instruct",
+    vision: "qwen/qwen3.6-27b",
   },
   google: {
     text: "gemini-1.5-flash",
@@ -81,7 +81,9 @@ async function callOpenAiCompatible(
   provider: Exclude<AiProvider, "google">,
   { messages, task, jsonMode, temperature, maxTokens }: Required<AiRequest>,
 ): Promise<string> {
-  const shouldUseResponseFormat = jsonMode && !(provider === "groq" && task === "vision");
+  const model = getModel(provider, task);
+  const shouldUseResponseFormat = jsonMode
+    && !(provider === "groq" && task === "vision" && !model.startsWith("qwen/"));
   const response = await fetch(getOpenAiCompatibleEndpoint(provider), {
     method: "POST",
     headers: {
@@ -89,10 +91,12 @@ async function callOpenAiCompatible(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: getModel(provider, task),
+      model,
       messages,
       temperature,
-      max_tokens: maxTokens,
+      ...(provider === "groq"
+        ? { max_completion_tokens: maxTokens }
+        : { max_tokens: maxTokens }),
       ...(shouldUseResponseFormat ? { response_format: { type: "json_object" } } : {}),
     }),
   });

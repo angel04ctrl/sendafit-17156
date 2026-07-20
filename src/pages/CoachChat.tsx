@@ -246,13 +246,22 @@ export default function CoachChat() {
         message: string;
         metadata_routine?: RoutineMetadata | null;
         coach_action_id?: string | null;
+        meal_saved?: boolean;
+        saved_meal_id?: string | null;
       };
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       setMessages((current) => [
         ...current,
         createMessage("assistant", data.message, data.metadata_routine || null, data.coach_action_id || null),
       ]);
+      if (data.meal_saved) {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["meals-history"] }),
+          queryClient.invalidateQueries({ queryKey: ["user-profile"] }),
+        ]);
+        toast.success("Comida registrada desde el Coach.");
+      }
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Error en el chat");

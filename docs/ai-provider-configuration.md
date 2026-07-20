@@ -30,7 +30,7 @@ Modelos por defecto:
 
 ```text
 GROQ_MODEL_TEXT=llama-3.3-70b-versatile
-GROQ_MODEL_VISION=meta-llama/llama-4-scout-17b-16e-instruct
+GROQ_MODEL_VISION=qwen/qwen3.6-27b
 ```
 
 ### Google AI Studio / Gemini

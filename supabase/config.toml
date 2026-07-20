@@ -56,3 +56,6 @@ verify_jwt = true
 
 [functions.apply-ai-routine]
 verify_jwt = true
+
+[functions.payments]
+verify_jwt = false

@@ -51,6 +51,7 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
   const annualPrice = 1058;
   const annualPriceBeforeDiscount = 1176;
   const discount = annualPriceBeforeDiscount - annualPrice;
+  const paypalEnabled = Boolean(import.meta.env.VITE_PAYPAL_CLIENT_ID);
 
   const currentPrice = billingPeriod === "mensual" ? monthlyPrice : annualPrice;
 
@@ -109,7 +110,7 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
    * Se configura con el client-id desde variables de entorno
    */
   useEffect(() => {
-    if (!open) return;
+    if (!open || !paypalEnabled) return;
 
     const script = document.createElement("script");
     script.src = `https://www.paypal.com/sdk/js?client-id=${import.meta.env.VITE_PAYPAL_CLIENT_ID || ""}&vault=true&intent=subscription&currency=MXN`;
@@ -122,7 +123,7 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
         document.body.removeChild(script);
       }
     };
-  }, [open]);
+  }, [open, paypalEnabled]);
 
   /**
    * Inicializa los botones de PayPal después de que el SDK se carga
@@ -256,18 +257,20 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
         </div>
 
         <Tabs defaultValue="card" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="card" className="gap-2">
-              <CreditCard className="w-4 h-4" />
-              Tarjeta
-            </TabsTrigger>
-            <TabsTrigger value="paypal" className="gap-2">
-              <Wallet className="w-4 h-4" />
-              PayPal
-            </TabsTrigger>
-          </TabsList>
+          {paypalEnabled && (
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="card" className="gap-2">
+                <CreditCard className="w-4 h-4" />
+                Tarjeta
+              </TabsTrigger>
+              <TabsTrigger value="paypal" className="gap-2">
+                <Wallet className="w-4 h-4" />
+                PayPal
+              </TabsTrigger>
+            </TabsList>
+          )}
 
-          <TabsContent value="card" className="space-y-4 mt-4">
+          <TabsContent value="card" className={paypalEnabled ? "space-y-4 mt-4" : "space-y-4"}>
             <div className="space-y-4">
               <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground">
                 <p className="mb-2">✓ Formulario de pago seguro de Stripe</p>
@@ -287,6 +290,7 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
             </div>
           </TabsContent>
 
+          {paypalEnabled && (
           <TabsContent value="paypal" className="space-y-4 mt-4">
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground text-center">
@@ -308,6 +312,7 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
               )}
             </div>
           </TabsContent>
+          )}
         </Tabs>
 
         <p className="text-xs text-center text-muted-foreground mt-4">
