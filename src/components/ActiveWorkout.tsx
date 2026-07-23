@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, Circle, Clock, HelpCircle, Plus, Repeat, SkipForward, Timer, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronDown, Circle, Clock, HelpCircle, Plus, Repeat, SkipForward, Timer, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { ExerciseDetailModal } from "@/components/ExerciseDetailModal";
 import { ExerciseSubstitutionDialog } from "@/components/ExerciseSubstitutionDialog";
@@ -21,6 +23,7 @@ import {
 } from "@/hooks/useBackendApi";
 import type { WorkoutSession } from "@/lib/api/backend";
 import { buildProgressionSuggestion } from "@/lib/progression";
+import { getProgressionContextLabel, PERSONAL_RECORD_HELP, RIR_HELP, RIR_LABEL, RPE_HELP, RPE_LABEL } from "@/lib/trainingProgressionCopy";
 import { logAppError } from "@/lib/appErrorLogger";
 
 interface WorkoutExercise {
@@ -86,6 +89,7 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
   const [painNotes, setPainNotes] = useState("");
   const [weightEdited, setWeightEdited] = useState(false);
   const [restSeconds, setRestSeconds] = useState(0);
+  const [advancedMetricsOpen, setAdvancedMetricsOpen] = useState(false);
   const [exerciseDetailOpen, setExerciseDetailOpen] = useState(false);
   const [substitutionOpen, setSubstitutionOpen] = useState(false);
   const [exerciseToSubstitute, setExerciseToSubstitute] = useState<WorkoutExercise | null>(null);
@@ -187,6 +191,11 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
       currentSessionFeeling: sessionFeeling,
     });
   }, [currentExercise?.exercise_id, exerciseProgress, sessionFeeling, targetReps, targetSets, targetWeight]);
+  const progressionContextLabel = getProgressionContextLabel(progressionSuggestion.confidence);
+
+  useEffect(() => {
+    setAdvancedMetricsOpen(false);
+  }, [currentExercise?.id]);
   const lastWeight = progressionSuggestion.suggestedWeight ?? lastSession?.sets.find((set) => set.weight !== null)?.weight ?? null;
   const displayedWeight = actualWeight || (!weightEdited && lastWeight !== null ? String(lastWeight) : "");
   const lastSessionLabel = lastSession
@@ -602,11 +611,25 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
                   <p className="font-medium">{lastSessionLabel || "Sin historial aún"}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Mayor peso</p>
+                  <p className="flex items-center gap-1 text-muted-foreground">
+                    Record personal
+                    <TooltipProvider delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="rounded-full text-muted-foreground hover:text-foreground" aria-label={PERSONAL_RECORD_HELP}>
+                            <HelpCircle className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p>{PERSONAL_RECORD_HELP}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </p>
                   <p className="font-medium">
                     {exerciseProgress?.prs.maxWeight !== null && exerciseProgress?.prs.maxWeight !== undefined
                       ? `${exerciseProgress.prs.maxWeight} kg`
-                      : "Sin PR"}
+                      : "Sin record"}
                   </p>
                 </div>
                 <div>
@@ -625,9 +648,7 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
                     <Badge variant={progressionSuggestion.action === "blocked_pain" ? "destructive" : "secondary"}>
                       {progressionSuggestion.label}
                     </Badge>
-                    <Badge variant="outline">
-                      Confianza {progressionSuggestion.confidence === "high" ? "alta" : progressionSuggestion.confidence === "medium" ? "media" : "baja"}
-                    </Badge>
+                    <Badge variant="outline">{progressionContextLabel}</Badge>
                   </div>
                 </div>
                 <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
@@ -644,7 +665,7 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Reps</Label>
                   <Input
@@ -669,34 +690,75 @@ export function ActiveWorkout({ workout, session, onClose }: ActiveWorkoutProps)
                     placeholder={targetWeight ? String(targetWeight) : "0"}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>RIR</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={10}
-                    value={rir}
-                    onChange={(event) => setRir(event.target.value)}
-                    placeholder={prescribedTargetRir !== null ? String(prescribedTargetRir) : "Opcional"}
-                  />
-                  {prescribedTargetRir !== null && (
-                    <p className="text-xs text-muted-foreground">
-                      Objetivo: deja aproximadamente {prescribedTargetRir} repeticiones en reserva.
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>RPE</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={rpe}
-                    onChange={(event) => setRpe(event.target.value)}
-                    placeholder="Opcional"
-                  />
-                </div>
               </div>
+
+              <Collapsible open={advancedMetricsOpen} onOpenChange={setAdvancedMetricsOpen} className="rounded-lg border bg-background">
+                <CollapsibleTrigger asChild>
+                  <Button type="button" variant="ghost" className="flex w-full justify-between px-3">
+                    <span>Datos avanzados opcionales</span>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${advancedMetricsOpen ? "rotate-180" : ""}`} />
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="border-t p-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1">
+                        {RIR_LABEL}
+                        <TooltipProvider delayDuration={150}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button type="button" className="rounded-full text-muted-foreground hover:text-foreground" aria-label={RIR_HELP}>
+                                <HelpCircle className="h-3.5 w-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>{RIR_HELP}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={10}
+                        value={rir}
+                        onChange={(event) => setRir(event.target.value)}
+                        placeholder={prescribedTargetRir !== null ? String(prescribedTargetRir) : "Opcional"}
+                      />
+                      {prescribedTargetRir !== null && (
+                        <p className="text-xs text-muted-foreground">
+                          Objetivo: deja aproximadamente {prescribedTargetRir} repeticiones en reserva.
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1">
+                        {RPE_LABEL}
+                        <TooltipProvider delayDuration={150}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button type="button" className="rounded-full text-muted-foreground hover:text-foreground" aria-label={RPE_HELP}>
+                                <HelpCircle className="h-3.5 w-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>{RPE_HELP}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={rpe}
+                        onChange={(event) => setRpe(event.target.value)}
+                        placeholder="Opcional"
+                      />
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
 
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button

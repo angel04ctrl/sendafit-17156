@@ -23,6 +23,7 @@ import { Dumbbell, Eye, EyeOff } from "lucide-react";
 import heroImage from "@/assets/hero-fitness.jpg";
 import { z } from "zod";
 import { getPasswordResetRedirectUrl } from "@/lib/authRedirect";
+import { getSpanishAuthErrorMessage } from "@/lib/authErrors";
 
 // Esquema de validación de datos de autenticación con Zod
 const authSchema = z.object({
@@ -42,6 +43,7 @@ const Auth = () => {
   // Estados para mostrar/ocultar contraseña
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordSignUp, setShowPasswordSignUp] = useState(false);
+  const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
 
   // Bloque de inicio de sesión - Autentica usuario existente
   const handleSignIn = async (e: React.FormEvent) => {
@@ -82,16 +84,15 @@ const Auth = () => {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
       } else {
-        const err = error as Error;
-        toast.error(err.message || "Error al iniciar sesión");
+        toast.error(getSpanishAuthErrorMessage(error, "No se pudo iniciar sesión."));
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // Bloque de registro - Guarda datos temporales y redirige a onboarding
-  // No crea la cuenta aquí, se crea al completar el onboarding
+  // Bloque de registro - Crea la cuenta en Auth de inmediato.
+  // Si Supabase requiere confirmar correo, se muestra una pantalla clara.
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -99,23 +100,38 @@ const Auth = () => {
     try {
       // Validar datos con Zod
       const validation = authSchema.parse({ email, password, fullName });
-      
-      // Guardar datos en sessionStorage para usarlos en onboarding
-      sessionStorage.setItem('pendingRegistration', JSON.stringify({
+
+      const { data, error } = await supabase.auth.signUp({
         email: validation.email,
         password: validation.password,
-        fullName: validation.fullName,
-      }));
-      
-      toast.success("¡Perfecto! Ahora completa tu perfil");
-      navigate("/onboarding");
+        options: {
+          emailRedirectTo: `${window.location.origin}/onboarding`,
+          data: {
+            full_name: validation.fullName,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.session) {
+        sessionStorage.setItem("pendingOnboardingProfile", JSON.stringify({
+          fullName: validation.fullName,
+        }));
+        toast.success("Cuenta creada. Completa tu perfil para empezar.");
+        navigate("/onboarding");
+        return;
+      }
+
+      setConfirmationEmail(validation.email);
+      setPassword("");
+      toast.info("Revisa tu correo para confirmar tu cuenta.");
     } catch (error: unknown) {
       // Manejar errores de validación
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
       } else {
-        const err = error as Error;
-        toast.error(err.message || "Error al validar datos");
+        toast.error(getSpanishAuthErrorMessage(error, "No se pudo crear la cuenta."));
       }
     } finally {
       setLoading(false);
@@ -135,12 +151,47 @@ const Auth = () => {
       if (error) throw error;
       toast.success("Te hemos enviado un enlace para recuperar tu contraseña");
     } catch (error: unknown) {
-      const err = error as Error;
-      toast.error(err.message || "Error al solicitar recuperación de contraseña");
+      toast.error(getSpanishAuthErrorMessage(error, "Error al solicitar recuperación de contraseña."));
     } finally {
       setLoading(false);
     }
   };
+
+  if (confirmationEmail) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background">
+        <div className="w-full flex items-center justify-center p-4 sm:p-8 flex-1">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Revisa tu correo</CardTitle>
+              <CardDescription>
+                Te enviamos un enlace para confirmar tu cuenta.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Confirma tu cuenta desde el correo enviado a{" "}
+                <span className="font-medium text-foreground">{confirmationEmail}</span>.
+                Después vuelve a SendaFit e inicia sesión para completar tu perfil.
+              </p>
+              <div className="rounded-md border bg-muted/50 p-3 text-sm text-muted-foreground">
+                Si no ves el correo, revisa spam o promociones. El enlace puede tardar unos minutos en llegar.
+              </div>
+              <Button
+                className="w-full"
+                onClick={() => {
+                  setConfirmationEmail(null);
+                  setPassword("");
+                }}
+              >
+                Volver a iniciar sesión
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">

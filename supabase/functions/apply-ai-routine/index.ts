@@ -3,6 +3,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { enforceAiRateLimit, rateLimitResponse } from "../_shared/rateLimit.ts";
 import { handleCors, isAllowedRequestOrigin, jsonResponse } from "../_shared/cors.ts";
 import { canAutomaticPlannerReplaceWorkout } from "../_shared/planIdentity.ts";
+import {
+  type CatalogExercise,
+  normalizeExerciseText,
+  resolveRoutineExercises,
+} from "../_shared/exerciseResolver.ts";
 
 interface RoutineExercise {
   name: string;
@@ -11,19 +16,6 @@ interface RoutineExercise {
   notes?: string;
   duration_minutes?: number;
 }
-
-type CatalogExercise = {
-  id: string;
-  nombre: string;
-  aliases?: string[] | string | null;
-  nivel_minimo?: string | null;
-  nivel?: string | null;
-  estado_calidad?: string | null;
-  tipo_entrenamiento?: string | null;
-  descanso_segundos_min?: number | null;
-  descanso_segundos_max?: number | null;
-  rir_recomendado?: number | null;
-};
 
 interface RoutineDay {
   day_name: string;
@@ -72,42 +64,7 @@ function normalizeLocation(value: unknown): "casa" | "gimnasio" | "exterior" {
 }
 
 function normalizeText(value: unknown): string {
-  return String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function toArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map(String).filter(Boolean);
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value);
-      if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
-    } catch {
-      return value.split(",").map((item) => item.trim()).filter(Boolean);
-    }
-  }
-  return [];
-}
-
-function levelRank(level: unknown): number {
-  const normalized = normalizeText(level);
-  if (["avanzado", "p", "profesional"].includes(normalized)) return 3;
-  if (["intermedio", "i"].includes(normalized)) return 2;
-  return 1;
-}
-
-function resolveExerciseByName(name: string, catalog: CatalogExercise[]) {
-  const wanted = normalizeText(name);
-  const matches = catalog.filter((exercise) => {
-    const names = [exercise.nombre, ...toArray(exercise.aliases)].map(normalizeText);
-    return names.includes(wanted);
-  });
-
-  return matches;
+  return normalizeExerciseText(value);
 }
 
 const deleteWorkoutTree = async (supabase: any, workoutIds: string[]) => {
@@ -234,41 +191,20 @@ serve(async (req) => {
       return jsonResponse(req, { error: "No se pudo validar la biblioteca de ejercicios." }, 500);
     }
 
-    const unresolved: string[] = [];
-    const ambiguous: Record<string, string[]> = {};
-    const incompatible: string[] = [];
-    const resolvedByKey = new Map<string, CatalogExercise>();
+    const routineResolution = resolveRoutineExercises(
+      metadata_routine.days,
+      exerciseCatalog as CatalogExercise[],
+      profile?.fitness_level,
+    );
+    const { unresolved, ambiguous, incompatible, substitutions, resolvedByKey } = routineResolution;
 
-    metadata_routine.days.forEach((day, dayIndex) => {
-      day.exercises.forEach((exercise, exerciseIndex) => {
-        const key = `${dayIndex}:${exerciseIndex}`;
-        const matches = resolveExerciseByName(exercise.name, exerciseCatalog as CatalogExercise[]);
-        if (matches.length === 0) {
-          unresolved.push(exercise.name);
-          return;
-        }
-        if (matches.length > 1) {
-          ambiguous[exercise.name] = matches.map((match) => `${match.id}:${match.nombre}`);
-          return;
-        }
-
-        const resolved = matches[0];
-        const quality = normalizeText(resolved.estado_calidad || "curado");
-        if (quality === "deprecado" || quality === "revisar" || levelRank(resolved.nivel_minimo || resolved.nivel) > levelRank(profile?.fitness_level)) {
-          incompatible.push(`${exercise.name} -> ${resolved.nombre}`);
-          return;
-        }
-
-        resolvedByKey.set(key, resolved);
-      });
-    });
-
-    if (unresolved.length || Object.keys(ambiguous).length || incompatible.length) {
+    if (!routineResolution.ok) {
       return jsonResponse(req, {
         error: "ai_routine_unresolved_exercises",
         unresolved,
         ambiguous,
         incompatible,
+        substitutions,
       }, 409);
     }
 

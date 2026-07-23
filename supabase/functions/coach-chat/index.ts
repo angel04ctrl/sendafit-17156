@@ -3,6 +3,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callAi } from "../_shared/aiClient.ts";
 import { enforceAiRateLimit, rateLimitResponse } from "../_shared/rateLimit.ts";
 import { handleCors, isAllowedRequestOrigin, jsonResponse } from "../_shared/cors.ts";
+import {
+  type CatalogExercise,
+  normalizeExerciseText,
+  resolveRoutineExercises,
+  toTextArray,
+} from "../_shared/exerciseResolver.ts";
 
 interface ChatHistoryItem {
   role: "user" | "assistant";
@@ -45,17 +51,6 @@ interface CoachResponse {
     days: RoutineDay[];
   } | null;
   meal_entry?: MealEntry | null;
-}
-
-interface CatalogExercise {
-  id: string;
-  nombre: string;
-  aliases?: string[] | string | null;
-  nivel_minimo?: string | null;
-  nivel?: string | null;
-  estado_calidad?: string | null;
-  equipo_requerido?: string[] | null;
-  equipamiento?: string | null;
 }
 
 const weekdayLabels: Record<number, string> = {
@@ -126,25 +121,11 @@ function normalizeCoachResponse(value: unknown): CoachResponse {
 }
 
 function normalizeText(value: unknown): string {
-  return String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return normalizeExerciseText(value);
 }
 
 function toArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map(String).filter(Boolean);
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value);
-      if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
-    } catch {
-      return value.split(",").map((item) => item.trim()).filter(Boolean);
-    }
-  }
-  return [];
+  return toTextArray(value);
 }
 
 function levelRank(level: unknown): number {
@@ -370,49 +351,21 @@ function routineValidationDetails(validation: Record<string, unknown> | null) {
   return parts.length ? ` (${parts.join("; ")})` : "";
 }
 
-function resolveExerciseByName(name: string, catalog: CatalogExercise[]) {
-  const wanted = normalizeText(name);
-  return catalog.filter((exercise) => {
-    const names = [exercise.nombre, ...toArray(exercise.aliases)].map(normalizeText);
-    return names.includes(wanted);
-  });
-}
-
 function validateRoutine(
   routine: CoachResponse["metadata_routine"],
   catalog: CatalogExercise[],
   profile: Record<string, unknown> | null,
 ) {
-  const unresolved: string[] = [];
-  const incompatible: string[] = [];
-  const ambiguous: Record<string, string[]> = {};
-  if (!routine?.days?.length) return { ok: true, unresolved, incompatible, ambiguous };
+  if (!routine?.days?.length) {
+    return { ok: true, unresolved: [], incompatible: [], ambiguous: {}, substitutions: [] };
+  }
 
-  routine.days.forEach((day) => {
-    (day.exercises || []).forEach((exercise) => {
-      const matches = resolveExerciseByName(exercise.name, catalog);
-      if (matches.length === 0) {
-        unresolved.push(exercise.name);
-        return;
-      }
-      if (matches.length > 1) {
-        ambiguous[exercise.name] = matches.map((match) => `${match.id}:${match.nombre}`);
-        return;
-      }
-      const resolved = matches[0];
-      const quality = normalizeText(resolved.estado_calidad || "curado");
-      if (["deprecado", "revisar"].includes(quality) || levelRank(resolved.nivel_minimo || resolved.nivel) > levelRank(profile?.fitness_level)) {
-        incompatible.push(`${exercise.name} -> ${resolved.nombre}`);
-      }
-    });
-  });
-
-  return {
-    ok: unresolved.length === 0 && incompatible.length === 0 && Object.keys(ambiguous).length === 0,
-    unresolved,
-    incompatible,
-    ambiguous,
-  };
+  const { resolvedByKey: _resolvedByKey, ...validation } = resolveRoutineExercises(
+    routine.days,
+    catalog,
+    profile?.fitness_level,
+  );
+  return validation;
 }
 
 async function safeQuery<T>(query: PromiseLike<{ data: T | null; error: unknown }>, fallback: T): Promise<T> {
@@ -867,6 +820,14 @@ ${JSON.stringify(compactForPrompt(context))}`;
       if (!routineValidation.ok) {
         response.message = `Puedo ayudarte a preparar un cambio de rutina, pero todavia no hay una vista previa aplicable porque algunos ejercicios no pasaron la validacion del catalogo${routineValidationDetails(routineValidation)}. No aplique ningun cambio. Pideme que la ajuste con ejercicios disponibles y te preparo una version validada.`;
         response.metadata_routine = null;
+      } else {
+        const substitutions = Array.isArray(routineValidation.substitutions)
+          ? routineValidation.substitutions as string[]
+          : [];
+        const substitutionText = substitutions.length
+          ? ` Use ejercicios equivalentes disponibles: ${substitutions.slice(0, 4).join("; ")}.`
+          : "";
+        response.message = `${response.message}${substitutionText} Prepare una vista previa valida con ejercicios del catalogo. Revisa y confirma antes de aplicar.`;
       }
     }
 

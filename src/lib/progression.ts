@@ -52,7 +52,7 @@ export function buildProgressionSuggestion({
   const source = hasStableExerciseId ? "exercise_id" : "snapshot";
   const fallbackConfidence: ProgressionConfidence = source === "exercise_id" ? "medium" : "low";
   const confidencePrefix = source === "snapshot"
-    ? "Solo hay historial por nombre, así que la recomendación es conservadora. "
+    ? "Esta es una recomendacion inicial porque aun falta historial completo de este ejercicio. "
     : "";
 
   if (currentSessionFeeling === "pain") {
@@ -80,8 +80,8 @@ export function buildProgressionSuggestion({
           ? " Usa una primera serie de aproximación para calibrar la carga del día."
           : "";
     const reason = targetWeight
-      ? `Mantén este peso por ahora y enfócate en completar las series con buena técnica. Cuando tengamos más historial, te sugeriré si conviene subir peso o repeticiones.${levelHint}`
-      : `Aún estamos construyendo tu historial. Elige un peso con el que puedas completar las reps objetivo dejando 2-3 repeticiones en reserva.${levelHint} En las próximas sesiones podré sugerirte cuándo subir la carga.`;
+      ? `Manten este peso por ahora y enfocate en completar las series con buena tecnica. Usa un peso comodo y deja 2-3 repeticiones en reserva. Con mas entrenamientos, SendaFit ajustara mejor tus sugerencias.${levelHint}`
+      : `Usa un peso comodo y deja 2-3 repeticiones en reserva. Con mas entrenamientos, SendaFit ajustara mejor tus sugerencias.${levelHint}`;
 
     return {
       action: "no_data",
@@ -198,7 +198,7 @@ export function buildProgressionSuggestion({
       action: "maintain_weight",
       label: "Mantener",
       confidence: "low",
-      reason: "Solo hay historial por nombre, no por exercise_id; mantén la carga hasta confirmar continuidad real del ejercicio.",
+      reason: "Recomendacion inicial: manten la carga hasta que SendaFit tenga mas entrenamientos registrados de este ejercicio.",
       previousWeight,
       previousReps,
       suggestedWeight: previousWeight,

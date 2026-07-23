@@ -1,15 +1,15 @@
-/**
+﻿/**
  * OnboardingForm.tsx - Formulario principal de onboarding
  * 
- * Este componente orquesta todo el proceso de registro y configuración inicial del usuario.
+ * Este componente orquesta todo el proceso de registro y configuraciÃ³n inicial del usuario.
  * Se encarga de:
- * - Gestionar 7 pasos de onboarding con validación en cada paso
- * - Verificar si el usuario ya completó onboarding (redirigir a dashboard)
+ * - Gestionar 7 pasos de onboarding con validaciÃ³n en cada paso
+ * - Verificar si el usuario ya completÃ³ onboarding (redirigir a dashboard)
  * - Verificar si hay registro pendiente en sessionStorage
- * - Calcular macros automáticamente basados en datos del perfil
+ * - Calcular macros automÃ¡ticamente basados en datos del perfil
  * - Crear cuenta de usuario en Supabase Auth
  * - Crear perfil completo en base de datos
- * - Asignar rutina automática al finalizar
+ * - Asignar rutina automÃ¡tica al finalizar
  * - Prevenir cierre accidental de ventana durante el proceso
  */
 
@@ -28,25 +28,36 @@ import OnboardingStep4 from "./OnboardingStep4";
 import OnboardingStep5 from "./OnboardingStep5";
 import OnboardingStep6 from "./OnboardingStep6";
 import OnboardingStep7 from "./OnboardingStep7";
+import { getSpanishAuthErrorMessage } from "@/lib/authErrors";
 
 const OnboardingForm = () => {
   const navigate = useNavigate();
   // Estado del paso actual (1-7)
   const [currentStep, setCurrentStep] = useState(1);
-  // Estado de carga durante envío del formulario
+  // Estado de carga durante envÃ­o del formulario
   const [loading, setLoading] = useState(false);
-  // Estado de verificación inicial del perfil
+  // Estado de verificaciÃ³n inicial del perfil
   const [checkingProfile, setCheckingProfile] = useState(true);
   // Datos acumulados del formulario de onboarding
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [formData, setFormData] = useState<any>({});
   const sb = supabase;
 
+  const getPendingOnboardingName = () => {
+    try {
+      const pendingProfile = sessionStorage.getItem("pendingOnboardingProfile");
+      return pendingProfile ? (JSON.parse(pendingProfile)?.fullName as string | undefined) : undefined;
+    } catch {
+      sessionStorage.removeItem("pendingOnboardingProfile");
+      return undefined;
+    }
+  };
+
   const totalSteps = 7; // Total de pasos en el proceso
   const progress = (currentStep / totalSteps) * 100; // Porcentaje de progreso
 
-  // Bloque de verificación inicial - Verifica estado de onboarding o registro pendiente
-  // Evita que usuarios autenticados que ya completaron onboarding vuelvan aquí
+  // Bloque de verificaciÃ³n inicial - Verifica estado de onboarding o registro pendiente
+  // Evita que usuarios autenticados que ya completaron onboarding vuelvan aquÃ­
   useEffect(() => {
     const checkOnboardingStatus = async () => {
       try {
@@ -54,6 +65,13 @@ const OnboardingForm = () => {
         const { data: { user } } = await supabase.auth.getUser();
         
         if (user) {
+          const pendingFullName = getPendingOnboardingName();
+          const metadataFullName = user.user_metadata?.full_name as string | undefined;
+          const initialFullName = pendingFullName || metadataFullName;
+          if (initialFullName) {
+            setFormData((prev: any) => ({ ...prev, fullName: prev.fullName || initialFullName }));
+          }
+
           // Usuario ya autenticado, verificar onboarding
           const { data: profile } = await sb
             .from("profiles")
@@ -62,26 +80,18 @@ const OnboardingForm = () => {
             .maybeSingle();
 
           if (profile?.onboarding_completed) {
-            // Ya completó onboarding, ir a dashboard
+            // Ya completÃ³ onboarding, ir a dashboard
             navigate("/dashboard", { replace: true });
             return;
           }
-          // Si no completó onboarding, permitir continuar (usuario autenticado sin perfil completo)
+          // Si no completÃ³ onboarding, permitir continuar (usuario autenticado sin perfil completo)
           setCheckingProfile(false);
           return;
         }
         
-        // No hay usuario autenticado, verificar si hay registro pendiente
-        const pendingReg = sessionStorage.getItem('pendingRegistration');
-        if (!pendingReg) {
-          // No hay usuario ni registro pendiente - redirigir a auth
-          toast.error("Debes registrarte primero");
-          navigate("/auth", { replace: true });
-          return;
-        }
-        
-        // Hay registro pendiente, permitir continuar (flujo normal de registro)
-        setCheckingProfile(false);
+        toast.error("Inicia sesiÃ³n para completar tu perfil.");
+        navigate("/auth", { replace: true });
+        return;
       } catch (error: unknown) {
         console.error("Error checking onboarding status:", error);
         toast.error("Error al verificar tu registro. Por favor vuelve a intentarlo.");
@@ -93,19 +103,19 @@ const OnboardingForm = () => {
     checkOnboardingStatus();
   }, [navigate, sb]);
 
-  // Bloque de prevención de cierre - Evita que el usuario pierda su progreso
+  // Bloque de prevenciÃ³n de cierre - Evita que el usuario pierda su progreso
   // Muestra advertencias si intenta cerrar la ventana durante el registro
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (currentStep > 0) {
         e.preventDefault();
-        e.returnValue = "¿Estás segura de salir? Perderás tu progreso y deberás registrarte nuevamente.";
+        e.returnValue = "Â¿EstÃ¡s segura de salir? PerderÃ¡s tu progreso y deberÃ¡s registrarte nuevamente.";
       }
     };
 
     const handleVisibilityChange = () => {
       if (document.hidden && currentStep > 0 && currentStep < totalSteps) {
-        toast.warning("⚠️ No cierres la app hasta completar tu registro");
+        toast.warning("âš ï¸ No cierres la app hasta completar tu registro");
       }
     };
 
@@ -126,15 +136,15 @@ const OnboardingForm = () => {
     );
   }
 
-  // Función helper para actualizar datos del formulario de forma incremental
+  // FunciÃ³n helper para actualizar datos del formulario de forma incremental
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateFormData = (data: any) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setFormData((prev: any) => ({ ...prev, ...data }));
   };
 
-  // Función de validación por paso - Verifica que cada paso tenga datos completos
-  // Retorna true si el paso actual está validado correctamente
+  // FunciÃ³n de validaciÃ³n por paso - Verifica que cada paso tenga datos completos
+  // Retorna true si el paso actual estÃ¡ validado correctamente
   const validateStep = () => {
     switch (currentStep) {
       case 1: // Validar datos personales
@@ -153,25 +163,25 @@ const OnboardingForm = () => {
           return false;
         }
         if (!formData.availableDays) {
-          toast.error("Por favor indica cuántos días por semana puedes entrenar");
+          toast.error("Por favor indica cuÃ¡ntos dÃ­as por semana puedes entrenar");
           return false;
         }
         if (!formData.sessionDuration) {
-          toast.error("Por favor indica la duración de tus sesiones");
+          toast.error("Por favor indica la duraciÃ³n de tus sesiones");
           return false;
         }
         if (!formData.availableWeekdays || formData.availableWeekdays.length === 0) {
-          toast.error("Por favor selecciona los días específicos disponibles para entrenar");
+          toast.error("Por favor selecciona los dÃ­as especÃ­ficos disponibles para entrenar");
           return false;
         }
         if (formData.availableWeekdays.length < formData.availableDays) {
-          toast.error(`Debes seleccionar al menos ${formData.availableDays} días específicos`);
+          toast.error(`Debes seleccionar al menos ${formData.availableDays} dÃ­as especÃ­ficos`);
           return false;
         }
         break;
       case 3:
         if (!formData.healthConditions || formData.healthConditions.length === 0) {
-          toast.error("Por favor selecciona al menos una opción en condiciones de salud");
+          toast.error("Por favor selecciona al menos una opciÃ³n en condiciones de salud");
           return false;
         }
         break;
@@ -181,17 +191,17 @@ const OnboardingForm = () => {
           return false;
         }
         if (!formData.sleepHours) {
-          toast.error("Por favor indica tus horas de sueño promedio");
+          toast.error("Por favor indica tus horas de sueÃ±o promedio");
           return false;
         }
         if (!formData.stressLevel) {
-          toast.error("Por favor indica tu nivel de estrés percibido");
+          toast.error("Por favor indica tu nivel de estrÃ©s percibido");
           return false;
         }
         break;
       case 7:
         if (!formData.termsAccepted) {
-          toast.error("Debes aceptar los términos y condiciones para continuar");
+          toast.error("Debes aceptar los tÃ©rminos y condiciones para continuar");
           return false;
         }
         break;
@@ -212,7 +222,7 @@ const OnboardingForm = () => {
     }
   };
 
-  // Función principal de envío - Ejecuta todo el proceso de creación de cuenta
+  // FunciÃ³n principal de envÃ­o - Ejecuta todo el proceso de creaciÃ³n de cuenta
   // Incluye: crear usuario, calcular macros, crear perfil, asignar rutina
   const handleSubmit = async () => {
     if (!validateStep()) return;
@@ -221,50 +231,21 @@ const OnboardingForm = () => {
     try {
       // PASO 1: Verificar si hay un usuario ya autenticado
       const { data: { user: existingUser } } = await supabase.auth.getUser();
-      
-      let userId: string;
-      let userFullName: string;
 
-      if (existingUser) {
-        // Usuario ya existe, solo crear/actualizar perfil
-        userId = existingUser.id;
-        userFullName = formData.fullName || existingUser.user_metadata?.full_name || existingUser.email?.split('@')[0] || 'Usuario';
-      } else {
-        // No hay usuario autenticado, verificar registro pendiente
-        const pendingRegString = sessionStorage.getItem('pendingRegistration');
-        
-        if (!pendingRegString) {
-          toast.error("Error: No hay registro pendiente. Redirigiendo a la página de registro...", {
-            duration: 3000,
-          });
-          setTimeout(() => {
-            navigate("/auth", { replace: true });
-          }, 1500);
-          return;
-        }
-
-        const pendingReg = JSON.parse(pendingRegString);
-        
-        // Crear usuario nuevo en Auth
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: pendingReg.email,
-          password: pendingReg.password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`,
-            data: {
-              full_name: pendingReg.fullName,
-            },
-          },
-        });
-
-        if (authError) throw authError;
-        if (!authData.user) throw new Error("No se pudo crear el usuario");
-        
-        userId = authData.user.id;
-        userFullName = formData.fullName || pendingReg.fullName;
+      if (!existingUser) {
+        toast.error("Tu sesion expiro. Inicia sesion para completar tu perfil.");
+        navigate("/auth", { replace: true });
+        return;
       }
 
-      // PASO 2: Calcular macros automáticamente basados en el perfil
+      const userId = existingUser.id;
+      const userFullName =
+        formData.fullName ||
+        existingUser.user_metadata?.full_name ||
+        existingUser.email?.split("@")[0] ||
+        "Usuario";
+
+      // PASO 2: Calcular macros automÃ¡ticamente basados en el perfil
       let calculatedMacros = null;
       
       if (validateProfileData({
@@ -327,14 +308,14 @@ const OnboardingForm = () => {
           notifications_enabled: formData.notifications ?? true,
           wearables_sync_enabled: formData.wearables || false,
           terms_accepted: formData.termsAccepted,
-          // Asignar los macros calculados automáticamente
+          // Asignar los macros calculados automÃ¡ticamente
           daily_calorie_goal: calculatedMacros?.dailyCalories || 2000,
           daily_protein_goal: calculatedMacros?.protein || 150,
           daily_carbs_goal: calculatedMacros?.carbs || 200,
           daily_fat_goal: calculatedMacros?.fat || 50,
           routine_assignment_status: "pending",
           routine_assignment_error: null,
-          onboarding_completed: false // Será completado por la función de backend
+          onboarding_completed: false // SerÃ¡ completado por la funciÃ³n de backend
         });
 
       if (profileError) {
@@ -351,20 +332,21 @@ const OnboardingForm = () => {
         });
 
       if (roleError) {
-        // Ignorar error si el rol ya existe (código 23505 es violación de unique constraint)
+        // Ignorar error si el rol ya existe (cÃ³digo 23505 es violaciÃ³n de unique constraint)
         if (roleError.code !== '23505') {
           console.error("Error al crear rol de usuario:", roleError);
           throw roleError;
         }
       }
 
-      // Limpiar datos temporales
-      sessionStorage.removeItem('pendingRegistration');
+      // Limpiar datos temporales de onboarding
+      sessionStorage.removeItem("pendingOnboardingProfile");
+      sessionStorage.removeItem("pendingRegistration");
 
-      // PASO 5: Asignar rutina automáticamente basada en el perfil
+      // PASO 5: Asignar rutina automÃ¡ticamente basada en el perfil
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error("No se encontró una sesión autenticada para asignar la rutina.");
+        if (!session) throw new Error("No se encontrÃ³ una sesiÃ³n autenticada para asignar la rutina.");
 
         const { data: routineData, error: routineError } = await supabase.functions.invoke('assign-routine', {
           headers: { 
@@ -375,18 +357,18 @@ const OnboardingForm = () => {
 
         if (routineError) {
           console.error("Error al asignar rutina:", routineError);
-          toast.warning("Cuenta creada, pero hubo un error al asignar tu rutina. Puedes asignarla después desde el dashboard.");
+          toast.warning("Cuenta creada, pero hubo un error al asignar tu rutina. Puedes asignarla despuÃ©s desde el dashboard.");
         } else if (routineData?.success === false || routineData?.status === "failed") {
           console.warn("Routine assignment failed:", routineData);
           toast.warning(
             routineData?.error ||
-              "Cuenta creada, pero no pudimos asignar tu rutina. Podrás reintentarlo desde el dashboard.",
+              "Cuenta creada, pero no pudimos asignar tu rutina. PodrÃ¡s reintentarlo desde el dashboard.",
           );
         } else {
-          toast.success(`¡Cuenta creada! Se te asignó el plan: ${routineData.plan?.nombre_plan || 'personalizado'} 🎉`);
+          toast.success(`Â¡Cuenta creada! Se te asignÃ³ el plan: ${routineData.plan?.nombre_plan || 'personalizado'} ðŸŽ‰`);
         }
       } catch (error) {
-        console.error("Error al llamar a la función de asignar rutina:", error);
+        console.error("Error al llamar a la funciÃ³n de asignar rutina:", error);
         toast.warning("Cuenta creada exitosamente. Puedes configurar tu rutina desde el dashboard.");
       }
 
@@ -395,31 +377,30 @@ const OnboardingForm = () => {
       console.error("Error en handleSubmit:", error);
       
       const err = error as Error & { code?: string };
-      // Determinar el mensaje de error específico
-      let errorMessage = "Hubo un error al completar tu registro";
+      // Determinar el mensaje de error especÃ­fico
+      let errorMessage = getSpanishAuthErrorMessage(error, "Hubo un error al completar tu registro.");
       
       if (err?.message?.includes("already registered") || err?.message?.includes("User already registered")) {
-        errorMessage = "Este correo ya está registrado. Serás redirigida a la página de inicio de sesión";
+        errorMessage = "Este correo ya estÃ¡ registrado. SerÃ¡s redirigida a la pÃ¡gina de inicio de sesiÃ³n";
       } else if (err?.message?.includes("Invalid email")) {
-        errorMessage = "El formato del correo electrónico no es válido";
+        errorMessage = "El formato del correo electrÃ³nico no es vÃ¡lido";
       } else if (err?.message?.includes("Password")) {
-        errorMessage = "La contraseña no cumple con los requisitos mínimos";
+        errorMessage = "La contraseÃ±a no cumple con los requisitos mÃ­nimos";
       } else if (err?.code === "23505") {
         errorMessage = "Este usuario ya existe en el sistema";
       } else if (err?.message?.includes("profiles")) {
         errorMessage = "Error al crear tu perfil. Verifica que todos los datos sean correctos";
       } else if (err?.message?.includes("permission denied") || err?.message?.includes("RLS")) {
         errorMessage = "Error de permisos al crear tu cuenta. Por favor, intenta nuevamente";
-      } else if (err?.message) {
-        errorMessage = err.message;
       }
       
       toast.error(errorMessage);
       
       // Limpiar datos temporales
-      sessionStorage.removeItem('pendingRegistration');
+      sessionStorage.removeItem("pendingOnboardingProfile");
+      sessionStorage.removeItem("pendingRegistration");
       
-      // Redirigir a la página de autenticación
+      // Redirigir a la pÃ¡gina de autenticaciÃ³n
       setTimeout(() => {
         navigate("/auth", { replace: true });
       }, 2000);
@@ -428,7 +409,7 @@ const OnboardingForm = () => {
     }
   };
 
-  // Función para renderizar el paso actual - Switch entre los 7 componentes
+  // FunciÃ³n para renderizar el paso actual - Switch entre los 7 componentes
   const renderStep = () => {
     const stepProps = { formData, updateFormData };
     
@@ -437,9 +418,9 @@ const OnboardingForm = () => {
       case 2: return <OnboardingStep2 {...stepProps} />; // Objetivos y nivel
       case 3: return <OnboardingStep3 {...stepProps} />; // Salud y condiciones
       case 4: return <OnboardingStep4 {...stepProps} />; // Ciclo menstrual (opcional)
-      case 5: return <OnboardingStep5 {...stepProps} />; // Nutrición y hábitos
+      case 5: return <OnboardingStep5 {...stepProps} />; // NutriciÃ³n y hÃ¡bitos
       case 6: return <OnboardingStep6 {...stepProps} />; // Medidas iniciales
-      case 7: return <OnboardingStep7 {...stepProps} />; // Preferencias y términos
+      case 7: return <OnboardingStep7 {...stepProps} />; // Preferencias y tÃ©rminos
       default: return null;
     }
   };

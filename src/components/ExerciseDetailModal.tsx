@@ -6,13 +6,15 @@
  */
 
 import type { ReactNode } from "react";
-import { AlertTriangle, Dumbbell, ListChecks, MapPin, Repeat, ShieldAlert, Target, Timer, TrendingUp } from "lucide-react";
+import { AlertTriangle, Dumbbell, HelpCircle, ListChecks, MapPin, Repeat, ShieldAlert, Target, Timer, TrendingUp } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useExerciseProgressSummary } from "@/hooks/useBackendApi";
 import { buildProgressionSuggestion } from "@/lib/progression";
 import { formatExerciseLevel, toTextArray } from "@/lib/exerciseMetadata";
+import { getProgressionContextLabel, PERSONAL_RECORD_HELP, RIR_LABEL, RPE_LABEL } from "@/lib/trainingProgressionCopy";
 
 interface ExerciseDetailModalProps {
   open: boolean;
@@ -116,6 +118,7 @@ export const ExerciseDetailModal = ({ open, onOpenChange, exercise }: ExerciseDe
     targetWeight: null,
     hasStableExerciseId: !!exercise.id,
   });
+  const progressionContextLabel = getProgressionContextLabel(progressionSuggestion.confidence);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -184,7 +187,7 @@ export const ExerciseDetailModal = ({ open, onOpenChange, exercise }: ExerciseDe
             </Card>
             {!isCardio && !isTimedExercise && exercise.rir_recomendado !== null && (
               <Card className="p-4">
-                <p className="text-xs text-muted-foreground">RIR sugerido</p>
+                <p className="text-xs text-muted-foreground">{RIR_LABEL} sugeridas</p>
                 <p className="mt-1 font-semibold">{formatRir(exercise.rir_recomendado)}</p>
               </Card>
             )}
@@ -266,7 +269,21 @@ export const ExerciseDetailModal = ({ open, onOpenChange, exercise }: ExerciseDe
                 <div className="space-y-4">
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div>
-                      <p className="text-xs text-muted-foreground">Mayor peso</p>
+                      <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                        Record personal
+                        <TooltipProvider delayDuration={150}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button type="button" className="rounded-full text-muted-foreground hover:text-foreground" aria-label={PERSONAL_RECORD_HELP}>
+                                <HelpCircle className="h-3.5 w-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>{PERSONAL_RECORD_HELP}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </p>
                       <p className="font-semibold">
                         {progressSummary.prs.maxWeight !== null ? `${progressSummary.prs.maxWeight} kg` : "Sin dato"}
                       </p>
@@ -298,8 +315,8 @@ export const ExerciseDetailModal = ({ open, onOpenChange, exercise }: ExerciseDe
                           {session.sets.map((set) => (
                             <div key={`${session.sessionId}-${set.setNumber}`} className="text-sm text-muted-foreground">
                               Serie {set.setNumber}: {set.weight || 0} kg x {set.reps || 0}
-                              {set.rir !== null ? ` | RIR ${set.rir}` : ""}
-                              {set.rpe !== null ? ` | RPE ${set.rpe}` : ""}
+                              {set.rir !== null ? ` | ${RIR_LABEL}: ${set.rir}` : ""}
+                              {set.rpe !== null ? ` | ${RPE_LABEL}: ${set.rpe}/10` : ""}
                             </div>
                           ))}
                         </div>
@@ -324,9 +341,7 @@ export const ExerciseDetailModal = ({ open, onOpenChange, exercise }: ExerciseDe
                   <p className="font-semibold">{progressionSuggestion.label}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{progressionSuggestion.reason}</p>
                 </div>
-                <Badge variant="outline">
-                  Confianza {progressionSuggestion.confidence === "high" ? "alta" : progressionSuggestion.confidence === "medium" ? "media" : "baja"}
-                </Badge>
+                <Badge variant="outline">{progressionContextLabel}</Badge>
               </div>
               <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                 <div>
