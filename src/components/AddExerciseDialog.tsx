@@ -270,11 +270,11 @@ export const AddExerciseDialog = ({ open, onOpenChange, onAddExercise, location 
                   <p className="truncate font-medium">{selectedExercise.nombre}</p>
                   <button
                     type="button"
-                    className="shrink-0 rounded-full p-0.5 text-blue-500 transition-colors hover:bg-blue-500/10 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    className="shrink-0 rounded-full p-0.5 text-primary transition-colors hover:bg-primary/10 hover:text-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     aria-label={`Ver información de ${selectedExercise.nombre}`}
                     onClick={() => setExerciseDetailOpen(true)}
                   >
-                    <HelpCircle className="h-4 w-4 text-blue-500" />
+                    <HelpCircle className="h-4 w-4 text-primary" />
                   </button>
                 </div>
                 <p className="text-muted-foreground text-xs">{selectedExercise.descripcion}</p>

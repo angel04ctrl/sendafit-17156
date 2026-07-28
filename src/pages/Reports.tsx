@@ -223,9 +223,9 @@ const Reports = () => {
                   <p className="text-muted-foreground">Completados</p>
                   <p className="text-lg font-bold text-primary">{weeklyCompleted}</p>
                 </div>
-                <div className="rounded-lg bg-amber-50 p-2">
+                <div className="rounded-lg bg-warning/10 p-2">
                   <p className="text-muted-foreground">Saltados</p>
-                  <p className="text-lg font-bold text-amber-700">{weeklySkipped}</p>
+                  <p className="text-lg font-bold text-warning">{weeklySkipped}</p>
                 </div>
                 <div className="rounded-lg bg-muted p-2">
                   <p className="text-muted-foreground">Pendientes</p>
@@ -243,8 +243,8 @@ const Reports = () => {
               <p className="animate-pulse text-sm text-muted-foreground">Cargando reporte...</p>
             </Card>
           ) : isError ? (
-            <Card className="border-amber-200 bg-amber-50 p-6">
-              <p className="text-sm text-amber-800">
+            <Card className="border-warning/30 bg-warning/10 p-6">
+              <p className="text-sm text-foreground">
                 Estamos presentando problemas al cargar tus reportes. Intenta de nuevo en unos minutos.
               </p>
             </Card>

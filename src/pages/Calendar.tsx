@@ -187,9 +187,9 @@ const Calendar = () => {
                     <p className="text-muted-foreground">Listos</p>
                     <p className="text-lg font-bold text-primary">{weeklyStats.completed}</p>
                   </div>
-                  <div className="rounded-lg bg-amber-50 p-2">
+                  <div className="rounded-lg bg-warning/10 p-2">
                     <p className="text-muted-foreground">Saltados</p>
-                    <p className="text-lg font-bold text-amber-700">{weeklyStats.skipped}</p>
+                    <p className="text-lg font-bold text-warning">{weeklyStats.skipped}</p>
                   </div>
                   <div className="rounded-lg bg-muted p-2">
                     <p className="text-muted-foreground">Pendientes</p>
@@ -201,12 +201,12 @@ const Calendar = () => {
           )}
 
           {hasCalendarError && (
-            <Card className="p-4 bg-amber-50 border-amber-200">
+            <Card className="p-4 border-warning/30 bg-warning/10">
               <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <h3 className="font-semibold text-amber-900 mb-2">Estamos presentando problemas con tu agenda</h3>
-                  <p className="text-sm text-amber-800">
+                  <h3 className="font-semibold text-foreground mb-2">Estamos presentando problemas con tu agenda</h3>
+                  <p className="text-sm text-muted-foreground">
                     No pudimos cargar tus entrenamientos en este momento. Intenta de nuevo en unos minutos.
                   </p>
                 </div>
@@ -216,12 +216,12 @@ const Calendar = () => {
 
           {/* Alerta cuando no hay entrenamientos */}
           {!hasCalendarError && workouts.length === 0 && (
-            <Card className="p-4 bg-amber-50 border-amber-200">
+            <Card className="p-4 border-warning/30 bg-warning/10">
               <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <h3 className="font-semibold text-amber-900 mb-2">Aún no tienes entrenamientos</h3>
-                  <p className="text-sm text-amber-800">
+                  <h3 className="font-semibold text-foreground mb-2">Aún no tienes entrenamientos</h3>
+                  <p className="text-sm text-muted-foreground">
                     Completa tu perfil y selecciona una rutina para que se generen tus entrenamientos automáticamente.
                   </p>
                 </div>
@@ -421,7 +421,7 @@ const Calendar = () => {
                                 workout.completed
                                   ? "bg-primary/20 text-primary"
                                   : workout.skipped
-                                  ? "bg-amber-50 text-amber-700"
+                                  ? "bg-warning/10 text-warning"
                                   : "bg-muted"
                               }`}
                             >

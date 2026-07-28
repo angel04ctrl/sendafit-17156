@@ -45,7 +45,7 @@ export const StatCard = ({
   const variants = {
     default: "bg-gradient-card border-primary/20",
     primary: "bg-gradient-primary text-primary-foreground border-primary/30",
-    secondary: "bg-gradient-secondary text-secondary-foreground border-secondary/30",
+    secondary: "bg-secondary text-secondary-foreground border-border",
     accent: "bg-gradient-accent text-accent-foreground border-accent/30",
   };
 

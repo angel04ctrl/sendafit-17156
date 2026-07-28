@@ -219,7 +219,7 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
                   ${currentPrice} <span className="text-sm text-muted-foreground">MXN</span>
                 </span>
                 {billingPeriod === "anual" && (
-                  <div className="text-xs text-green-600 dark:text-green-400 font-medium">
+                  <div className="text-xs text-success font-medium">
                     Ahorra ${discount} MXN
                   </div>
                 )}
@@ -248,7 +248,7 @@ export const PaymentModal = ({ open, onOpenChange }: PaymentModalProps) => {
                 <Label htmlFor="anual" className="flex-1 cursor-pointer">
                   <div className="font-medium">Anual</div>
                   <div className="text-xs text-muted-foreground">
-                    $1,058 MXN/año <span className="text-green-600 dark:text-green-400 font-medium">(Ahorra 10%)</span>
+                    $1,058 MXN/año <span className="text-success font-medium">(Ahorra 10%)</span>
                   </div>
                 </Label>
               </div>

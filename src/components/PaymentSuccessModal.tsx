@@ -24,9 +24,9 @@ export const PaymentSuccessModal = ({ open, onOpenChange }: PaymentSuccessModalP
         <div className="flex flex-col items-center text-center space-y-4 py-4">
           <div className="relative">
             <div className="absolute inset-0 animate-ping">
-              <CheckCircle2 className="w-16 h-16 text-green-500 opacity-75" />
+              <CheckCircle2 className="w-16 h-16 text-success opacity-75" />
             </div>
-            <CheckCircle2 className="w-16 h-16 text-green-500 relative" />
+            <CheckCircle2 className="w-16 h-16 text-success relative" />
           </div>
 
           <div className="space-y-2">

@@ -169,6 +169,182 @@ Entrega:
 - build.
 
 ---
+# Sprint 1.1: Coach IA con contexto conversacional y edición de rutina en progreso.
+
+No avances a features grandes nuevas. No cambies macros, pagos, paleta, PWA ni Stripe en este sprint.
+
+## Problema real
+
+El Coach IA pierde contexto después de proponer una rutina.
+
+Ejemplo:
+
+Usuario:
+“Hazme un plan de entrenamiento de tres días, lunes, miércoles y viernes, con duración de dos horas cada día y enfocado en hipertrofia para ganar masa muscular.”
+
+El Coach genera una rutina.
+
+Luego el usuario dice:
+“Quiero que lunes sea brazos, miércoles espalda y viernes pierna.”
+
+El Coach responde algo genérico como:
+“Soy un coach de IA y puedo ayudarte con entrenamiento, nutrición…”
+
+Eso está mal.
+
+El Coach debería entender que el usuario está modificando la rutina que acaba de pedir.
+
+## Objetivo
+
+El Coach debe mantener contexto suficiente para permitir una conversación natural sobre una rutina en progreso.
+
+Debe poder entender frases como:
+
+- “Cambia el lunes por brazos.”
+- “Haz que miércoles sea espalda.”
+- “No quiero pierna el lunes.”
+- “Mejor pon pecho y tríceps el viernes.”
+- “Cambia ese ejercicio.”
+- “Dame otra opción.”
+- “Ahora aplícala.”
+- “No me gusta esa distribución.”
+- “Déjalo en lunes, miércoles y viernes.”
+
+## Solución esperada
+
+No depender solamente de la ventana de contexto del modelo.
+
+Crear o usar un estado estructurado del Coach.
+
+Por ejemplo:
+
+- conversación activa;
+- mensajes recientes;
+- intención actual;
+- rutina en borrador;
+- rutina pendiente de aplicar;
+- cambios solicitados;
+- preview validada;
+- ejercicios resueltos con `exercise_id`.
+
+Si ya existen tablas o estructuras para mensajes del coach, reutilizarlas. Si no existen, proponer una solución mínima segura.
+
+## Reglas
+
+1. Cuando el Coach genera una rutina, debe guardarla como `draft` o “vista previa pendiente”.
+2. Si el usuario manda un mensaje posterior y existe una rutina pendiente, el Coach debe interpretar referencias como:
+   - “el lunes”
+   - “ese entrenamiento”
+   - “la rutina”
+   - “cámbialo”
+   - “ponlo”
+   - “mejor así”
+3. El Coach debe modificar el draft, no empezar de cero.
+4. El Coach debe devolver una nueva vista previa.
+5. No debe aplicar la rutina sin confirmación explícita.
+6. Si el usuario dice “aplícalo”, “sí, déjala así”, “guardar rutina” o equivalente, entonces puede aplicar la rutina validada.
+7. Si no hay draft activo, el Coach debe pedir contexto en vez de responder genérico.
+8. No debe perder `exercise_id`.
+9. No debe usar ejercicios no resueltos.
+10. No debe usar texto libre como identidad.
+11. Si hay ambigüedad real, preguntar una aclaración concreta.
+
+## Ejemplo esperado
+
+Usuario:
+“Hazme un plan de 3 días lunes, miércoles y viernes, 2 horas, hipertrofia.”
+
+Coach:
+“Preparé esta vista previa…”
+
+Usuario:
+“Quiero que lunes sea brazos, miércoles espalda y viernes pierna.”
+
+Coach:
+“Claro. Actualicé la distribución de la rutina pendiente:
+- Lunes: brazos
+- Miércoles: espalda
+- Viernes: pierna
+
+También ajusté los ejercicios para mantener el volumen de hipertrofia. ¿Quieres que la aplique?”
+
+## Casos de prueba obligatorios
+
+### Caso A
+
+Usuario pide rutina de 3 días.
+Luego pide cambiar los grupos musculares por día.
+Resultado:
+El Coach modifica la rutina pendiente.
+
+### Caso B
+
+Usuario pide cambiar un ejercicio específico.
+Resultado:
+El Coach usa sustitución válida con `exercise_id`.
+
+### Caso C
+
+Usuario dice “aplícalo”.
+Resultado:
+Solo aplica si la vista previa es válida.
+
+### Caso D
+
+Usuario dice “no, mejor déjalo como antes”.
+Resultado:
+El Coach puede volver a la versión anterior del draft si la estructura lo permite, o regenerar una vista previa anterior.
+
+### Caso E
+
+Usuario inicia una conversación nueva sin draft.
+Resultado:
+El Coach no inventa contexto.
+
+### Caso F
+
+Usuario pide una rutina y luego refresca la página.
+Resultado:
+El draft pendiente no se pierde si la sesión sigue activa o está guardado.
+
+## Revisar archivos
+
+Revisar como mínimo:
+
+- edge function del coach
+- `apply-ai-routine`
+- resolución de ejercicios IA
+- tablas/memoria de mensajes si existen
+- frontend del chat
+- preview/aplicación de rutina
+- manejo de errores
+
+## UX
+
+No responder con frases genéricas cuando el usuario está hablando de la rutina pendiente.
+
+Evitar:
+“Soy un coach de IA y puedo ayudarte con nutrición y entrenamiento…”
+
+Usar:
+“Estoy tomando como referencia la rutina que acabamos de crear…”
+
+## Entrega
+
+Al terminar entrega:
+
+1. Causa raíz de la pérdida de contexto.
+2. Cómo guardaste el contexto.
+3. Dónde se guarda el draft de rutina.
+4. Cómo se modifica el draft.
+5. Cómo se aplica.
+6. Cómo evitas aplicar rutinas inválidas.
+7. Archivos modificados.
+8. Migraciones si fueron necesarias.
+9. Pruebas realizadas.
+10. Resultado de `npm run build`.
+11. Resultado de `deno check` si tocaste Edge Functions.
+12. Riesgos pendientes.
 
 # Beta Sprint 2 — UX entrenamiento: RIR/RPE/confianza baja
 

@@ -440,8 +440,8 @@ const Profile = () => {
             </div>
             
             {userFlagsData.devMode ? (
-              <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                <p className="text-sm font-medium mb-1 text-yellow-600 dark:text-yellow-400">
+              <div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 p-4">
+                <p className="mb-1 text-sm font-medium text-warning">
                   🔧 Modo Desarrollo Activo
                 </p>
                 <p className="text-xs text-muted-foreground">

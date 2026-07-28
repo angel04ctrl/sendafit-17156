@@ -166,6 +166,10 @@ export default function CoachChat() {
   const [inputValue, setInputValue] = useState("");
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [aiConsentAccepted, setAiConsentAccepted] = useState(false);
+  const [pendingAutoApply, setPendingAutoApply] = useState<null | {
+    metadataRoutine: RoutineMetadata;
+    coachActionId?: string | null;
+  }>(null);
   const chatStorageKey = user?.id ? `sendafit-coach-chat:${user.id}` : null;
 
   useEffect(() => {
@@ -246,6 +250,7 @@ export default function CoachChat() {
         message: string;
         metadata_routine?: RoutineMetadata | null;
         coach_action_id?: string | null;
+        apply_routine_now?: boolean;
         meal_saved?: boolean;
         saved_meal_id?: string | null;
       };
@@ -261,6 +266,12 @@ export default function CoachChat() {
           queryClient.invalidateQueries({ queryKey: ["user-profile"] }),
         ]);
         toast.success("Comida registrada desde el Coach.");
+      }
+      if (data.apply_routine_now && data.metadata_routine) {
+        setPendingAutoApply({
+          metadataRoutine: data.metadata_routine,
+          coachActionId: data.coach_action_id || null,
+        });
       }
     },
     onError: (error) => {
@@ -303,6 +314,12 @@ export default function CoachChat() {
       });
     },
   });
+
+  useEffect(() => {
+    if (!pendingAutoApply || applyRoutineMutation.isPending) return;
+    applyRoutineMutation.mutate(pendingAutoApply);
+    setPendingAutoApply(null);
+  }, [applyRoutineMutation, pendingAutoApply]);
 
   const sendMessage = async () => {
     const trimmed = inputValue.trim();

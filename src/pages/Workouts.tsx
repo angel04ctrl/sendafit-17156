@@ -139,7 +139,7 @@ const WorkoutList = ({ workouts, emptyTitle = "No hay entrenamientos", emptyActi
                 <span>{workout.duration_minutes} min</span>
               </div>
               <div className="flex items-center gap-1">
-                <Flame className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500/70" />
+                <Flame className="h-3 w-3 sm:h-4 sm:w-4 text-warning/80" />
                 <span>{workout.estimated_calories} kcal</span>
               </div>
             </div>
@@ -155,11 +155,11 @@ const WorkoutList = ({ workouts, emptyTitle = "No hay entrenamientos", emptyActi
                       </span>
                       <button
                         type="button"
-                        className="shrink-0 rounded-full p-0.5 text-blue-500 transition-colors hover:bg-blue-500/10 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        className="shrink-0 rounded-full p-0.5 text-primary transition-colors hover:bg-primary/10 hover:text-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                         aria-label={`Ver informacion de ${exercise.name}`}
                         onClick={() => handleShowExerciseDetails(exercise.name)}
                       >
-                        <HelpCircle className="h-4 w-4 text-blue-500" />
+                        <HelpCircle className="h-4 w-4 text-primary" />
                       </button>
                       {!workout.completed && (
                         <button
@@ -192,7 +192,7 @@ const WorkoutList = ({ workouts, emptyTitle = "No hay entrenamientos", emptyActi
               )}
               <Button 
                 variant="outline"
-                className={`w-full sm:flex-none text-xs sm:text-sm border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 ${!workout.completed ? 'sm:w-auto' : ''}`}
+                className={`w-full sm:flex-none border-destructive/30 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive sm:text-sm ${!workout.completed ? 'sm:w-auto' : ''}`}
                 onClick={() => handleDeleteWorkout(workout.id)}
               >
                 <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
@@ -632,14 +632,14 @@ const Workouts = () => {
                                 <p className="truncate font-medium">{ex.exercise.nombre}</p>
                                 <button
                                   type="button"
-                                  className="shrink-0 rounded-full p-0.5 text-blue-500 transition-colors hover:bg-blue-500/10 hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                  className="shrink-0 rounded-full p-0.5 text-primary transition-colors hover:bg-primary/10 hover:text-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                   aria-label={`Ver informacion de ${ex.exercise.nombre}`}
                                   onClick={() => {
                                     setSelectedExercise(ex.exercise);
                                     setExerciseDetailOpen(true);
                                   }}
                                 >
-                                  <HelpCircle className="h-4 w-4 text-blue-500" />
+                                  <HelpCircle className="h-4 w-4 text-primary" />
                                 </button>
                               </div>
                               <p className="text-sm text-muted-foreground">
@@ -923,9 +923,9 @@ const Workouts = () => {
                         <p className="text-muted-foreground">Listos</p>
                         <p className="text-lg font-bold text-primary">{weeklyStats.completed}</p>
                       </div>
-                      <div className="rounded-lg bg-amber-50 p-2">
+                      <div className="rounded-lg bg-warning/10 p-2">
                         <p className="text-muted-foreground">Saltados</p>
-                        <p className="text-lg font-bold text-amber-700">{weeklyStats.skipped}</p>
+                        <p className="text-lg font-bold text-warning">{weeklyStats.skipped}</p>
                       </div>
                       <div className="rounded-lg bg-muted p-2">
                         <p className="text-muted-foreground">Pendientes</p>

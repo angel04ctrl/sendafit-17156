@@ -11,6 +11,7 @@ import {
 
 interface RoutineExercise {
   name: string;
+  exercise_id?: string | null;
   sets?: number;
   reps?: number;
   notes?: string;
@@ -146,15 +147,12 @@ serve(async (req) => {
       metadata_routine?: MetadataRoutine;
       coach_action_id?: string;
     };
-    const metadata_routine = rawRoutine ? normalizeRoutine(rawRoutine) : undefined;
-    if (!metadata_routine?.days?.length) {
-      return jsonResponse(req, { error: "La rutina sugerida no contiene días válidos." }, 400);
-    }
+    let actionRoutine: MetadataRoutine | undefined;
 
     if (coach_action_id) {
       const { data: action, error: actionError } = await supabase
         .from("coach_actions")
-        .select("id,status,action_type,user_id")
+        .select("id,status,action_type,user_id,preview,payload")
         .eq("id", coach_action_id)
         .eq("user_id", user.id)
         .maybeSingle();
@@ -168,6 +166,10 @@ serve(async (req) => {
         return jsonResponse(req, { error: "coach_action_not_pending" }, 409);
       }
 
+      const payloadRoutine = action.payload?.metadata_routine;
+      const previewRoutine = action.preview;
+      actionRoutine = payloadRoutine?.days ? payloadRoutine : previewRoutine?.days ? previewRoutine : undefined;
+
       const { error: confirmError } = await supabase
         .from("coach_actions")
         .update({ status: "confirmed", confirmed_at: new Date().toISOString() })
@@ -175,6 +177,11 @@ serve(async (req) => {
         .eq("user_id", user.id);
 
       if (confirmError) throw confirmError;
+    }
+
+    const metadata_routine = normalizeRoutine(rawRoutine || actionRoutine || { days: [] });
+    if (!metadata_routine?.days?.length) {
+      return jsonResponse(req, { error: "La rutina sugerida no contiene dias validos." }, 400);
     }
 
     const { data: profile } = await supabase

@@ -54,7 +54,7 @@ export const formatVolumeStatus = (status?: RoutineMuscleStat["status"]) => {
 };
 
 export const getVolumeStatusClassName = (status?: RoutineMuscleStat["status"]) => {
-  if (status === "bajo") return "border-amber-200 bg-amber-50 text-amber-800";
-  if (status === "alto") return "border-red-200 bg-red-50 text-red-800";
-  return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "bajo") return "border-warning/30 bg-warning/10 text-foreground";
+  if (status === "alto") return "border-destructive/30 bg-destructive/10 text-foreground";
+  return "border-success/30 bg-success/10 text-foreground";
 };

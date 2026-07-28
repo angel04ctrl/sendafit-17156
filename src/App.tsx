@@ -21,6 +21,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { OfflineBanner } from "./components/OfflineBanner";
+import { IOSInstallBanner } from "./components/IOSInstallBanner";
 import { hydrateQueryCache, subscribeQueryCachePersistence } from "./lib/queryPersistence";
 
 const OnboardingForm = lazy(() => import("./components/onboarding/OnboardingForm"));
@@ -120,6 +121,7 @@ const App = () => {
               <TooltipProvider>
                 {/* Componentes de notificaciones */}
                 <OfflineBanner />
+                <IOSInstallBanner />
                 <Toaster />
                 <Sonner />
                 

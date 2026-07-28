@@ -45,8 +45,8 @@ const phaseConfigs: Record<string, PhaseConfig> = {
   menstrual: {
     name: "Menstrual",
     icon: <Droplets className="w-5 h-5" />,
-    color: "text-rose-500",
-    bgColor: "bg-rose-500/10",
+    color: "text-destructive",
+    bgColor: "bg-destructive/10",
     description: "Fase de descanso y recuperación",
     tips: [
       "Reduce la intensidad del ejercicio",
@@ -57,8 +57,8 @@ const phaseConfigs: Record<string, PhaseConfig> = {
   folicular: {
     name: "Folicular",
     icon: <Sun className="w-5 h-5" />,
-    color: "text-amber-500",
-    bgColor: "bg-amber-500/10",
+    color: "text-warning",
+    bgColor: "bg-warning/10",
     description: "Energía en aumento",
     tips: [
       "Ideal para entrenamientos intensos",
@@ -158,7 +158,7 @@ export const MenstrualTrackingCard = () => {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold flex items-center gap-2">
-            <Heart className="w-5 h-5 text-rose-500" />
+            <Heart className="w-5 h-5 text-destructive" />
             Ciclo Menstrual
             <Badge variant="secondary" className="bg-primary/10 text-primary text-xs">
               PRO
@@ -174,7 +174,7 @@ export const MenstrualTrackingCard = () => {
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <Droplets className="w-5 h-5 text-rose-500" />
+                  <Droplets className="w-5 h-5 text-destructive" />
                   Registrar Periodo
                 </DialogTitle>
               </DialogHeader>
@@ -238,7 +238,7 @@ export const MenstrualTrackingCard = () => {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label>Duración del periodo</Label>
-                    <span className="text-sm font-medium text-rose-500">{periodLength} días</span>
+                    <span className="text-sm font-medium text-destructive">{periodLength} días</span>
                   </div>
                   <Slider
                     value={[periodLength]}
@@ -329,7 +329,7 @@ export const MenstrualTrackingCard = () => {
                   className="flex items-center justify-between p-2 rounded-lg bg-muted/30 text-sm"
                 >
                   <div className="flex items-center gap-2">
-                    <Droplets className="w-4 h-4 text-rose-400" />
+                    <Droplets className="w-4 h-4 text-destructive/80" />
                     <span>{format(new Date(log.period_start_date), "d MMM yyyy", { locale: es })}</span>
                     <span className="text-muted-foreground">({log.cycle_length} días)</span>
                   </div>

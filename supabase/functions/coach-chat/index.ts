@@ -17,6 +17,7 @@ interface ChatHistoryItem {
 
 interface RoutineExercise {
   name: string;
+  exercise_id?: string | null;
   sets?: number;
   reps?: number;
   notes?: string;
@@ -51,6 +52,13 @@ interface CoachResponse {
     days: RoutineDay[];
   } | null;
   meal_entry?: MealEntry | null;
+}
+
+interface PendingRoutineDraft {
+  id: string;
+  routine: NonNullable<CoachResponse["metadata_routine"]>;
+  validation_result?: Record<string, unknown>;
+  created_at?: string;
 }
 
 const weekdayLabels: Record<number, string> = {
@@ -162,11 +170,86 @@ function formatWeekdays(days: number[]): string {
 function classifyIntent(message: string): string {
   const text = normalizeText(message);
   if (/dolor|lesion|molestia|mareo|desmayo|pecho|enfermedad|medicamento|embaraz/.test(text)) return "lesion";
-  if (/rutina|plan|programa|cambiar|modificar|entrenamiento nuevo|crear/.test(text)) return "rutina";
+  if (/rutina|plan|programa|cambiar|modificar|entrenamiento nuevo|crear|aplica|aplicar|guardala|guardar rutina|distribucion/.test(text)) return "rutina";
   if (/macro|caloria|proteina|carbo|grasa|comida|dieta|nutricion|receta/.test(text)) return "nutricion";
   if (/entreno|ejercicio|serie|repeticion|peso|carga|tecnica|descanso/.test(text)) return "entrenamiento";
   if (/motiv|animo|disciplina|constancia|ganas/.test(text)) return "motivacion";
   return "fuera_de_alcance";
+}
+
+function isRoutineDraftReference(message: string): boolean {
+  const text = normalizeText(message);
+  return /lunes|martes|miercoles|jueves|viernes|sabado|domingo|rutina|plan|distribucion|ese entrenamiento|esa rutina|dejalo|cambialo|ponlo|aplica|guardala|guardar rutina|otra opcion|ejercicio|pecho|espalda|pierna|piernas|brazos|hombro|hombros|triceps|biceps/.test(text);
+}
+
+function isNewRoutineRequest(message: string): boolean {
+  const text = normalizeText(message);
+  return /hazme|crea|crear|nuevo plan|nueva rutina|plan de entrenamiento|rutina de|programa de/.test(text);
+}
+
+function isRoutineConfirmationRequest(message: string): boolean {
+  const text = normalizeText(message);
+  return /^(si|sí|ok|okay|dale|va|perfecto)[\s,.!]*$/.test(text)
+    || /aplicala|aplicalo|aplica la rutina|aplica el plan|guardar rutina|guardala|guardalo|dejala asi|dejalo asi|si dejala|si dejalo|actualiza rutina/.test(text);
+}
+
+function isRoutineRevertRequest(message: string): boolean {
+  const text = normalizeText(message);
+  return /como antes|version anterior|rutina anterior|dejalo como antes|regresa|revertir|deshacer/.test(text);
+}
+
+function routineFromAction(row: Record<string, any> | null): PendingRoutineDraft | null {
+  if (!row) return null;
+  const payloadRoutine = row.payload?.metadata_routine;
+  const previewRoutine = row.preview;
+  const routine = payloadRoutine?.days ? payloadRoutine : previewRoutine?.days ? previewRoutine : null;
+  if (!routine?.days?.length) return null;
+
+  return {
+    id: row.id,
+    routine,
+    validation_result: row.validation_result || {},
+    created_at: row.created_at,
+  };
+}
+
+async function getLatestRoutineDraft(
+  supabase: any,
+  userId: string,
+  statuses: string[],
+): Promise<PendingRoutineDraft | null> {
+  const { data, error } = await supabase
+    .from("coach_actions")
+    .select("id,preview,payload,validation_result,created_at,status")
+    .eq("user_id", userId)
+    .eq("action_type", "modify_routine")
+    .in("status", statuses)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("pending routine draft query failed:", error);
+    return null;
+  }
+
+  return routineFromAction(data);
+}
+
+function annotateRoutineWithResolvedExercises(
+  routine: NonNullable<CoachResponse["metadata_routine"]>,
+  resolvedByKey?: Map<string, CatalogExercise>,
+) {
+  if (!resolvedByKey) return routine;
+  routine.days.forEach((day, dayIndex) => {
+    (day.exercises || []).forEach((exercise, exerciseIndex) => {
+      const resolved = resolvedByKey.get(`${dayIndex}:${exerciseIndex}`);
+      if (!resolved) return;
+      exercise.exercise_id = resolved.id;
+      exercise.name = resolved.nombre;
+    });
+  });
+  return routine;
 }
 
 function isMealLoggingRequest(message: string): boolean {
@@ -275,6 +358,25 @@ function compactForPrompt(context: Record<string, any>) {
       overall_rpe: session.overall_rpe,
     })),
     recent_meals: (context.recent_meals || []).slice(0, 5),
+    pending_routine_draft: context.pending_routine_draft
+      ? {
+          coach_action_id: context.pending_routine_draft.id,
+          routine_name: context.pending_routine_draft.routine?.routine_name,
+          days: (context.pending_routine_draft.routine?.days || []).map((day: Record<string, any>) => ({
+            day_name: day.day_name,
+            weekday: day.weekday,
+            location: day.location,
+            duration_minutes: day.duration_minutes,
+            exercises: (day.exercises || []).map((exercise: Record<string, unknown>) => ({
+              name: exercise.name,
+              exercise_id: exercise.exercise_id,
+              sets: exercise.sets,
+              reps: exercise.reps,
+              notes: exercise.notes,
+            })),
+          })),
+        }
+      : null,
   };
 }
 
@@ -360,12 +462,13 @@ function validateRoutine(
     return { ok: true, unresolved: [], incompatible: [], ambiguous: {}, substitutions: [] };
   }
 
-  const { resolvedByKey: _resolvedByKey, ...validation } = resolveRoutineExercises(
+  const { resolvedByKey, ...validation } = resolveRoutineExercises(
     routine.days,
     catalog,
     profile?.fitness_level,
   );
-  return validation;
+  annotateRoutineWithResolvedExercises(routine, resolvedByKey);
+  return { ...validation, resolved_exercise_count: resolvedByKey.size };
 }
 
 async function safeQuery<T>(query: PromiseLike<{ data: T | null; error: unknown }>, fallback: T): Promise<T> {
@@ -539,6 +642,15 @@ async function createRoutineAction(
   routine: NonNullable<CoachResponse["metadata_routine"]>,
   validationResult: Record<string, unknown>,
 ) {
+  const { error: expireError } = await supabase
+    .from("coach_actions")
+    .update({ status: "expired", rejected_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .eq("action_type", "modify_routine")
+    .eq("status", "pending");
+
+  if (expireError) console.warn("previous routine draft expire failed:", expireError);
+
   const { data, error } = await supabase
     .from("coach_actions")
     .insert({
@@ -652,7 +764,7 @@ serve(async (req) => {
     }
 
     const userMessage = user_message.trim();
-    const intentType = classifyIntent(userMessage);
+    let intentType = classifyIntent(userMessage);
     const safetyFlags = detectSafetyFlags(userMessage);
 
     const { data: profile } = await supabase
@@ -661,12 +773,18 @@ serve(async (req) => {
       .eq("id", user.id)
       .maybeSingle();
 
+    const pendingRoutineDraft = await getLatestRoutineDraft(supabase, user.id, ["pending"]);
+    if (pendingRoutineDraft && isRoutineDraftReference(userMessage)) {
+      intentType = "rutina";
+    }
+
     const contextProfile = { ...(profile || {}), ...(user_context || {}) };
     const context = await buildCoachContext(supabase, user.id, contextProfile);
+    (context as Record<string, unknown>).pending_routine_draft = pendingRoutineDraft;
     const profileWeekdays = normalizeProfileWeekdays(profile?.available_weekdays || []);
     const requestedWeekdays = requestedWeekdaysFromMessage(userMessage);
 
-    if (requestedWeekdays && profileWeekdays.length > 0) {
+    if (!pendingRoutineDraft && requestedWeekdays && profileWeekdays.length > 0) {
       const sameDays = requestedWeekdays.length === profileWeekdays.length
         && requestedWeekdays.every((day) => profileWeekdays.includes(day));
 
@@ -684,6 +802,72 @@ serve(async (req) => {
           requested_weekdays: requestedWeekdays,
         });
       }
+    }
+
+    if (!pendingRoutineDraft && isRoutineDraftReference(userMessage) && !isNewRoutineRequest(userMessage) && intentType === "rutina") {
+      const message = "No tengo una rutina pendiente en esta conversacion para modificar. Dime que rutina quieres crear o ajustar, por ejemplo: hazme un plan de 3 dias lunes, miercoles y viernes para hipertrofia.";
+      const conversationId = await persistConversation(supabase, user.id, "rutina", userMessage, message, context, null, safetyFlags);
+      return jsonResponse(req, {
+        success: true,
+        message,
+        metadata_routine: null,
+        coach_action_id: null,
+        conversation_id: conversationId,
+        intent_type: "rutina",
+      });
+    }
+
+    if (pendingRoutineDraft && isRoutineConfirmationRequest(userMessage)) {
+      const message = `Perfecto. Voy a aplicar la rutina pendiente "${pendingRoutineDraft.routine.routine_name || "Rutina sugerida por SendaFit AI Coach"}" ahora.`;
+      const conversationId = await persistConversation(
+        supabase,
+        user.id,
+        "rutina",
+        userMessage,
+        message,
+        context,
+        pendingRoutineDraft.routine,
+        safetyFlags,
+      );
+      return jsonResponse(req, {
+        success: true,
+        message,
+        metadata_routine: pendingRoutineDraft.routine,
+        coach_action_id: pendingRoutineDraft.id,
+        conversation_id: conversationId,
+        intent_type: "rutina",
+        routine_validation: pendingRoutineDraft.validation_result || { ok: true },
+        apply_routine_now: true,
+      });
+    }
+
+    if (pendingRoutineDraft && isRoutineRevertRequest(userMessage)) {
+      const previousDraft = await getLatestRoutineDraft(supabase, user.id, ["expired", "rejected"]);
+      if (!previousDraft) {
+        const message = "Estoy tomando como referencia la rutina pendiente, pero no encontre una version anterior guardada para restaurar. Puedo ajustarla de nuevo si me dices como quieres dejarla.";
+        const conversationId = await persistConversation(supabase, user.id, "rutina", userMessage, message, context, pendingRoutineDraft.routine, safetyFlags);
+        return jsonResponse(req, {
+          success: true,
+          message,
+          metadata_routine: pendingRoutineDraft.routine,
+          coach_action_id: pendingRoutineDraft.id,
+          conversation_id: conversationId,
+          intent_type: "rutina",
+        });
+      }
+
+      const message = "Listo. Recupere la version anterior de la rutina pendiente. Revisa la vista previa y dime si quieres aplicarla.";
+      const conversationId = await persistConversation(supabase, user.id, "rutina", userMessage, message, context, previousDraft.routine, safetyFlags);
+      const coachActionId = await createRoutineAction(supabase, user.id, conversationId, previousDraft.routine, previousDraft.validation_result || { ok: true, restored: true });
+      return jsonResponse(req, {
+        success: true,
+        message,
+        metadata_routine: previousDraft.routine,
+        coach_action_id: coachActionId,
+        conversation_id: conversationId,
+        intent_type: "rutina",
+        routine_validation: previousDraft.validation_result || { ok: true, restored: true },
+      });
     }
 
     if (safetyFlags.length > 0) {
@@ -718,6 +902,16 @@ Reglas de seguridad:
 - No apliques cambios. Solo puedes proponer previews; la app pedira confirmacion al usuario.
 - Si propones rutina, usa solo ejercicios comunes que existan en el catalogo de SendaFit y respeta nivel, equipo, lesiones y calendario.
 - Excepcion controlada: si el usuario pide explicitamente agregar, registrar o guardar una comida y proporciona macros suficientes o puedes estimarlos desde datos escritos por el usuario, incluye meal_entry. No digas que una comida fue registrada si meal_entry es null.
+
+Reglas de contexto conversacional de rutina:
+- Si context.pending_routine_draft existe y el usuario menciona "lunes", "miercoles", "viernes", "ese ejercicio", "la rutina", "cambialo", "ponlo", "otra opcion" o una distribucion muscular, toma como referencia esa rutina pendiente.
+- En ese caso modifica el draft pendiente, no empieces desde cero.
+- Conserva los dias, duracion, objetivo y volumen salvo que el usuario pida cambiarlos.
+- Devuelve una nueva metadata_routine completa con todos los dias del draft actualizado, no solo el dia cambiado.
+- No pierdas exercise_id si ya existe en los ejercicios; si cambias un ejercicio, usa un nombre comun que pueda resolverse en catalogo.
+- Responde con una frase como "Estoy tomando como referencia la rutina que acabamos de crear..." cuando hagas ajustes al draft.
+- Si hay ambiguedad real, haz una pregunta concreta y deja metadata_routine en null.
+- Si no existe context.pending_routine_draft, no inventes una rutina anterior.
 
 Responde siempre en JSON valido, sin markdown y sin texto adicional, con esta forma:
 {
@@ -805,6 +999,20 @@ ${JSON.stringify(compactForPrompt(context))}`;
 
     if (response.metadata_routine && intentType !== "rutina") {
       response = buildFallbackResponse(intentType, userMessage, context);
+    }
+
+    if (
+      pendingRoutineDraft
+      && intentType === "rutina"
+      && isRoutineDraftReference(userMessage)
+      && !isRoutineConfirmationRequest(userMessage)
+      && !response.metadata_routine
+    ) {
+      response = {
+        message: "Estoy tomando como referencia la rutina pendiente, pero necesito una aclaracion concreta para modificarla sin romper el plan. Dime el dia o ejercicio exacto y que quieres cambiar.",
+        metadata_routine: pendingRoutineDraft.routine,
+        meal_entry: null,
+      };
     }
 
     if (response.meal_entry && !isMealLoggingRequest(userMessage)) {

@@ -545,7 +545,7 @@ export function GymMachineScanner({
               </div>
 
               {lowConfidence && (
-                <Card className="border-amber-300 bg-amber-50 p-3 text-amber-950">
+                <Card className="border-warning/30 bg-warning/10 p-3 text-foreground">
                   <div className="flex gap-2">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                     <div className="text-sm">

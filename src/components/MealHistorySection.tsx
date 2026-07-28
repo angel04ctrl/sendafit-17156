@@ -48,13 +48,13 @@ const mealTypeLabels = {
 
 const getMealTypeColor = (type: string): string => {
   const colors: Record<string, string> = {
-    desayuno: "bg-amber-100",
-    colacion_am: "bg-green-100",
-    comida: "bg-red-100",
-    colacion_pm: "bg-blue-100",
-    cena: "bg-purple-100",
+    desayuno: "bg-warning/15",
+    colacion_am: "bg-success/15",
+    comida: "bg-destructive/10",
+    colacion_pm: "bg-primary/10",
+    cena: "bg-fitness/15",
   };
-  return colors[type] || "bg-gray-100";
+  return colors[type] || "bg-muted";
 };
 
 export const MealHistorySection = ({
@@ -250,43 +250,43 @@ export const MealHistorySection = ({
         <>
           {/* Resumen del período */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
-            <Card className="p-3 sm:p-4 bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+            <Card className="border-warning/30 bg-warning/10 p-3 sm:p-4">
               <div className="flex items-center gap-2 mb-1">
-                <Flame className="w-4 h-4 text-orange-600" />
+                <Flame className="w-4 h-4 text-warning" />
                 <span className="text-xs font-medium text-muted-foreground">Calorías</span>
               </div>
-              <div className="text-lg sm:text-2xl font-bold text-orange-700">
+              <div className="text-lg sm:text-2xl font-bold text-foreground">
                 {Math.round(periodTotals.calories)}
               </div>
-              <p className="text-xs text-orange-600">{groupedMeals.length} día(s)</p>
+              <p className="text-xs text-muted-foreground">{groupedMeals.length} día(s)</p>
             </Card>
 
-            <Card className="p-3 sm:p-4 bg-gradient-to-br from-red-50 to-red-100 border-red-200">
+            <Card className="border-fitness/30 bg-fitness/10 p-3 sm:p-4">
               <div className="flex items-center gap-2 mb-1">
-                <Beef className="w-4 h-4 text-red-600" />
+                <Beef className="w-4 h-4 text-fitness" />
                 <span className="text-xs font-medium text-muted-foreground">Proteína</span>
               </div>
-              <div className="text-lg sm:text-2xl font-bold text-red-700">
+              <div className="text-lg sm:text-2xl font-bold text-foreground">
                 {Math.round(periodTotals.protein)}g
               </div>
             </Card>
 
-            <Card className="p-3 sm:p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <Card className="border-primary/30 bg-primary/10 p-3 sm:p-4">
               <div className="flex items-center gap-2 mb-1">
-                <Pizza className="w-4 h-4 text-blue-600" />
+                <Pizza className="w-4 h-4 text-primary" />
                 <span className="text-xs font-medium text-muted-foreground">Carbos</span>
               </div>
-              <div className="text-lg sm:text-2xl font-bold text-blue-700">
+              <div className="text-lg sm:text-2xl font-bold text-foreground">
                 {Math.round(periodTotals.carbs)}g
               </div>
             </Card>
 
-            <Card className="p-3 sm:p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
+            <Card className="border-success/30 bg-success/10 p-3 sm:p-4">
               <div className="flex items-center gap-2 mb-1">
-                <Droplet className="w-4 h-4 text-yellow-600" />
+                <Droplet className="w-4 h-4 text-success" />
                 <span className="text-xs font-medium text-muted-foreground">Grasas</span>
               </div>
-              <div className="text-lg sm:text-2xl font-bold text-yellow-700">
+              <div className="text-lg sm:text-2xl font-bold text-foreground">
                 {Math.round(periodTotals.fat)}g
               </div>
             </Card>

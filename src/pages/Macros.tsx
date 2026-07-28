@@ -686,8 +686,8 @@ const Macros = () => {
                             required
                           />
                         </div>
-                        <Card className="border-amber-200 bg-amber-50 p-3">
-                          <p className="text-sm text-amber-900">
+                        <Card className="border-warning/30 bg-warning/10 p-3">
+                          <p className="text-sm text-foreground">
                             Corrección manual avanzada: captura valores por porción. Esta corrección puede afectar la precisión de tus reportes.
                           </p>
                         </Card>

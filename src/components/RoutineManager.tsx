@@ -92,7 +92,7 @@ export function RoutineManager() {
                   {(statsData.stats.weight_change ?? 0) > 0 ? '+' : ''}
                   {(statsData.stats.weight_change ?? 0).toFixed(1)}
                 </div>
-                <TrendingUp className={`h-3 w-3 sm:h-4 sm:w-4 ${(statsData.stats.weight_change ?? 0) > 0 ? 'text-green-500' : 'text-red-500'}`} />
+                <TrendingUp className={`h-3 w-3 sm:h-4 sm:w-4 ${(statsData.stats.weight_change ?? 0) > 0 ? 'text-success' : 'text-destructive'}`} />
               </div>
               <p className="text-[10px] sm:text-xs text-muted-foreground">kg</p>
             </CardContent>
@@ -164,9 +164,9 @@ export function RoutineManager() {
                   )}
 
                   {planner.rest_day && (
-                    <div className="rounded-md border border-sky-200 bg-sky-50 p-2 text-xs sm:text-sm text-sky-900">
+                    <div className="rounded-md border border-fitness/30 bg-fitness/10 p-2 text-xs sm:text-sm text-foreground">
                       <p className="font-medium">Dia de descanso programado: {planner.rest_day.name}</p>
-                      <p className="mt-1 text-sky-800">
+                      <p className="mt-1 text-muted-foreground">
                         Seleccionaste disponibilidad toda la semana. SendaFit reservo un dia de descanso para favorecer la recuperacion entre sesiones.
                       </p>
                     </div>
@@ -175,7 +175,7 @@ export function RoutineManager() {
                   {planner.warnings && planner.warnings.length > 0 && (
                     <div className="space-y-1">
                       {planner.warnings.map((warning) => (
-                        <div key={warning} className="flex items-start gap-2 text-xs text-amber-700">
+                        <div key={warning} className="flex items-start gap-2 text-xs text-warning">
                           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                           <span>{warning}</span>
                         </div>
