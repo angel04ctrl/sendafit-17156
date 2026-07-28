@@ -133,7 +133,7 @@ const App = () => {
                     {/* Ruta de autenticación (login/registro) */}
                     <Route path="/auth" element={<PublicOnlyRoute><Auth /></PublicOnlyRoute>} />
                     {/* Ruta de onboarding para nuevos usuarios */}
-                    <Route path="/onboarding" element={<OnboardingForm />} />
+                    <Route path="/onboarding" element={<ProtectedRoute><OnboardingForm /></ProtectedRoute>} />
                     {/* Ruta del dashboard principal */}
                     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                     {/* Ruta de seguimiento de macros/nutrición */}

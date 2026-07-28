@@ -170,6 +170,7 @@ serve(async (req) => {
         workouts: finalWorkouts || [],
         weekday: weekday,
         count: finalWorkouts?.length || 0,
+        date: todayDate,
         todayDate: todayDate,
         timezone: timezone,
       }),

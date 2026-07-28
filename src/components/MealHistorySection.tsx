@@ -16,6 +16,7 @@ import { ChevronDown, Flame, Beef, Pizza, Droplet, Trash2, Edit, Copy } from "lu
 import { format, startOfWeek, endOfWeek, subWeeks, addDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { parseDateOnlyAsLocal } from "@/lib/dayMapping";
 
 interface Meal {
   id: string;
@@ -79,7 +80,7 @@ export const MealHistorySection = ({
         start = startOfWeek(today, { locale: es, weekStartsOn: 1 });
         end = endOfWeek(today, { locale: es, weekStartsOn: 1 });
         break;
-      case "last-week":
+      case "last-week": {
         const lastWeekStart = subWeeks(
           startOfWeek(today, { locale: es, weekStartsOn: 1 }),
           1
@@ -87,6 +88,7 @@ export const MealHistorySection = ({
         start = lastWeekStart;
         end = endOfWeek(lastWeekStart, { locale: es, weekStartsOn: 1 });
         break;
+      }
       case "last-7-days":
         start = addDays(today, -7);
         end = today;
@@ -296,7 +298,7 @@ export const MealHistorySection = ({
           <div className="space-y-2">
             {groupedMeals.map(([date, dayMeals]) => {
               const dayTotals = calculateDayTotals(dayMeals);
-              const dateObj = new Date(date);
+              const dateObj = parseDateOnlyAsLocal(date);
               const isExpanded = expandedDates.has(date);
 
               return (

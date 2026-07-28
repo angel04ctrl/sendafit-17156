@@ -24,6 +24,7 @@ import { format, differenceInDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { parseDateOnlyAsLocal } from "@/lib/dayMapping";
 import { 
   useMenstrualLogs, 
   useMenstrualPhase, 
@@ -330,7 +331,7 @@ export const MenstrualTrackingCard = () => {
                 >
                   <div className="flex items-center gap-2">
                     <Droplets className="w-4 h-4 text-destructive/80" />
-                    <span>{format(new Date(log.period_start_date), "d MMM yyyy", { locale: es })}</span>
+                    <span>{format(parseDateOnlyAsLocal(log.period_start_date), "d MMM yyyy", { locale: es })}</span>
                     <span className="text-muted-foreground">({log.cycle_length} días)</span>
                   </div>
                   <Button

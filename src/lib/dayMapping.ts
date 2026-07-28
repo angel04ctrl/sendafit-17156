@@ -71,14 +71,28 @@ export function planDayToShort(dayNum: number): string {
   return mapping[dayNum] || `${dayNum}`;
 }
 
+export function parseDateOnlyAsLocal(date: Date | string): Date {
+  if (date instanceof Date) {
+    return date;
+  }
+
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  return new Date(date);
+}
+
 export function getDateDayName(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
+  const d = parseDateOnlyAsLocal(date);
   const dayOfWeek = d.getDay();
   return dayNumberToName[dayOfWeek] || "Desconocido";
 }
 
 export function getDateDayShort(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
+  const d = parseDateOnlyAsLocal(date);
   const dayOfWeek = d.getDay();
   return dayNamesShort[dayOfWeek] || "?";
 }

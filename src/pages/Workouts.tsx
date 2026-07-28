@@ -51,6 +51,7 @@ import { ActiveWorkout } from "@/components/ActiveWorkout";
 import { AdaptiveWorkoutActions } from "@/components/AdaptiveWorkoutActions";
 import { format, startOfWeek } from "date-fns";
 import { es } from "date-fns/locale";
+import { parseDateOnlyAsLocal } from "@/lib/dayMapping";
 import { getActiveWorkoutSession, type WorkoutSession } from "@/lib/api/backend";
 import { logAppError } from "@/lib/appErrorLogger";
 
@@ -123,7 +124,7 @@ const WorkoutList = ({ workouts, emptyTitle = "No hay entrenamientos", emptyActi
                   </CardTitle>
                   <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1 truncate">
                     <CalendarDays className="h-3 w-3 shrink-0" />
-                    {format(new Date(workout.scheduled_date), "EEEE d 'de' MMMM", { locale: es })}
+                    {format(parseDateOnlyAsLocal(workout.scheduled_date), "EEEE d 'de' MMMM", { locale: es })}
                   </p>
                 </div>
               </div>
@@ -872,11 +873,7 @@ const Workouts = () => {
                                 <h4 className="font-medium text-sm">{workout.name}</h4>
                                 {workout.scheduled_date && (
                                   <p className="text-xs text-muted-foreground">
-                                    {new Date(workout.scheduled_date).toLocaleDateString('es-ES', {
-                                      weekday: 'short',
-                                      month: 'short',
-                                      day: 'numeric'
-                                    })}
+                                    {format(parseDateOnlyAsLocal(workout.scheduled_date), "EEE d MMM", { locale: es })}
                                   </p>
                                 )}
                               </div>

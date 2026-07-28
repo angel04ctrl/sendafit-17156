@@ -16,9 +16,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useTodaysWorkouts } from "@/hooks/useBackendApi";
 import { Dumbbell, Clock, Flame, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { completeWorkout } from "@/lib/api/backend";
 
 /**
  * Componente TodaysWorkouts
@@ -34,7 +34,6 @@ export const TodaysWorkouts = () => {
   const { data, isLoading, error } = useTodaysWorkouts();
   const [completingWorkout, setCompletingWorkout] = useState<string | null>(null);
   const queryClient = useQueryClient();
-  const sb = supabase;
 
   /**
    * Handler para marcar workout como completado/incompleto
@@ -43,18 +42,14 @@ export const TodaysWorkouts = () => {
   const handleCompleteWorkout = async (workoutId: string, currentStatus: boolean) => {
     setCompletingWorkout(workoutId);
     try {
-      const { error } = await sb
-        .from('workouts')
-        .update({ 
-          completed: !currentStatus,
-          completed_at: !currentStatus ? new Date().toISOString() : null
-        })
-        .eq('id', workoutId);
-
-      if (error) throw error;
+      await completeWorkout(workoutId, !currentStatus);
 
       // Invalidar queries para refrescar los datos
       queryClient.invalidateQueries({ queryKey: ['todays-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['weekly-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['weekly-calendar-workouts'] });
+      queryClient.invalidateQueries({ queryKey: ['workouts-by-date'] });
+      queryClient.invalidateQueries({ queryKey: ['all-workouts'] });
       queryClient.invalidateQueries({ queryKey: ['progress-stats'] });
       toast.success(!currentStatus ? '¡Entrenamiento completado!' : 'Entrenamiento marcado como incompleto');
     } catch (error) {

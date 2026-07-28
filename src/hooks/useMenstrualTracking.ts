@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { parseDateOnlyAsLocal } from "@/lib/dayMapping";
 
 export interface MenstrualLog {
   id: string;
@@ -63,7 +64,7 @@ export const useMenstrualPhase = () => {
       if (!logs || logs.length === 0) return null;
 
       const lastLog = logs[0] as MenstrualLog;
-      const lastPeriodStart = new Date(lastLog.period_start_date);
+      const lastPeriodStart = parseDateOnlyAsLocal(lastLog.period_start_date);
       const cycleLength = lastLog.cycle_length || 28;
       const today = new Date();
       today.setHours(0, 0, 0, 0);

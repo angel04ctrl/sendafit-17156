@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { StatCard } from "@/components/StatCard";
 import { Flame, Activity, Target, TrendingUp, BarChart3, Dumbbell, AlertCircle } from "lucide-react";
@@ -39,6 +39,7 @@ const Dashboard = () => {
   // Hook de autenticación
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const sb = supabase as any;
   // Estados de datos del usuario
   const [profile, setProfile] = useState<any>(null);

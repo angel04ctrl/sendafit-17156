@@ -7,7 +7,7 @@
  * 3. Runtime (local) - UI-only flags para desarrollo
  */
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -181,19 +181,26 @@ export const FeatureFlagsProvider = ({ children }: { children: React.ReactNode }
     checkSubscription();
   }, [user?.id]);
 
-  const effectiveUserFlags = {
-    ...userFlags,
-    devMode: userFlags.devMode || localDevMode,
-  };
+  const effectiveUserFlags = useMemo(
+    () => ({
+      ...userFlags,
+      devMode: userFlags.devMode || localDevMode,
+    }),
+    [localDevMode, userFlags],
+  );
 
-  const effectiveGlobalFlags = localDevMode
-    ? {
-        aiEnabled: true,
-        foodAIEnabled: true,
-        gymAIEnabled: true,
-        coachAIEnabled: true,
-      }
-    : global;
+  const effectiveGlobalFlags = useMemo(
+    () =>
+      localDevMode
+        ? {
+            aiEnabled: true,
+            foodAIEnabled: true,
+            gymAIEnabled: true,
+            coachAIEnabled: true,
+          }
+        : global,
+    [global, localDevMode],
+  );
 
   const hasProAccess = effectiveUserFlags.isPro || effectiveUserFlags.devMode;
 
