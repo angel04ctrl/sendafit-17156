@@ -1,0 +1,155 @@
+# Nutrition Import v2.1 Report
+
+Generated: 2026-08-03T16:16:18.107Z
+Mode: apply
+Decision: apply_committed
+Import batch: 51e29c0d-2e9c-4ccd-b2fd-31d15318ddf5
+
+## Summary
+
+```json
+{
+  "csvPath": "BD-sendaFit/nutrition-master-catalog-v2.1-curated.csv",
+  "fileSha256": "f9c30937fdadc6260ddaf197560f23855aff53fb2755feb81a8dd5e2954759ff",
+  "bytes": 7631727,
+  "rows": 304,
+  "headers": 70,
+  "existingFoodIds": 169,
+  "newFoods": 135,
+  "clientKeys": 304,
+  "servings": 875,
+  "nutrients": 2490,
+  "canonicalGroups": 235,
+  "relationships": 71,
+  "preparations": 42,
+  "deprecatedFoods": 16,
+  "referenceCatalogRows": 1,
+  "uniqueReferenceCatalogs": 1
+}
+```
+
+## Issues
+
+critical=0, warning=0, info=2
+
+- info / imported_food_count: 304
+- info / catalog_food_count: 304
+
+## UTF-8 Samples
+
+```json
+[
+  {
+    "row": 7,
+    "column": "canonical_group_name",
+    "value": "Arándanos azules crudos",
+    "chars": 23,
+    "sha256": "ffde9c3d561c47f0beabbab7af6718c7cbe5a3e12625baeff3c3b686386bbff3"
+  },
+  {
+    "row": 8,
+    "column": "description",
+    "value": "Arroz blanco glutinoso cocido. Los valores nutricionales corresponden a 100 g del alimento cocido según la preparación indicada, sin ingredientes añadidos salvo que el nombre los especifique.",
+    "chars": 191,
+    "sha256": "52e858e8634ba81843f4ae5b718cfe5dc60714e172eda63ea7434381d1b5fb19"
+  },
+  {
+    "row": 9,
+    "column": "description",
+    "value": "Arroz integral de grano largo cocido. Los valores nutricionales corresponden a 100 g del alimento cocido según la preparación indicada, sin ingredientes añadidos salvo que el nombre los especifique.",
+    "chars": 198,
+    "sha256": "c4b1fd0a5cd63260b62c523668af85bf02b4924d3f84705fabd04da22888401a"
+  },
+  {
+    "row": 10,
+    "column": "canonical_group_name",
+    "value": "Atún enlatado",
+    "chars": 13,
+    "sha256": "b7ba6630ae53911c307b3a5e00b42db553a278a98688c9b5401ace8bce7c8339"
+  },
+  {
+    "row": 11,
+    "column": "canonical_group_name",
+    "value": "Atún enlatado",
+    "chars": 13,
+    "sha256": "b7ba6630ae53911c307b3a5e00b42db553a278a98688c9b5401ace8bce7c8339"
+  },
+  {
+    "row": 13,
+    "column": "description",
+    "value": "Avena cocida con agua, sin sal. Los valores nutricionales corresponden a 100 g del alimento hervido, sin ingredientes añadidos salvo que el nombre los especifique.",
+    "chars": 163,
+    "sha256": "0c47c1714a47be826ba1970fd56e638d7f6d11964f79542c4fa1902f26a05dd2"
+  },
+  {
+    "row": 14,
+    "column": "canonical_group_name",
+    "value": "Azúcar",
+    "chars": 6,
+    "sha256": "0cee87e24b62a0ad2cc637b7c57af6195be8270b8c0c9dfa930a0cf9b16d42c0"
+  },
+  {
+    "row": 15,
+    "column": "canonical_group_name",
+    "value": "Azúcar",
+    "chars": 6,
+    "sha256": "0cee87e24b62a0ad2cc637b7c57af6195be8270b8c0c9dfa930a0cf9b16d42c0"
+  },
+  {
+    "row": 16,
+    "column": "description",
+    "value": "Bagel simple enriquecido. Preparación compuesta tal como la describe la fuente; la composición se expresa por 100 g.",
+    "chars": 116,
+    "sha256": "189eec828a932d6fa7217c71990dd52e199cba4ef0dc027aa6481c03a9fc1a0a"
+  },
+  {
+    "row": 17,
+    "column": "description",
+    "value": "Camote hervido sin piel. Los valores nutricionales corresponden a 100 g del alimento hervido, sin ingredientes añadidos salvo que el nombre los especifique.",
+    "chars": 156,
+    "sha256": "fb39ae5113de800f893c1d65a3c1fa7ccce0f31260daa7bfa16c7638fe9992de"
+  },
+  {
+    "row": 18,
+    "column": "description",
+    "value": "Bistec ribeye cocido, carne y grasa. Los valores nutricionales corresponden a 100 g del alimento cocido según la preparación indicada, sin ingredientes añadidos salvo que el nombre los especifique.",
+    "chars": 197,
+    "sha256": "cd761d36629f2ee96b49005a3625f552be4cd2f7d86b3b56d7dab05c40fe54b4"
+  },
+  {
+    "row": 19,
+    "column": "canonical_group_name",
+    "value": "Brócoli",
+    "chars": 7,
+    "sha256": "1d5b141d35795f21390ec6c0eecb490fc1e5bbfb0091d6d1a01dbd01ac64f16e"
+  }
+]
+```
+
+## DB / Changes
+
+```json
+{
+  "db": {
+    "serverEncoding": "UTF8",
+    "clientEncoding": "UTF8"
+  },
+  "changes": {
+    "sources": 4,
+    "units": 19,
+    "nutrients": 7,
+    "brands": 0,
+    "categories": 0,
+    "foodsInserted": 135,
+    "foodsUpdated": 169,
+    "aliases": 549,
+    "servings": 875,
+    "nutrientsApplied": 1974,
+    "canonicalGroups": 304,
+    "groupMembers": 304,
+    "preparations": 42,
+    "relationships": 71,
+    "barcodes": 0
+  }
+}
+```

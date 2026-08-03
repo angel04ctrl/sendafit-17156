@@ -30,7 +30,6 @@ import { ProButton } from "@/components/ProButton";
 import { StatCard } from "@/components/StatCard";
 import { Flame, Pizza, Beef, Droplet } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { DashboardMobileCarousel } from "@/components/DashboardMobileCarousel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -40,12 +39,9 @@ import { useMealsHistory } from "@/hooks/useBackendApi";
 import { MealHistorySection } from "@/components/MealHistorySection";
 import { useQueryClient } from "@tanstack/react-query";
 import { validateCalculatedMealInput, validateMealInput } from "@/lib/mealValidation";
-import {
-  calculateMacrosByGrams,
-  normalizeFoodNutrition,
-  sumMacroTotals,
-  type MacroTotals,
-} from "@/lib/nutritionCalculator";
+import type { MacroTotals } from "@/lib/nutritionCalculator";
+import { NutritionFoodSelector } from "@/components/nutrition/NutritionFoodSelector";
+import type { NutritionMealType } from "@/integrations/supabase/nutrition-types";
 
 type Meal = {
   id: string;
@@ -57,33 +53,6 @@ type Meal = {
   protein: number;
   carbs: number;
   fat: number;
-};
-
-const normalizeSearchText = (value: string) =>
-  value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9ñ\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-const getFoodDisplayName = (food: any) => food.display_name || food.name || food.nombre;
-
-const foodMatchesSearch = (food: any, query: string) => {
-  const normalizedQuery = normalizeSearchText(query);
-  if (!normalizedQuery) return true;
-  const aliases = Array.isArray(food.aliases) ? food.aliases.join(" ") : "";
-  const searchable = [
-    food.display_name,
-    food.search_name,
-    food.name,
-    food.nombre,
-    food.category,
-    food.group_name,
-    aliases,
-  ].filter(Boolean).join(" ");
-  return normalizeSearchText(searchable).includes(normalizedQuery);
 };
 
 const mealTypes = [
@@ -108,12 +77,6 @@ const Macros = () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [profile, setProfile] = useState<any>(null);
   const [open, setOpen] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [foods, setFoods] = useState<any[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [selectedFood, setSelectedFood] = useState<any>(null);
-  const [foodGrams, setFoodGrams] = useState("100");
   const [customServings, setCustomServings] = useState("1");
   const [customGramsPerServing, setCustomGramsPerServing] = useState("100");
   const [foodAnalysisOpen, setFoodAnalysisOpen] = useState(false);
@@ -130,16 +93,6 @@ const Macros = () => {
     date: today,
   });
 
-  const selectedFoodNutrition = useMemo(() => {
-    if (!selectedFood) return null;
-    return normalizeFoodNutrition(selectedFood);
-  }, [selectedFood]);
-
-  const selectedFoodMacros = useMemo(() => {
-    if (!selectedFood) return null;
-    return calculateMacrosByGrams(selectedFood, Number(foodGrams) || 0);
-  }, [selectedFood, foodGrams]);
-
   const customMealMacros = useMemo<MacroTotals>(() => {
     const servings = Number(customServings) || 0;
     return {
@@ -149,18 +102,6 @@ const Macros = () => {
       fat: Math.round((Number(formData.fat) || 0) * servings),
     };
   }, [customServings, formData.calories, formData.protein, formData.carbs, formData.fat]);
-
-  const fetchFoods = useCallback(async () => {
-    const { data } = await sb
-      .from("foods")
-      .select("*")
-      .eq("is_visible" as any, true)
-      .order("is_common" as any, { ascending: false })
-      .order("visibility_priority" as any, { ascending: true })
-      .order("display_name" as any, { ascending: true });
-    
-    setFoods(data || []);
-  }, [sb]);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -190,8 +131,7 @@ const Macros = () => {
 
   useEffect(() => {
     fetchData();
-    fetchFoods();
-  }, [fetchData, fetchFoods]);
+  }, [fetchData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -283,91 +223,6 @@ const Macros = () => {
     refreshMeals();
   };
 
-  const handleSubmitFromDatabase = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!selectedFood) {
-      toast.error("Selecciona un alimento");
-      return;
-    }
-
-    if (!user) return;
-
-    const grams = Number(foodGrams);
-    if (!Number.isFinite(grams) || grams <= 0) {
-      toast.error("Los gramos deben ser mayores a cero.");
-      return;
-    }
-    
-    const normalizedFood = normalizeFoodNutrition(selectedFood);
-    const calculatedMacros = calculateMacrosByGrams(selectedFood, grams);
-    const validation = validateCalculatedMealInput({
-      meal_type: formData.meal_type,
-      name: `${normalizedFood.name} (${grams} g)`,
-      calories: calculatedMacros.calories,
-      protein: calculatedMacros.protein,
-      carbs: calculatedMacros.carbs,
-      fat: calculatedMacros.fat,
-      date: formData.date,
-      ingredientCount: 1,
-      hasCalculatedMacros: calculatedMacros.calories > 0,
-    });
-
-    if (!validation.meal) {
-      toast.error(validation.errors[0] || "No se pudo calcular esta comida.");
-      return;
-    }
-
-    validation.warnings.forEach((warning) => toast.warning(warning));
-
-    const { data: savedMeal, error } = await sb.from("meals").insert([{
-      user_id: user.id,
-      meal_type: validation.meal.meal_type as any,
-      name: validation.meal.name,
-      calories: validation.meal.calories,
-      protein: validation.meal.protein,
-      carbs: validation.meal.carbs,
-      fat: validation.meal.fat,
-      date: validation.meal.date,
-    }]).select("id").single();
-
-    if (error) {
-      toast.error("Error al registrar comida");
-      return;
-    }
-
-    await sb.from("meal_ingredients" as any).insert([{
-      meal_id: savedMeal.id,
-      user_id: user.id,
-      food_id: selectedFood.id,
-      ingredient_name: normalizedFood.name,
-      source: selectedFood.source || "food_database",
-      is_verified: Boolean(selectedFood.is_verified),
-      quantity: grams,
-      unit: "g",
-      grams,
-      calories: validation.meal.calories,
-      protein: validation.meal.protein,
-      carbs: validation.meal.carbs,
-      fat: validation.meal.fat,
-      fiber: calculatedMacros.fiber,
-      sugar: calculatedMacros.sugar,
-      sodium_mg: calculatedMacros.sodiumMg,
-      metadata: {
-        fdcId: selectedFood.fdc_id,
-        sourceLicense: selectedFood.source_license,
-        servingUnit: normalizedFood.servingUnit,
-        gramsPerServing: normalizedFood.gramsPerServing,
-      },
-    }]).then(({ error: ingredientError }) => {
-      if (ingredientError) console.warn("meal_ingredients insert skipped:", ingredientError.message);
-    });
-
-    toast.success("Comida registrada");
-    resetForm();
-    refreshMeals();
-  };
-
   const resetForm = () => {
     setOpen(false);
     setEditingMeal(null);
@@ -380,18 +235,12 @@ const Macros = () => {
       fat: "",
       date: today,
     });
-    setSelectedFood(null);
-    setFoodGrams("100");
     setCustomServings("1");
     setCustomGramsPerServing("100");
-    setSearchQuery("");
   };
 
   const openEditMeal = (meal: Meal) => {
     setEditingMeal(meal);
-    setSelectedFood(null);
-    setSearchQuery("");
-    setFoodGrams("100");
     setCustomServings("1");
     setCustomGramsPerServing("100");
     setFormData({
@@ -409,9 +258,6 @@ const Macros = () => {
   const duplicateMeal = async (meal: Meal, date: string, editBeforeSave = false) => {
     if (editBeforeSave) {
       setEditingMeal(null);
-      setSelectedFood(null);
-      setSearchQuery("");
-      setFoodGrams("100");
       setCustomServings("1");
       setCustomGramsPerServing("100");
       setFormData({
@@ -576,102 +422,15 @@ const Macros = () => {
                     </TabsList>
 
                     <TabsContent value="database" className="space-y-4">
-                      <form onSubmit={handleSubmitFromDatabase} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label>Buscar Alimento</Label>
-                          <Command className="rounded-lg border">
-                            <CommandInput 
-                              placeholder="Busca un alimento..." 
-                              value={searchQuery}
-                              onValueChange={setSearchQuery}
-                            />
-                            <CommandList className="max-h-[200px]">
-                              <CommandEmpty>No se encontraron alimentos.</CommandEmpty>
-                              <CommandGroup>
-                                {foods
-                                  .filter((food) => foodMatchesSearch(food, searchQuery))
-                                  .slice(0, 10)
-                                  .map((food) => (
-                                    <CommandItem
-                                      key={food.id}
-                                      value={getFoodDisplayName(food)}
-                                      onSelect={() => {
-                                        setSelectedFood(food);
-                                      }}
-                                    >
-                                      <div className="flex flex-col">
-                                        <span className="font-medium">{getFoodDisplayName(food)}</span>
-                                        <span className="text-xs text-muted-foreground">
-                                          {food.calories_per_100g || food.calorias} kcal · {food.protein_per_100g || food.proteinas}g proteína · {food.carbs_per_100g || food.carbohidratos}g carbohidratos · {food.fat_per_100g || food.grasas}g grasa
-                                          <span className="ml-2">100 g</span>
-                                        </span>
-                                      </div>
-                                    </CommandItem>
-                                  ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </div>
-
-                        {selectedFood && (
-                          <Card className="p-4 bg-muted">
-                            <div className="space-y-3">
-                              <div>
-                                <p className="font-semibold text-lg">{selectedFoodNutrition?.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  Porción base: {selectedFood.racion}{selectedFood.unidad}
-                                </p>
-                              </div>
-                              
-                              <div className="space-y-2">
-                                <Label>Gramos estimados</Label>
-                                <Input
-                                  type="number"
-                                  step="1"
-                                  min="1"
-                                  value={foodGrams}
-                                  onChange={(e) => setFoodGrams(e.target.value)}
-                                  placeholder="Ej: 100, 150, 250"
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                  Corrige cantidades para mejorar la estimación. Los macros se recalculan automáticamente.
-                                </p>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-3 pt-2 border-t">
-                                <div>
-                                  <p className="text-xs text-muted-foreground">Calorías</p>
-                                  <p className="text-lg font-bold">
-                                    {selectedFoodMacros?.calories || 0} kcal
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-muted-foreground">Proteína</p>
-                                  <p className="text-lg font-bold">
-                                    {selectedFoodMacros?.protein || 0}g
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-muted-foreground">Carbohidratos</p>
-                                  <p className="text-lg font-bold">
-                                    {selectedFoodMacros?.carbs || 0}g
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-muted-foreground">Grasas</p>
-                                  <p className="text-lg font-bold">
-                                    {selectedFoodMacros?.fat || 0}g
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          </Card>
-                        )}
-
-                        <Button type="submit" className="w-full" disabled={!selectedFood}>
-                          Registrar Alimento
-                        </Button>
-                      </form>
+                      <NutritionFoodSelector
+                        enabled={open && !editingMeal}
+                        mealType={formData.meal_type as NutritionMealType}
+                        loggedDate={formData.date}
+                        onRegistered={async () => {
+                          resetForm();
+                          await refreshMeals();
+                        }}
+                      />
                     </TabsContent>
 
                     <TabsContent value="manual" className="space-y-4">
