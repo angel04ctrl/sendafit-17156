@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Copy, Edit, Plus, Trash2, Search, Camera, Sparkles } from "lucide-react";
+import { BookOpen, Copy, Edit, Plus, Trash2, Search, Camera, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ProButton } from "@/components/ProButton";
@@ -41,6 +41,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { validateCalculatedMealInput, validateMealInput } from "@/lib/mealValidation";
 import type { MacroTotals } from "@/lib/nutritionCalculator";
 import { NutritionFoodSelector } from "@/components/nutrition/NutritionFoodSelector";
+import { RecipeManagerDialog } from "@/components/nutrition/RecipeManagerDialog";
 import type { NutritionMealType } from "@/integrations/supabase/nutrition-types";
 
 type Meal = {
@@ -80,6 +81,7 @@ const Macros = () => {
   const [customServings, setCustomServings] = useState("1");
   const [customGramsPerServing, setCustomGramsPerServing] = useState("100");
   const [foodAnalysisOpen, setFoodAnalysisOpen] = useState(false);
+  const [recipeManagerOpen, setRecipeManagerOpen] = useState(false);
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
   const today = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
 
@@ -528,6 +530,24 @@ const Macros = () => {
                 </div>
               </DialogContent>
               </Dialog>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2 w-full sm:w-auto"
+                onClick={() => setRecipeManagerOpen(true)}
+              >
+                <BookOpen className="w-4 h-4" />
+                <span className="text-sm sm:text-base">Recetas</span>
+              </Button>
+
+              <RecipeManagerDialog
+                open={recipeManagerOpen}
+                onOpenChange={setRecipeManagerOpen}
+                mealType={formData.meal_type as NutritionMealType}
+                loggedDate={formData.date}
+                onRegistered={refreshMeals}
+              />
               
               {canAccess("foodAIEnabled") ? (
                 <Button 

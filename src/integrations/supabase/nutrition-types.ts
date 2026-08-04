@@ -180,6 +180,7 @@ export interface NutritionMealLogItemRow {
   meal_log_id: string;
   food_id: string | null;
   recipe_id: string | null;
+  recipe_version_id: string | null;
   serving_id: string | null;
   unit_id: string | null;
   canonical_group_id: string | null;
@@ -199,6 +200,130 @@ export interface NutritionMealLogItemRow {
   metadata: Json;
   created_at: string;
   updated_at: string;
+}
+
+export interface NutritionRecipeRow {
+  id: string;
+  user_id: string | null;
+  name: string;
+  normalized_name: string;
+  description: string | null;
+  visibility: "private" | "shared" | "global";
+  status: "active" | "archived";
+  origin: "user" | "system" | "duplicated";
+  locale: string;
+  category: string | null;
+  difficulty: "facil" | "intermedia" | "avanzada" | null;
+  image_url: string | null;
+  servings: number;
+  total_weight_g: number | null;
+  instructions: string[];
+  tags: string[];
+  meal_types: NutritionMealType[];
+  dietary_labels: string[];
+  allergens: string[];
+  attribute_evaluation_complete: boolean;
+  source_recipe_id: string | null;
+  current_version_id: string | null;
+  published_at: string | null;
+  archived_at: string | null;
+  metadata: Json;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NutritionRecipeVersionRow {
+  id: string;
+  recipe_id: string;
+  version_number: number;
+  status: "draft" | "published" | "archived";
+  servings: number;
+  yield_quantity: number | null;
+  yield_unit: string | null;
+  total_weight_g: number | null;
+  total_volume_ml: number | null;
+  ingredient_weight_g: number | null;
+  prep_time_minutes: number | null;
+  cook_time_minutes: number | null;
+  notes: string | null;
+  calculation_complete: boolean;
+  missing_nutrient_codes: string[];
+  calculated_at: string | null;
+  client_request_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  published_at: string | null;
+  metadata: Json;
+}
+
+export interface NutritionRecipeIngredientRow {
+  id: string;
+  recipe_id: string;
+  recipe_version_id: string;
+  canonical_group_id: string | null;
+  food_id: string | null;
+  serving_id: string | null;
+  unit_id: string | null;
+  ingredient_name: string;
+  food_name_snapshot: string | null;
+  serving_label_snapshot: string | null;
+  unit_label_snapshot: string | null;
+  quantity: number;
+  grams: number | null;
+  milliliters: number | null;
+  order_index: number;
+  notes: string | null;
+  nutrient_snapshot: Json;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NutritionRecipeStepRow {
+  id: string;
+  recipe_version_id: string;
+  step_number: number;
+  instruction: string;
+  duration_minutes: number | null;
+  metadata: Json;
+  created_at: string;
+}
+
+export interface NutritionRecipeNutrientRow {
+  id: string;
+  recipe_version_id: string;
+  nutrient_id: string;
+  total_amount: number;
+  amount_per_serving: number;
+  amount_per_100g: number | null;
+  created_at: string;
+}
+
+export interface NutritionRecipeSearchRow {
+  recipe_id: string;
+  name: string;
+  description: string | null;
+  origin: "user" | "system" | "duplicated";
+  category: string | null;
+  difficulty: "facil" | "intermedia" | "avanzada" | null;
+  meal_types: NutritionMealType[];
+  visibility: "private" | "shared" | "global";
+  is_owner: boolean;
+  current_version_id: string;
+  version_number: number;
+  servings: number;
+  yield_quantity: number | null;
+  yield_unit: string | null;
+  prep_time_minutes: number | null;
+  cook_time_minutes: number | null;
+  total_time_minutes: number;
+  ingredient_count: number;
+  calculation_complete: boolean;
+  missing_nutrient_codes: string[];
+  calories_per_serving: number | null;
+  protein_per_serving: number | null;
+  carbs_per_serving: number | null;
+  fat_per_serving: number | null;
+  total_count: number;
 }
 
 export type NutritionMealLogItemInsert = Omit<NutritionMealLogItemRow, "id" | "created_at" | "updated_at"> & {
@@ -258,6 +383,37 @@ export interface NutritionRpcDefinitions {
     Args: { _nutrition_meal_log_id: string };
     Returns: Json;
   };
+  search_nutrition_recipes: {
+    Args: { _query?: string | null; _limit?: number; _offset?: number };
+    Returns: NutritionRecipeSearchRow[];
+  };
+  get_nutrition_recipe: {
+    Args: { _recipe_id: string };
+    Returns: Json;
+  };
+  save_nutrition_recipe: {
+    Args: { _payload: Json };
+    Returns: Json;
+  };
+  duplicate_nutrition_recipe: {
+    Args: { _recipe_id: string; _client_request_id: string };
+    Returns: Json;
+  };
+  archive_nutrition_recipe: {
+    Args: { _recipe_id: string };
+    Returns: undefined;
+  };
+  register_nutrition_recipe_meal: {
+    Args: {
+      _recipe_id: string;
+      _recipe_version_id: string;
+      _servings: number;
+      _meal_type: NutritionMealType;
+      _logged_date: string;
+      _client_request_id: string;
+    };
+    Returns: Json;
+  };
 }
 
 export interface NutritionTableRelations {
@@ -284,5 +440,17 @@ export interface NutritionTableRelations {
     food_id: "nutrition_foods.id";
     serving_id: "nutrition_food_servings.id";
     canonical_group_id: "nutrition_canonical_food_groups.id";
+    recipe_id: "nutrition_recipes.id";
+    recipe_version_id: "nutrition_recipe_versions.id";
+  };
+  nutrition_recipe_versions: {
+    recipe_id: "nutrition_recipes.id";
+  };
+  nutrition_recipe_ingredients: {
+    recipe_id: "nutrition_recipes.id";
+    recipe_version_id: "nutrition_recipe_versions.id";
+    canonical_group_id: "nutrition_canonical_food_groups.id";
+    food_id: "nutrition_foods.id";
+    serving_id: "nutrition_food_servings.id";
   };
 }
